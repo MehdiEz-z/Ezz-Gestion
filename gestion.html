@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Achats maison</title>
+<style>
+  :root {
+    --bg: #F5F7F3;
+    --surface: #FFFFFF;
+    --border: #E1E5DC;
+    --ink: #202A22;
+    --muted: #6E7568;
+    --week: #2F6E5B;
+    --month: #3B4B7A;
+    --danger: #B23A3A;
+    --pill-bg: #EAF2EC;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); }
+  #app { max-width: 480px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; padding-bottom: 78px; position: relative; }
+
+  /* header */
+  header { padding: 16px 16px 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .header-title { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+  .month-btn { display:flex; align-items:center; gap:6px; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-size: 13px; font-weight: 700; color: var(--ink); cursor: pointer; white-space: nowrap; }
+
+  /* sub tabs */
+  .subtabs { display: flex; gap: 8px; padding: 12px 16px 0; }
+  .subtab { flex: 1; padding: 10px 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer; text-align:center; }
+  .subtab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+  main { padding: 14px 16px 16px; flex: 1; }
+  .stack { display: flex; flex-direction: column; gap: 12px; }
+  .section-label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 4px 2px -2px; }
+
+  /* cards / accordion */
+  .card { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .card.disabled { opacity: 0.5; }
+  .card-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; cursor: pointer; gap: 10px; }
+  .card.disabled .card-head { cursor: default; }
+  .card-title { font-size: 14px; font-weight: 700; }
+  .card-range { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .card-preview { font-size: 12px; color: var(--muted); text-align: right; white-space: nowrap; }
+  .badge { display:inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; margin-top: 4px; }
+  .badge-current { background: #E3F1EC; color: var(--week); }
+  .badge-past { background: #EDEDEA; color: var(--muted); }
+  .badge-future { background: #EDEDEA; color: var(--muted); }
+  .chevron { font-size: 12px; color: var(--muted); transition: transform 0.15s ease; }
+  .card-body { padding: 0 16px 16px; display: none; }
+  .card-body.open { display: block; }
+
+  .big-row { display: flex; justify-content: space-between; align-items: flex-end; margin: 4px 0 12px; }
+  .big-number { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .small-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .progress-track { height: 7px; background: var(--bg); border-radius: 999px; margin: 8px 0 4px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 999px; }
+
+  .inline-form { display: flex; gap: 8px; }
+  input, select, button { font-family: inherit; font-size: 15px; }
+  .field { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--ink); }
+  .row2 { display: flex; gap: 8px; }
+  .form-col { display: flex; flex-direction: column; gap: 10px; }
+  .segment-row { display: flex; gap: 8px; }
+  .segment { flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .segment.active-week { background: var(--week); color: #fff; border-color: var(--week); }
+  .segment.active-month { background: var(--month); color: #fff; border-color: var(--month); }
+  .btn-primary { padding: 12px; border-radius: 8px; border: none; background: var(--ink); color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; width: 100%; }
+  .btn-small { padding: 9px 14px; border-radius: 8px; border: none; color: #fff; font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap; }
+
+  /* rows d'articles */
+  ul.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+  .item-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px solid var(--border); gap: 10px; }
+  .item-row:first-child { border-top: none; }
+  .item-name { font-size: 14px; font-weight: 600; flex: 1; }
+  .item-amount { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .item-actions { display: flex; gap: 4px; }
+  .icon-btn { width: 30px; height: 30px; border-radius: 8px; border: none; background: var(--bg); color: var(--ink); cursor: pointer; font-size: 15px; display:flex; align-items:center; justify-content:center; }
+  .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .icon-btn.add { background: #E3F1EC; color: var(--week); }
+  .btn-delete { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 4px; }
+
+  .list-item { display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid var(--border); }
+  .list-item:first-child { padding-top: 0; border-top: none; }
+  .list-item-name { font-size: 14px; font-weight: 600; }
+  .list-item-right { display: flex; align-items: center; gap: 10px; }
+  .list-item-price { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* bottom nav (mobile) */
+  nav.bottom { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); width: calc(100% - 32px); max-width: 448px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.08); display:flex; }
+  .nav-pill { display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px; border: none; background: var(--pill-bg); color: var(--week); font-weight: 700; font-size: 14px; cursor: pointer; }
+
+  /* overlay / modal / bottom sheet */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: flex; align-items: flex-end; justify-content: center; z-index: 50; }
+  .sheet { background: var(--surface); width: 100%; max-width: 480px; border-radius: 16px 16px 0 0; padding: 18px 16px 22px; max-height: 80vh; overflow-y: auto; }
+  .sheet-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; display:flex; justify-content:space-between; align-items:center; }
+  .close-btn { background: none; border: none; font-size: 18px; color: var(--muted); cursor: pointer; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { padding: 9px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg); color: var(--ink); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .chip.is-active { background: var(--week); border-color: var(--week); color: #fff; }
+  .chip.is-selected { background: var(--month); border-color: var(--month); color: #fff; }
+  .chip.is-disabled { opacity: 0.4; cursor: not-allowed; }
+
+  #toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 8px 16px; border-radius: 999px; font-size: 13px; z-index: 60; display: none; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="header-title" id="header-title">Gestion achats maison</div>
+    <button class="month-btn" data-action="open-month-panel">📅 <span id="month-btn-label"></span></button>
+  </header>
+  <div class="subtabs" id="subtabs"></div>
+  <main id="main"></main>
+  <div id="toast"></div>
+  <nav class="bottom">
+    <button class="nav-pill">🏠 Maison</button>
+  </nav>
+</div>
+<div id="modal-root"></div>
+
+<script>
+const STORAGE_KEY = "achats-maison-v2";
+const CATEGORY_SUGGESTIONS = ["Légume", "Fruit", "Hygiène", "Épicerie", "Boisson", "Autre"];
+const APP_START_MONTH = "2026-09";
+
+// ---------- état persisté ----------
+let state = loadState();
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return { categories: [], places: [], purchases: [], monthlyBudgets: {}, weeklyBudgets: {} };
+}
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch (e) { flash("Erreur de sauvegarde."); }
+}
+
+// ---------- état d'interface (non persisté) ----------
+const ui = {
+  subTab: "budget",
+  viewedMonthKey: null,
+  monthPanelOpen: false,
+  expanded: new Set(),
+  modal: null,
+};
+
+// ---------- dates ----------
+function pad(n) { return n < 10 ? "0" + n : "" + n; }
+function toISO(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+function parseISODate(s) { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); }
+function addDays(d, n) { const r = new Date(d); r.setDate(d.getDate() + n); return r; }
+function getWeekStart(d) {
+  const day = d.getDay();
+  const diff = (day - 6 + 7) % 7;
+  const ws = new Date(d); ws.setDate(d.getDate() - diff); ws.setHours(0,0,0,0);
+  return ws;
+}
+function getMonthKey(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1); }
+function monthLabel(monthKey) {
+  const [y, m] = monthKey.split("-").map(Number);
+  const d = new Date(y, m - 1, 1);
+  const s = d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+function monthChipLabel(monthKey) {
+  const [y, m] = monthKey.split("-").map(Number);
+  const d = new Date(y, m - 1, 1);
+  const s = d.toLocaleDateString("fr-FR", { month: "short", year: "2-digit" });
+  return s.charAt(0).toUpperCase() + s.slice(1).replace(".", "");
+}
+function formatDateShort(d) { return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }); }
+function formatDateFull(d) { return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }); }
+function getWeekNumberInMonth(weekStart) {
+  const year = weekStart.getFullYear(), month = weekStart.getMonth();
+  let d = new Date(year, month, 1);
+  while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
+  let n = 1;
+  while (d.getTime() < weekStart.getTime()) { d.setDate(d.getDate() + 7); n++; }
+  return n;
+}
+function getWeeksOfMonth(monthKey) {
+  const [y, m] = monthKey.split("-").map(Number);
+  const last = new Date(y, m, 0);
+  const weeks = [];
+  let d = new Date(y, m - 1, 1);
+  while (d <= last) { if (d.getDay() === 6) weeks.push(new Date(d)); d.setDate(d.getDate() + 1); }
+  return weeks;
+}
+function activeMonthKey() { return getMonthKey(getWeekStart(new Date())); }
+function monthsRange() {
+  const [sy, sm] = APP_START_MONTH.split("-").map(Number);
+  const [ay, am] = activeMonthKey().split("-").map(Number);
+  const end = new Date(ay, am - 1 + 6, 1);
+  let d = new Date(sy, sm - 1, 1);
+  const list = [];
+  while (d <= end) { list.push(getMonthKey(d)); d.setMonth(d.getMonth() + 1); }
+  return list;
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function money(n) { const v = Number(n) || 0; return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+function toTitleCase(s) {
+  return s.split(" ").filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+}
+
+if (!ui.viewedMonthKey) ui.viewedMonthKey = activeMonthKey();
+
+// ---------- toast ----------
+let toastTimer = null;
+function flash(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg; el.style.display = "block";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.style.display = "none"; }, 2200);
+}
+
+// ---------- mutations ----------
+function setMonthBudget(monthKey, amount) {
+  if (state.monthlyBudgets[monthKey] !== undefined) return;
+  state.monthlyBudgets[monthKey] = amount; saveState(); render();
+}
+function setWeekBudget(isoWeekStart, amount) {
+  if (state.weeklyBudgets[isoWeekStart] !== undefined) return;
+  state.weeklyBudgets[isoWeekStart] = amount; saveState(); render();
+}
+function addCategory(name, type) {
+  state.categories.push({ id: uid(), name, type }); saveState(); render();
+  flash("Catégorie ajoutée");
+}
+function deleteCategory(id) { state.categories = state.categories.filter(c => c.id !== id); saveState(); render(); }
+function addPlace(name) { state.places.push({ id: uid(), name }); saveState(); render(); flash("Lieu ajouté"); }
+function deletePlace(id) { state.places = state.places.filter(p => p.id !== id); saveState(); render(); }
+function addPurchase({ categoryId, categoryName, type, place, price }) {
+  state.purchases.unshift({ id: uid(), categoryId, categoryName, type, place, price, date: toISO(new Date()) });
+  saveState(); render(); flash("Achat enregistré");
+}
+function deletePurchase(id) { state.purchases = state.purchases.filter(p => p.id !== id); saveState(); render(); }
+
+// ---------- helpers de calcul ----------
+function categoryTotalForMonth(categoryId, type, monthKey) {
+  return state.purchases.filter(p => p.categoryId === categoryId && p.type === type && p.date.slice(0,7) === monthKey)
+    .reduce((s,p)=>s+Number(p.price),0);
+}
+function categoryTotalForWeek(categoryId, type, isoWs, isoWe) {
+  return state.purchases.filter(p => p.categoryId === categoryId && p.type === type && p.date >= isoWs && p.date <= isoWe)
+    .reduce((s,p)=>s+Number(p.price),0);
+}
+function purchasesForMonth(categoryId, type, monthKey) {
+  return state.purchases.filter(p => p.categoryId === categoryId && p.type === type && p.date.slice(0,7) === monthKey)
+    .sort((a,b)=> a.date < b.date ? 1 : -1);
+}
+function purchasesForWeek(categoryId, type, isoWs, isoWe) {
+  return state.purchases.filter(p => p.categoryId === categoryId && p.type === type && p.date >= isoWs && p.date <= isoWe)
+    .sort((a,b)=> a.date < b.date ? 1 : -1);
+}
+
+// ---------- rendu racine ----------
+function render() {
+  document.getElementById("header-title").textContent =
+    ui.subTab === "budget" ? "Gestion achats maison" : ui.subTab === "categories" ? "Catégories & lieux" : "Enregistrer un achat";
+  document.getElementById("month-btn-label").textContent = monthChipLabel(ui.viewedMonthKey);
+
+  document.getElementById("subtabs").innerHTML = `
+    <button class="subtab ${ui.subTab==='budget'?'active':''}" data-action="set-subtab" data-tab="budget">Budget</button>
+    <button class="subtab ${ui.subTab==='categories'?'active':''}" data-action="set-subtab" data-tab="categories">Catégories</button>
+    <button class="subtab ${ui.subTab==='achats'?'active':''}" data-action="set-subtab" data-tab="achats">Achats</button>
+  `;
+
+  const main = document.getElementById("main");
+  if (ui.subTab === "budget") main.innerHTML = renderBudgetTab();
+  else if (ui.subTab === "categories") main.innerHTML = renderCategoriesTab();
+  else main.innerHTML = renderAchatsTab();
+
+  document.getElementById("modal-root").innerHTML = ui.monthPanelOpen ? renderMonthPanel() : (ui.modal ? renderModal() : "");
+}
+
+// ---------- onglet Budget (accordéons : uniquement infos budget, pas de detail achats) ----------
+function renderBudgetTab() {
+  return renderMonthAccordion(ui.viewedMonthKey);
+}
+
+function renderMonthAccordion(monthKey) {
+  const isActiveMonth = monthKey === activeMonthKey();
+  const monthBudget = state.monthlyBudgets[monthKey];
+  const mensuelCats = state.categories.filter(c => c.type === "mensuel");
+  const monthTotal = mensuelCats.reduce((s,c)=> s + categoryTotalForMonth(c.id, "mensuel", monthKey), 0);
+  const monthKeyStr = "month:" + monthKey;
+  const monthOpen = ui.expanded.has(monthKeyStr);
+
+  const monthCard = `
+    <div class="card" style="border-color:var(--month)">
+      <div class="card-head" data-action="${monthBudget===undefined?'toggle-card':''}" data-key="${monthKeyStr}">
+        <div>
+          <div class="card-title" style="color:var(--month)">Budget mensuel</div>
+          <div class="card-range">${monthLabel(monthKey)}</div>
+          <span class="badge ${isActiveMonth?'badge-current':'badge-past'}">${isActiveMonth?'Mois en cours':'Consultation'}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="card-preview">${monthBudget!==undefined ? money(monthBudget)+" DH<br>"+money(monthTotal)+" DH consommé" : "budget non défini"}</div>
+          ${monthBudget===undefined ? `<span class="chevron">${monthOpen?'▲':'▼'}</span>` : ''}
+        </div>
+      </div>
+      <div class="card-body ${monthBudget!==undefined || monthOpen?'open':''}">
+        ${monthBudget===undefined ? (
+          isActiveMonth ? `
+            <form class="inline-form" data-form="set-month-budget">
+              <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Définir le budget en DH" required />
+              <button type="submit" class="btn-small" style="background:var(--month)">Fixer</button>
+            </form>` : `<div class="small-label">Budget non défini pour ce mois.</div>`
+        ) : `
+          <div class="progress-track"><div class="progress-fill" style="width:${Math.min(100,(monthTotal/Number(monthBudget))*100)}%;background:${monthTotal>Number(monthBudget)?'var(--danger)':'var(--month)'}"></div></div>
+        `}
+      </div>
+    </div>`;
+
+  const weeks = getWeeksOfMonth(monthKey);
+  const todayWeekISO = toISO(getWeekStart(new Date()));
+  const hebdoCats = state.categories.filter(c => c.type === "hebdo");
+
+  const weekCards = weeks.map(wStart => {
+    const isoWs = toISO(wStart), isoWe = toISO(addDays(wStart, 6));
+    const n = getWeekNumberInMonth(wStart);
+    let status;
+    if (!isActiveMonth) status = "past";
+    else if (isoWs === todayWeekISO) status = "current";
+    else if (isoWs < todayWeekISO) status = "past";
+    else status = "future";
+
+    const budget = state.weeklyBudgets[isoWs];
+    const total = hebdoCats.reduce((s,c)=> s + categoryTotalForWeek(c.id, "hebdo", isoWs, isoWe), 0);
+    const key = "week:" + isoWs;
+    const canToggle = status !== "future" && budget === undefined;
+    const open = budget !== undefined ? status !== "future" : (canToggle && ui.expanded.has(key));
+    const badgeClass = status==="current"?"badge-current":status==="past"?"badge-past":"badge-future";
+    const badgeText = status==="current"?"Semaine active":status==="past"?"Consultation":"Verrouillée";
+
+    return `
+      <div class="card ${status==='future'?'disabled':''}" style="border-color:var(--week)">
+        <div class="card-head" data-action="${canToggle?'toggle-card':''}" data-key="${key}">
+          <div>
+            <div class="card-title" style="color:var(--week)">Semaine ${n}</div>
+            <div class="card-range">${formatDateShort(wStart)} → ${formatDateShort(addDays(wStart,6))}</div>
+            <span class="badge ${badgeClass}">${badgeText}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="card-preview">${budget!==undefined ? money(budget)+" DH<br>"+money(total)+" DH consommé" : "budget non défini"}</div>
+            ${canToggle ? `<span class="chevron">${open?'▲':'▼'}</span>` : ''}
+          </div>
+        </div>
+        <div class="card-body ${open?'open':''}">
+          ${budget===undefined ? (
+            status==="current" ? `
+              <form class="inline-form" data-form="set-week-budget" data-week-start="${isoWs}">
+                <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Définir le budget en DH" required />
+                <button type="submit" class="btn-small" style="background:var(--week)">Fixer</button>
+              </form>` : `<div class="small-label">Budget non défini pour cette semaine.</div>`
+          ) : `
+            <div class="progress-track"><div class="progress-fill" style="width:${Math.min(100,(total/Number(budget))*100)}%;background:${total>Number(budget)?'var(--danger)':'var(--week)'}"></div></div>
+          `}
+        </div>
+      </div>`;
+  }).join("");
+
+  return `<div class="stack">${monthCard}${weekCards}</div>`;
+}
+
+// ligne d'article réutilisable : nom — montant — [détails] [ajouter]
+function renderItemRow(cat, type, editable, ctx) {
+  const total = type === "mensuel"
+    ? categoryTotalForMonth(cat.id, type, ctx.monthKey)
+    : categoryTotalForWeek(cat.id, type, ctx.weekStart, toISO(addDays(parseISODate(ctx.weekStart),6)));
+  const ctxAttr = type === "mensuel" ? `data-month-key="${ctx.monthKey}"` : `data-week-start="${ctx.weekStart}"`;
+  return `
+    <li class="item-row">
+      <div class="item-name">${esc(cat.name)}</div>
+      <div class="item-amount">${money(total)} DH</div>
+      <div class="item-actions">
+        <button class="icon-btn" ${total===0?'disabled':''} data-action="open-details" data-category-id="${cat.id}" data-type="${type}" ${ctxAttr} title="Détails">🧾</button>
+        ${editable ? `<button class="icon-btn add" data-action="open-add-purchase" data-category-id="${cat.id}" data-type="${type}" ${ctxAttr} title="Ajouter">＋</button>` : ""}
+      </div>
+    </li>`;
+}
+
+// ---------- onglet Catégories & lieux ----------
+function renderCategoriesTab() {
+  const hebdo = state.categories.filter(c => c.type === "hebdo");
+  const mensuel = state.categories.filter(c => c.type === "mensuel");
+  const hebdoOpen = ui.expanded.has("cats:hebdo");
+  const mensuelOpen = ui.expanded.has("cats:mensuel");
+  const placesOpen = ui.expanded.has("places:list");
+
+  return `
+    <div class="stack">
+      <div class="card">
+        <div style="padding:16px 16px 4px" class="card-title">Ajouter une catégorie</div>
+        <div style="padding:0 16px 16px">
+          <form class="form-col" data-form="add-category">
+            <input class="field" name="name" placeholder="Nom de la catégorie" required />
+            <div class="segment-row">
+              <button type="button" class="segment active-week" data-action="pick-cat-type" data-value="hebdo">Hebdo</button>
+              <button type="button" class="segment" data-action="pick-cat-type" data-value="mensuel">Mensuel</button>
+            </div>
+            <input type="hidden" name="type" value="hebdo" />
+            <button type="submit" class="btn-primary">Ajouter la catégorie</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card" style="border-color:var(--week)">
+        <div class="card-head" data-action="toggle-card" data-key="cats:hebdo">
+          <div class="card-title" style="color:var(--week)">Catégories hebdo</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="card-preview">${hebdo.length} catégorie${hebdo.length>1?'s':''}</div>
+            <span class="chevron">${hebdoOpen?'▲':'▼'}</span>
+          </div>
+        </div>
+        <div class="card-body ${hebdoOpen?'open':''}">
+          ${hebdo.length===0 ? `<div class="small-label">Aucune catégorie hebdo.</div>` : `
+            <ul class="list">${hebdo.map(c=>`
+              <li class="list-item"><div class="list-item-name">${esc(c.name)}</div></li>`).join("")}</ul>
+          `}
+        </div>
+      </div>
+
+      <div class="card" style="border-color:var(--month)">
+        <div class="card-head" data-action="toggle-card" data-key="cats:mensuel">
+          <div class="card-title" style="color:var(--month)">Catégories mensuelles</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="card-preview">${mensuel.length} catégorie${mensuel.length>1?'s':''}</div>
+            <span class="chevron">${mensuelOpen?'▲':'▼'}</span>
+          </div>
+        </div>
+        <div class="card-body ${mensuelOpen?'open':''}">
+          ${mensuel.length===0 ? `<div class="small-label">Aucune catégorie mensuelle.</div>` : `
+            <ul class="list">${mensuel.map(c=>`
+              <li class="list-item"><div class="list-item-name">${esc(c.name)}</div></li>`).join("")}</ul>
+          `}
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="padding:16px 16px 4px" class="card-title">Ajouter un lieu</div>
+        <div style="padding:0 16px 16px">
+          <form class="inline-form" data-form="add-place">
+            <input class="field" name="name" placeholder="Nouveau lieu" required />
+            <button type="submit" class="btn-small" style="background:var(--ink)">Ajouter</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head" data-action="toggle-card" data-key="places:list">
+          <div class="card-title">Lieux d'achat</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="card-preview">${state.places.length} lieu${state.places.length>1?'x':''}</div>
+            <span class="chevron">${placesOpen?'▲':'▼'}</span>
+          </div>
+        </div>
+        <div class="card-body ${placesOpen?'open':''}">
+          ${state.places.length===0 ? `<div class="small-label">Aucun lieu créé pour l'instant.</div>` : `
+            <ul class="list">${state.places.map(p=>`
+              <li class="list-item"><div class="list-item-name">${esc(p.name)}</div></li>`).join("")}</ul>
+          `}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ---------- onglet Achats (detail par categorie, verrouillé tant que le budget n'est pas fixé) ----------
+function renderAchatsTab() {
+  const monthKey = activeMonthKey();
+  const monthBudget = state.monthlyBudgets[monthKey];
+  const mensuelCats = state.categories.filter(c => c.type === "mensuel");
+  const monthTotal = mensuelCats.reduce((s,c)=> s + categoryTotalForMonth(c.id, "mensuel", monthKey), 0);
+  const monthKeyStr = "achat-month:" + monthKey;
+  const monthOpen = monthBudget !== undefined && ui.expanded.has(monthKeyStr);
+
+  const monthCard = `
+    <div class="card" style="border-color:var(--month)">
+      <div class="card-head" data-action="${monthBudget!==undefined?'toggle-card':''}" data-key="${monthKeyStr}">
+        <div>
+          <div class="card-title" style="color:var(--month)">Achat Mensuel</div>
+          <div class="card-range">${monthLabel(monthKey)}</div>
+          <span class="badge badge-current">Mois en cours</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="card-preview">${monthBudget!==undefined ? money(monthTotal)+" DH consommé" : "Budget non défini"}</div>
+          ${monthBudget!==undefined ? `<span class="chevron">${monthOpen?'▲':'▼'}</span>` : ''}
+        </div>
+      </div>
+      ${monthBudget===undefined ? `
+        <div style="padding:0 16px 16px" class="small-label">Définis d'abord le budget de ce mois dans l'onglet Budget.</div>
+      ` : `
+        <div class="card-body ${monthOpen?'open':''}">
+          ${mensuelCats.length===0 ? `<div class="small-label">Aucune catégorie mensuelle créée.</div>` : `
+            <ul class="list">${mensuelCats.map(c => renderItemRow(c, "mensuel", true, { monthKey })).join("")}</ul>
+          `}
+        </div>
+      `}
+    </div>`;
+
+  const weeks = getWeeksOfMonth(monthKey);
+  const todayWeekISO = toISO(getWeekStart(new Date()));
+  const hebdoCats = state.categories.filter(c => c.type === "hebdo");
+
+  const weekCards = weeks.map(wStart => {
+    const isoWs = toISO(wStart), isoWe = toISO(addDays(wStart, 6));
+    const n = getWeekNumberInMonth(wStart);
+    let status;
+    if (isoWs === todayWeekISO) status = "current";
+    else if (isoWs < todayWeekISO) status = "past";
+    else status = "future";
+
+    const budget = state.weeklyBudgets[isoWs];
+    const total = hebdoCats.reduce((s,c)=> s + categoryTotalForWeek(c.id, "hebdo", isoWs, isoWe), 0);
+    const key = "achat-week:" + isoWs;
+    const canExpand = status !== "future" && budget !== undefined;
+    const open = canExpand && ui.expanded.has(key);
+    const badgeClass = status==="current"?"badge-current":status==="past"?"badge-past":"badge-future";
+    const badgeText = status==="current"?"Semaine active":status==="past"?"Consultation":"Verrouillée";
+
+    return `
+      <div class="card ${status==='future'?'disabled':''}" style="border-color:var(--week)">
+        <div class="card-head" data-action="${canExpand?'toggle-card':''}" data-key="${key}">
+          <div>
+            <div class="card-title" style="color:var(--week)">Achat Semaine ${n}</div>
+            <div class="card-range">${formatDateShort(wStart)} → ${formatDateShort(addDays(wStart,6))}</div>
+            <span class="badge ${badgeClass}">${badgeText}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="card-preview">${status==='future' ? '' : budget!==undefined ? money(total)+" DH consommé" : "Budget non défini"}</div>
+            ${canExpand ? `<span class="chevron">${open?'▲':'▼'}</span>` : ''}
+          </div>
+        </div>
+        ${status!=='future' && budget===undefined ? `
+          <div style="padding:0 16px 16px" class="small-label">Définis d'abord le budget de cette semaine dans l'onglet Budget.</div>
+        ` : status!=='future' ? `
+          <div class="card-body ${open?'open':''}">
+            ${hebdoCats.length===0 ? `<div class="small-label">Aucune catégorie hebdo créée.</div>` : `
+              <ul class="list">${hebdoCats.map(c => renderItemRow(c, "hebdo", status==="current", { weekStart: isoWs })).join("")}</ul>
+            `}
+          </div>
+        ` : ``}
+      </div>`;
+  }).join("");
+
+  return `<div class="stack">${monthCard}${weekCards}</div>`;
+}
+
+
+// ---------- panel Mois ----------
+function renderMonthPanel() {
+  const active = activeMonthKey();
+  const months = monthsRange();
+  return `
+    <div class="overlay" data-overlay-close="month">
+      <div class="sheet">
+        <div class="sheet-title">Choisir un mois <button class="close-btn" data-action="close-month-panel">✕</button></div>
+        <div class="chip-row">
+          ${months.map(mk => {
+            const isFuture = mk > active;
+            const isActive = mk === active;
+            const isSelected = mk === ui.viewedMonthKey && !isActive;
+            const cls = isFuture ? "chip is-disabled" : isActive ? "chip is-active" : isSelected ? "chip is-selected" : "chip";
+            return `<button class="${cls}" ${isFuture?'':`data-action="select-month" data-month="${mk}"`}>${monthChipLabel(mk)}</button>`;
+          }).join("")}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ---------- modal ajout / détails ----------
+function renderModal() {
+  const m = ui.modal;
+  const cat = state.categories.find(c => c.id === m.categoryId);
+  if (!cat) return "";
+
+  if (m.type === "add") {
+    return `
+      <div class="overlay" data-overlay-close="modal">
+        <div class="sheet">
+          <div class="sheet-title">${esc(cat.name)} <button class="close-btn" data-action="close-modal">✕</button></div>
+          ${state.places.length===0 ? `
+            <div class="small-label">Ajoute d'abord un lieu d'achat dans l'onglet Catégories.</div>
+          ` : `
+            <form class="form-col" data-form="add-purchase" data-category-id="${cat.id}" data-type="${m.type_}" ${m.monthKey?`data-month-key="${m.monthKey}"`:''} ${m.weekStart?`data-week-start="${m.weekStart}"`:''}>
+              <input class="field" name="price" type="number" min="0" step="0.01" placeholder="Prix en DH" required />
+              <select class="field" name="place" required>
+                <option value="">Choisir un lieu…</option>
+                ${state.places.map(p=>`<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("")}
+              </select>
+              <div class="small-label">Date : aujourd'hui (${formatDateFull(new Date())})</div>
+              <button type="submit" class="btn-primary">Enregistrer</button>
+            </form>
+          `}
+        </div>
+      </div>`;
+  }
+
+  // details (lecture seule, pas de suppression)
+  const list = m.periodType === "mensuel"
+    ? purchasesForMonth(cat.id, "mensuel", m.monthKey)
+    : purchasesForWeek(cat.id, "hebdo", m.weekStart, toISO(addDays(parseISODate(m.weekStart),6)));
+  const total = list.reduce((s,p)=>s+Number(p.price),0);
+
+  return `
+    <div class="overlay" data-overlay-close="modal">
+      <div class="sheet">
+        <div class="sheet-title">${esc(cat.name)} — ${money(total)} DH <button class="close-btn" data-action="close-modal">✕</button></div>
+        <ul class="list">
+          ${list.map(p => `
+            <li class="list-item" style="flex-direction:column;align-items:stretch;gap:4px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div class="list-item-name">${money(p.price)} DH</div>
+                <div class="list-item-name">${esc(p.place)}</div>
+              </div>
+              <div class="small-label">${formatDateFull(parseISODate(p.date))}</div>
+            </li>`).join("")}
+        </ul>
+      </div>
+    </div>`;
+}
+
+// ---------- délégation d'événements ----------
+document.addEventListener("click", (e) => {
+  if (e.target.classList && e.target.classList.contains("overlay")) {
+    const type = e.target.dataset.overlayClose;
+    if (type === "month") ui.monthPanelOpen = false;
+    else if (type === "modal") ui.modal = null;
+    render();
+    return;
+  }
+
+  const target = e.target.closest("[data-action]");
+  if (!target) return;
+  const action = target.dataset.action;
+
+  if (action === "set-subtab") { ui.subTab = target.dataset.tab; render(); }
+  else if (action === "open-month-panel") { ui.monthPanelOpen = true; render(); }
+  else if (action === "close-month-panel") { ui.monthPanelOpen = false; render(); }
+  else if (action === "select-month") { ui.viewedMonthKey = target.dataset.month; ui.monthPanelOpen = false; ui.subTab = "budget"; render(); }
+  else if (action === "toggle-card") {
+    const key = target.dataset.key;
+    if (ui.expanded.has(key)) ui.expanded.delete(key); else ui.expanded.add(key);
+    render();
+  }
+  else if (action === "pick-cat-type") {
+    const form = target.closest("form");
+    form.querySelectorAll("[data-action='pick-cat-type']").forEach(b => b.classList.remove("active-week","active-month"));
+    target.classList.add(target.dataset.value === "hebdo" ? "active-week" : "active-month");
+    form.querySelector("[name='type']").value = target.dataset.value;
+  }
+  else if (action === "open-add-purchase") {
+    ui.modal = {
+      type: "add",
+      categoryId: target.dataset.categoryId,
+      type_: target.dataset.type,
+      monthKey: target.dataset.monthKey || null,
+      weekStart: target.dataset.weekStart || null,
+    };
+    render();
+  }
+  else if (action === "open-details") {
+    const type = target.dataset.type;
+    const monthKey = target.dataset.monthKey || null;
+    const weekStart = target.dataset.weekStart || null;
+    const editable = type === "mensuel" ? monthKey === activeMonthKey() : weekStart === toISO(getWeekStart(new Date()));
+    ui.modal = { type: "details", categoryId: target.dataset.categoryId, periodType: type, monthKey, weekStart, editable };
+    render();
+  }
+  else if (action === "close-modal") { ui.modal = null; render(); }
+});
+
+document.addEventListener("submit", (e) => {
+  const form = e.target.closest("[data-form]");
+  if (!form) return;
+  e.preventDefault();
+  const type = form.dataset.form;
+
+  if (type === "set-month-budget") {
+    const n = parseFloat(form.amount.value);
+    if (!isNaN(n) && n >= 0) setMonthBudget(ui.viewedMonthKey, n);
+  }
+  else if (type === "set-week-budget") {
+    const n = parseFloat(form.amount.value);
+    if (!isNaN(n) && n >= 0) setWeekBudget(form.dataset.weekStart, n);
+  }
+  else if (type === "add-category") {
+    const name = toTitleCase(form.name.value.trim());
+    const t = form.type.value;
+    if (name) addCategory(name, t);
+    form.reset();
+  }
+  else if (type === "add-place") {
+    const name = toTitleCase(form.name.value.trim());
+    if (name) addPlace(name);
+    form.reset();
+  }
+  else if (type === "add-purchase") {
+    const price = parseFloat(form.price.value);
+    const place = form.place.value;
+    const categoryId = form.dataset.categoryId;
+    const cat = state.categories.find(c => c.id === categoryId);
+    if (!cat || isNaN(price) || price < 0 || !place) return;
+    addPurchase({ categoryId: cat.id, categoryName: cat.name, type: cat.type, place, price });
+    ui.modal = null;
+    render();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
