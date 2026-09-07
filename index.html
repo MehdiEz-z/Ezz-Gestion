@@ -140,7 +140,7 @@
   <div class="auth-box stack">
     <h1>Connexion</h1>
     <form class="form-col" id="auth-form">
-      <input class="field" type="text" id="auth-username" placeholder="Nom d'utilisateur (mehdiEz ou imaneHa)" required />
+      <input class="field" type="text" id="auth-username" placeholder="Nom d'utilisateur" required />
       <input class="field" type="password" id="auth-password" placeholder="Mot de passe" required />
       <button type="submit" class="btn-primary" id="auth-login">Se connecter</button>
       <button type="button" class="btn-primary" id="auth-signup" style="background:var(--week)">Créer ce compte</button>
@@ -154,7 +154,7 @@ const CATEGORY_SUGGESTIONS = ["Légume", "Fruit", "Hygiène", "Épicerie", "Bois
 const APP_START_MONTH = "2026-09";
 
 // ---------- état persisté ----------
-const SUPABASE_URL = "https://ksroqaxqagidnhrihmmq.supabase.co";
+const SUPABASE_URL = "https://ksroqexqagidnhrihmmq.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtzcm9xZXhxYWdpZG5ocmlobW1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3Mjg1MjMsImV4cCI6MjEwNDMwNDUyM30.hRqj2HHBg12kjp1Y_YPv4eoD7KTQ7cZBPeYk9b3k2f0";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
