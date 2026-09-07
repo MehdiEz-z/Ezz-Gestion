@@ -98,3 +98,13 @@ export function getErrorMessage(error, fallback) {
   }
   return msg || fallback;
 }
+
+export function renderDateField(name, { value = "", required = true, extraClass = "" } = {}) {
+  const val = value ? ` value="${value}"` : "";
+  const req = required ? " required" : "";
+  return `
+    <div class="date-field">
+      <input class="field field-date ${extraClass}" name="${name}" type="date"${req}${val} />
+      <span class="date-field-placeholder">Choisir une date</span>
+    </div>`;
+}
