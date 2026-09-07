@@ -44,9 +44,29 @@ function renderBudgetProgress(budget, total, colorVar) {
     ${over ? `<div class="small-label danger">Budget dépassé de ${money(total - Number(budget))} DH</div>` : ""}`;
 }
 
+function renderBudgetProgressRow(budget, total, colorVar, editBtnHtml) {
+  return `
+    <div class="progress-edit-row">
+      <div class="progress-edit-track">${renderBudgetProgress(budget, total, colorVar)}</div>
+      ${editBtnHtml || ""}
+    </div>`;
+}
+
 function renderBudgetEditBtn(budgetType, attrs) {
   if (!isAdmin) return "";
-  return `<button class="icon-btn edit" data-action="open-edit-budget" data-budget-type="${budgetType}" ${attrs} title="Modifier">✏️</button>`;
+  return `<button type="button" class="icon-btn edit" data-action="open-edit-budget" data-budget-type="${budgetType}" ${attrs} title="Modifier">✏️</button>`;
+}
+
+function renderExpandableAddCard(key, title, bodyHtml) {
+  const open = ui.expanded.has(key);
+  return `
+    <div class="card card-add">
+      <div class="card-head" data-action="toggle-card" data-key="${key}">
+        <div class="card-title">${title}</div>
+        <span class="chevron">${open ? "▲" : "▼"}</span>
+      </div>
+      <div class="card-body ${open ? "open" : ""}">${bodyHtml}</div>
+    </div>`;
 }
 
 function renderBudgetTab() {
@@ -83,8 +103,7 @@ function renderMonthAccordion(monthKey) {
             <button type="submit" class="btn-small" style="background:var(--month)">Fixer</button>
           </form>` : `<div class="small-label">Budget non défini pour ce mois.</div>`
   ) : `
-          ${renderBudgetProgress(monthBudget, monthTotal, "var(--month)")}
-          ${canEditMonth ? `<div style="display:flex;justify-content:flex-end;margin-top:8px">${renderBudgetEditBtn("month", `data-month-key="${monthKey}"`)}</div>` : ""}
+          ${renderBudgetProgressRow(monthBudget, monthTotal, "var(--month)", canEditMonth ? renderBudgetEditBtn("month", `data-month-key="${monthKey}"`) : "")}
         `}
       </div>
     </div>`;
@@ -130,8 +149,7 @@ function renderMonthAccordion(monthKey) {
               <button type="submit" class="btn-small" style="background:var(--week)">Fixer</button>
             </form>` : `<div class="small-label">Budget non défini pour cette semaine.</div>`
     ) : `
-            ${renderBudgetProgress(budget, total, "var(--week)")}
-            ${canEditWeek ? `<div style="display:flex;justify-content:flex-end;margin-top:8px">${renderBudgetEditBtn("week", `data-week-start="${isoWs}"`)}</div>` : ""}
+            ${renderBudgetProgressRow(budget, total, "var(--week)", canEditWeek ? renderBudgetEditBtn("week", `data-week-start="${isoWs}"`) : "")}
           `}
         </div>
       </div>`;
@@ -146,18 +164,19 @@ function renderRemainingLabel(budget, spent) {
   return `<div class="small-label ${cls}">Reste : ${money(remaining)} DH</div>`;
 }
 
-function renderItemRow(cat, type, editable, ctx) {
+function renderItemRow(cat, type, editable, ctx, pastOnly = false) {
   const total = type === "mensuel"
     ? categoryTotalForMonth(cat.id, type, ctx.monthKey)
     : categoryTotalForWeek(cat.id, type, ctx.weekStart, toISO(addDays(parseISODate(ctx.weekStart), 6)));
+  if (pastOnly && total === 0) return "";
   const ctxAttr = type === "mensuel" ? `data-month-key="${ctx.monthKey}"` : `data-week-start="${ctx.weekStart}"`;
   return `
     <li class="item-row">
       <div class="item-name">${esc(cat.name)}</div>
       <div class="item-amount">${money(total)} DH</div>
       <div class="item-actions">
-        <button class="icon-btn" ${total === 0 ? "disabled" : ""} data-action="open-details" data-category-id="${cat.id}" data-type="${type}" ${ctxAttr} title="Détails">🧾</button>
-        ${editable ? `<button class="icon-btn add" data-action="open-add-purchase" data-category-id="${cat.id}" data-type="${type}" ${ctxAttr} title="Ajouter">＋</button>` : ""}
+        <button type="button" class="icon-btn" data-action="open-details" data-category-id="${cat.id}" data-type="${type}" ${ctxAttr} title="Détails">🧾</button>
+        ${editable && !pastOnly ? `<button type="button" class="icon-btn add" data-action="open-add-purchase" data-category-id="${cat.id}" data-type="${type}" ${ctxAttr} title="Ajouter">＋</button>` : ""}
       </div>
     </li>`;
 }
@@ -193,20 +212,36 @@ function renderCategoriesTab() {
   const mensuelOpen = ui.expanded.has("cats:mensuel");
   const placesOpen = ui.expanded.has("places:list");
 
+  const addCatForm = `
+    <form class="form-col" data-form="add-category">
+      <input class="field" name="name" placeholder="Nom de la catégorie" required />
+      <div class="segment-row">
+        <button type="button" class="segment active-month" data-action="pick-cat-type" data-value="mensuel">Mensuel</button>
+        <button type="button" class="segment" data-action="pick-cat-type" data-value="hebdo">Hebdo</button>
+      </div>
+      <input type="hidden" name="type" value="mensuel" />
+      <button type="submit" class="btn-primary">Ajouter la catégorie</button>
+    </form>`;
+
+  const addPlaceForm = `
+    <form class="inline-form" data-form="add-place">
+      <input class="field" name="name" placeholder="Nom du lieu" required />
+      <button type="submit" class="btn-small" style="background:var(--month)">Ajouter</button>
+    </form>`;
+
   return `
     <div class="stack">
-      <div class="card">
-        <div style="padding:16px 16px 4px" class="card-title">Ajouter une catégorie</div>
-        <div style="padding:0 16px 16px">
-          <form class="form-col" data-form="add-category">
-            <input class="field" name="name" placeholder="Nom de la catégorie" required />
-            <div class="segment-row">
-              <button type="button" class="segment active-week" data-action="pick-cat-type" data-value="hebdo">Hebdo</button>
-              <button type="button" class="segment" data-action="pick-cat-type" data-value="mensuel">Mensuel</button>
-            </div>
-            <input type="hidden" name="type" value="hebdo" />
-            <button type="submit" class="btn-primary">Ajouter la catégorie</button>
-          </form>
+      ${renderExpandableAddCard("cats:add", "Ajouter une catégorie", addCatForm)}
+      <div class="card" style="border-color:var(--month)">
+        <div class="card-head" data-action="toggle-card" data-key="cats:mensuel">
+          <div class="card-title" style="color:var(--month)">Catégories mensuelles</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="card-preview">${mensuel.length} catégorie${mensuel.length > 1 ? "s" : ""}</div>
+            <span class="chevron">${mensuelOpen ? "▲" : "▼"}</span>
+          </div>
+        </div>
+        <div class="card-body ${mensuelOpen ? "open" : ""}">
+          ${mensuel.length === 0 ? `<div class="small-label">Aucune catégorie mensuelle.</div>` : `<ul class="list">${mensuel.map(renderCategoryRow).join("")}</ul>`}
         </div>
       </div>
       <div class="card" style="border-color:var(--week)">
@@ -221,30 +256,10 @@ function renderCategoriesTab() {
           ${hebdo.length === 0 ? `<div class="small-label">Aucune catégorie hebdo.</div>` : `<ul class="list">${hebdo.map(renderCategoryRow).join("")}</ul>`}
         </div>
       </div>
-      <div class="card" style="border-color:var(--month)">
-        <div class="card-head" data-action="toggle-card" data-key="cats:mensuel">
-          <div class="card-title" style="color:var(--month)">Catégories mensuelles</div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <div class="card-preview">${mensuel.length} catégorie${mensuel.length > 1 ? "s" : ""}</div>
-            <span class="chevron">${mensuelOpen ? "▲" : "▼"}</span>
-          </div>
-        </div>
-        <div class="card-body ${mensuelOpen ? "open" : ""}">
-          ${mensuel.length === 0 ? `<div class="small-label">Aucune catégorie mensuelle.</div>` : `<ul class="list">${mensuel.map(renderCategoryRow).join("")}</ul>`}
-        </div>
-      </div>
-      <div class="card">
-        <div style="padding:16px 16px 4px" class="card-title">Ajouter un lieu</div>
-        <div style="padding:0 16px 16px">
-          <form class="inline-form" data-form="add-place">
-            <input class="field" name="name" placeholder="Nouveau lieu" required />
-            <button type="submit" class="btn-small" style="background:var(--ink)">Ajouter</button>
-          </form>
-        </div>
-      </div>
-      <div class="card">
+      ${renderExpandableAddCard("places:add", "Ajouter un lieu", addPlaceForm)}
+      <div class="card card-places">
         <div class="card-head" data-action="toggle-card" data-key="places:list">
-          <div class="card-title">Lieux d'achat</div>
+          <div class="card-title" style="color:var(--month)">Lieux d'achat</div>
           <div style="display:flex;align-items:center;gap:10px">
             <div class="card-preview">${state.places.length} lieu${state.places.length > 1 ? "x" : ""}</div>
             <span class="chevron">${placesOpen ? "▲" : "▼"}</span>
@@ -265,6 +280,8 @@ function renderAchatsTab() {
   const monthOpen = monthBudget !== undefined && ui.expanded.has(monthKeyStr);
   const mensuelCats = state.categories.filter(c => c.type === "mensuel");
   const monthOver = monthBudget !== undefined && monthTotal > Number(monthBudget);
+  const monthRemaining = monthBudget !== undefined ? Number(monthBudget) - monthTotal : 0;
+  const monthRemCls = monthRemaining < 0 ? "danger" : "success";
 
   const monthCard = `
     <div class="card" style="border-color:var(--month)">
@@ -276,7 +293,7 @@ function renderAchatsTab() {
           ${monthOver ? `<span class="badge badge-danger">Dépassé</span>` : ""}
         </div>
         <div style="display:flex;align-items:center;gap:10px">
-          <div class="card-preview">${monthBudget !== undefined ? money(monthTotal) + " DH consommé" : "Budget non défini"}</div>
+          <div class="card-preview">${monthBudget !== undefined ? money(monthTotal) + " DH consommé" : "Budget non défini"}${monthBudget !== undefined ? `<br><span class="small-label ${monthRemCls}">Reste : ${money(monthRemaining)} DH</span>` : ""}</div>
           ${monthBudget !== undefined ? `<span class="chevron">${monthOpen ? "▲" : "▼"}</span>` : ""}
         </div>
       </div>
@@ -284,7 +301,6 @@ function renderAchatsTab() {
         <div style="padding:0 16px 16px" class="small-label">Définis d'abord le budget de ce mois dans l'onglet Budget.</div>
       ` : `
         <div class="card-body ${monthOpen ? "open" : ""}">
-          ${renderRemainingLabel(monthBudget, monthTotal)}
           ${monthOver ? `<div class="alert-banner">Budget mensuel dépassé !</div>` : ""}
           ${mensuelCats.length === 0 ? `<div class="small-label">Aucune catégorie mensuelle créée.</div>` : `
             <ul class="list">${mensuelCats.map(c => renderItemRow(c, "mensuel", true, { monthKey })).join("")}</ul>`}
@@ -307,13 +323,18 @@ function renderAchatsTab() {
     const budget = state.weeklyBudgets[isoWs];
     const total = weekSpentTotal(isoWs, isoWe);
     const key = "achat-week:" + isoWs;
+    const isPast = status === "past";
     const canExpand = status !== "future" && budget !== undefined;
     const open = canExpand && ui.expanded.has(key);
     const weekOver = budget !== undefined && total > Number(budget);
+    const remaining = budget !== undefined ? Number(budget) - total : 0;
+    const remCls = remaining < 0 ? "danger" : "success";
+    const catRows = hebdoCats.map(c => renderItemRow(c, "hebdo", status === "current", { weekStart: isoWs }, isPast)).filter(Boolean).join("");
+    const hasCatRows = catRows.length > 0;
 
     return `
       <div class="card ${status === "future" ? "disabled" : ""}" style="border-color:var(--week)">
-        <div class="card-head" data-action="${canExpand ? "toggle-card" : ""}" data-key="${key}">
+        <div class="card-head" data-action="${canExpand && (status === "current" || hasCatRows) ? "toggle-card" : ""}" data-key="${key}">
           <div>
             <div class="card-title" style="color:var(--week)">Achat Semaine ${n}</div>
             <div class="card-range">${formatDateShort(wStart)} → ${formatDateShort(addDays(wStart, 6))}</div>
@@ -321,19 +342,19 @@ function renderAchatsTab() {
             ${weekOver ? `<span class="badge badge-danger">Dépassé</span>` : ""}
           </div>
           <div style="display:flex;align-items:center;gap:10px">
-            <div class="card-preview">${status === "future" ? "" : budget !== undefined ? money(total) + " DH consommé" : "Budget non défini"}</div>
-            ${canExpand ? `<span class="chevron">${open ? "▲" : "▼"}</span>` : ""}
+            <div class="card-preview">${status === "future" ? "" : budget !== undefined ? money(total) + " DH consommé" + (budget !== undefined ? `<br><span class="small-label ${remCls}">Reste : ${money(remaining)} DH</span>` : "") : "Budget non défini"}</div>
+            ${canExpand && (status === "current" || hasCatRows) ? `<span class="chevron">${open ? "▲" : "▼"}</span>` : ""}
           </div>
         </div>
         ${status !== "future" && budget === undefined ? `
           <div style="padding:0 16px 16px" class="small-label">Définis d'abord le budget de cette semaine dans l'onglet Budget.</div>
-        ` : status !== "future" ? `
+        ` : status !== "future" && hasCatRows ? `
           <div class="card-body ${open ? "open" : ""}">
-            ${renderRemainingLabel(budget, total)}
             ${weekOver ? `<div class="alert-banner">Budget hebdo dépassé !</div>` : ""}
-            ${hebdoCats.length === 0 ? `<div class="small-label">Aucune catégorie hebdo créée.</div>` : `
-              <ul class="list">${hebdoCats.map(c => renderItemRow(c, "hebdo", status === "current", { weekStart: isoWs })).join("")}</ul>`}
+            <ul class="list">${catRows}</ul>
           </div>
+        ` : status !== "future" && isPast ? `
+          <div style="padding:0 16px 16px" class="small-label">Aucun achat enregistré.</div>
         ` : ""}
       </div>`;
   }).join("");
