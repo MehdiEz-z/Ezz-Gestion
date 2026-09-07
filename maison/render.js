@@ -1,9 +1,10 @@
 import {
-  state, ui, isAdmin, categoryHasPurchases,
+  state, ui, categoryHasPurchases,
   categoryTotalForMonth, categoryTotalForWeek,
   purchasesForMonth, purchasesForWeek,
   monthSpentTotal, weekSpentTotal, isPurchaseEditable,
 } from "./data.js";
+import { isAdmin } from "../shared/auth.js";
 import {
   activeMonthKey, addDays, esc, formatDateFull, formatDateShort,
   getWeekNumberInMonth, getWeekStart, getWeeksOfMonth, monthChipLabel,

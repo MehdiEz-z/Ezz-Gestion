@@ -3,24 +3,40 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Achats maison — Ezz-Gestion</title>
-  <link rel="stylesheet" href="shared/styles.css" />
+  <title>Ezz-Gestion</title>
+  <link rel="stylesheet" href="shared/styles.css?v=3" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div id="app">
     <header>
-      <div class="header-title" id="header-title">Gestion achats maison</div>
+      <div class="header-title" id="header-title">Ezz-Gestion</div>
       <div style="display:flex;gap:8px;align-items:center;">
         <button class="month-btn" id="logout-btn" style="display:none;background:var(--danger);color:#fff;border:none;padding:8px 12px;">🚪</button>
-        <button class="month-btn" data-action="open-month-panel">📅 <span id="month-btn-label"></span></button>
+        <div id="maison-controls" style="display:none;">
+          <button class="month-btn" data-action="open-month-panel">📅 <span id="month-btn-label"></span></button>
+        </div>
       </div>
     </header>
     <div class="subtabs" id="subtabs"></div>
     <main id="main"></main>
     <div id="toast"></div>
-    <nav class="bottom">
-      <button class="nav-pill active">🏠 Maison</button>
+    <nav class="bottom-nav" id="bottom-nav" style="display:none;">
+      <button type="button" class="nav-item active" data-module="maison">
+        <span class="nav-indicator"></span>
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Maison</span>
+      </button>
+      <button type="button" class="nav-item" data-module="maladie">
+        <span class="nav-indicator"></span>
+        <span class="nav-icon">🏥</span>
+        <span class="nav-label">Maladie</span>
+      </button>
+      <button type="button" class="nav-item" data-module="eau">
+        <span class="nav-indicator"></span>
+        <span class="nav-icon">⚡</span>
+        <span class="nav-label">Eau &amp; Elec</span>
+      </button>
     </nav>
   </div>
 
@@ -57,6 +73,6 @@
     </div>
   </div>
 
-  <script type="module" src="maison/app.js"></script>
+  <script type="module" src="app.js?v=3"></script>
 </body>
 </html>
