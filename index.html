@@ -1,473 +1,939 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Achats maison</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<style>
-  :root {
-    --bg: #F5F7F3;
-    --surface: #FFFFFF;
-    --border: #E1E5DC;
-    --ink: #202A22;
-    --muted: #6E7568;
-    --week: #2F6E5B;
-    --month: #3B4B7A;
-    --danger: #B23A3A;
-    --pill-bg: #EAF2EC;
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); }
-  #app { max-width: 480px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; padding-bottom: 78px; position: relative; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Achats maison</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #F5F7F3;
+      --surface: #FFFFFF;
+      --border: #E1E5DC;
+      --ink: #202A22;
+      --muted: #6E7568;
+      --week: #2F6E5B;
+      --month: #3B4B7A;
+      --danger: #B23A3A;
+      --pill-bg: #EAF2EC;
+    }
 
-  /* header */
-  header { padding: 16px 16px 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-  .header-title { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
-  .month-btn { display:flex; align-items:center; gap:6px; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-size: 13px; font-weight: 700; color: var(--ink); cursor: pointer; white-space: nowrap; }
+    * {
+      box-sizing: border-box;
+    }
 
-  /* auth */
-  #auth-overlay { position: fixed; inset: 0; background: var(--surface); z-index: 100; display: flex; flex-direction: column; justify-content: center; padding: 24px; }
-  .auth-box { text-align: center; }
-  .auth-box h1 { margin-bottom: 24px; font-size: 24px; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
 
-  /* sub tabs */
-  .subtabs { display: flex; gap: 8px; padding: 12px 16px 0; }
-  .subtab { flex: 1; padding: 10px 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer; text-align:center; }
-  .subtab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+    #app {
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: 78px;
+      position: relative;
+    }
 
-  main { padding: 14px 16px 16px; flex: 1; }
-  .stack { display: flex; flex-direction: column; gap: 12px; }
-  .section-label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 4px 2px -2px; }
+    /* header */
+    header {
+      padding: 16px 16px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
 
-  /* cards / accordion */
-  .card { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: 10px; overflow: hidden; }
-  .card.disabled { opacity: 0.5; }
-  .card-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; cursor: pointer; gap: 10px; }
-  .card.disabled .card-head { cursor: default; }
-  .card-title { font-size: 14px; font-weight: 700; }
-  .card-range { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .card-preview { font-size: 12px; color: var(--muted); text-align: right; white-space: nowrap; }
-  .badge { display:inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; margin-top: 4px; }
-  .badge-current { background: #E3F1EC; color: var(--week); }
-  .badge-past { background: #EDEDEA; color: var(--muted); }
-  .badge-future { background: #EDEDEA; color: var(--muted); }
-  .chevron { font-size: 12px; color: var(--muted); transition: transform 0.15s ease; }
-  .card-body { padding: 0 16px 16px; display: none; }
-  .card-body.open { display: block; }
+    .header-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
 
-  .big-row { display: flex; justify-content: space-between; align-items: flex-end; margin: 4px 0 12px; }
-  .big-number { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .small-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .progress-track { height: 7px; background: var(--bg); border-radius: 999px; margin: 8px 0 4px; overflow: hidden; }
-  .progress-fill { height: 100%; border-radius: 999px; }
+    .month-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink);
+      cursor: pointer;
+      white-space: nowrap;
+    }
 
-  .inline-form { display: flex; gap: 8px; }
-  input, select, button { font-family: inherit; font-size: 15px; }
-  .field { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--ink); }
-  .row2 { display: flex; gap: 8px; }
-  .form-col { display: flex; flex-direction: column; gap: 10px; }
-  .segment-row { display: flex; gap: 8px; }
-  .segment { flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; }
-  .segment.active-week { background: var(--week); color: #fff; border-color: var(--week); }
-  .segment.active-month { background: var(--month); color: #fff; border-color: var(--month); }
-  .btn-primary { padding: 12px; border-radius: 8px; border: none; background: var(--ink); color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; width: 100%; }
-  .btn-small { padding: 9px 14px; border-radius: 8px; border: none; color: #fff; font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap; }
+    /* auth */
+    #auth-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--surface);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 24px;
+    }
 
-  /* rows d'articles */
-  ul.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-  .item-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px solid var(--border); gap: 10px; }
-  .item-row:first-child { border-top: none; }
-  .item-name { font-size: 14px; font-weight: 600; flex: 1; }
-  .item-amount { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .item-actions { display: flex; gap: 4px; }
-  .icon-btn { width: 30px; height: 30px; border-radius: 8px; border: none; background: var(--bg); color: var(--ink); cursor: pointer; font-size: 15px; display:flex; align-items:center; justify-content:center; }
-  .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-  .icon-btn.add { background: #E3F1EC; color: var(--week); }
-  .btn-delete { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 4px; }
+    .auth-box {
+      text-align: center;
+    }
 
-  .list-item { display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid var(--border); }
-  .list-item:first-child { padding-top: 0; border-top: none; }
-  .list-item-name { font-size: 14px; font-weight: 600; }
-  .list-item-right { display: flex; align-items: center; gap: 10px; }
-  .list-item-price { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .auth-box h1 {
+      margin-bottom: 24px;
+      font-size: 24px;
+    }
 
-  /* bottom nav (mobile) */
-  nav.bottom { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); width: calc(100% - 32px); max-width: 448px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.08); display:flex; }
-  .nav-pill { display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px; border: none; background: var(--pill-bg); color: var(--week); font-weight: 700; font-size: 14px; cursor: pointer; }
+    /* sub tabs */
+    .subtabs {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px 0;
+    }
 
-  /* overlay / modal / bottom sheet */
-  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: flex; align-items: flex-end; justify-content: center; z-index: 50; }
-  .sheet { background: var(--surface); width: 100%; max-width: 480px; border-radius: 16px 16px 0 0; padding: 18px 16px 22px; max-height: 80vh; overflow-y: auto; }
-  .sheet-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; display:flex; justify-content:space-between; align-items:center; }
-  .close-btn { background: none; border: none; font-size: 18px; color: var(--muted); cursor: pointer; }
-  .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
-  .chip { padding: 9px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg); color: var(--ink); font-size: 13px; font-weight: 600; cursor: pointer; }
-  .chip.is-active { background: var(--week); border-color: var(--week); color: #fff; }
-  .chip.is-selected { background: var(--month); border-color: var(--month); color: #fff; }
-  .chip.is-disabled { opacity: 0.4; cursor: not-allowed; }
+    .subtab {
+      flex: 1;
+      padding: 10px 6px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+    }
 
-  #toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 8px 16px; border-radius: 999px; font-size: 13px; z-index: 60; display: none; }
-</style>
+    .subtab.active {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
+
+    main {
+      padding: 14px 16px 16px;
+      flex: 1;
+    }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .section-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin: 4px 2px -2px;
+    }
+
+    /* cards / accordion */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .card.disabled {
+      opacity: 0.5;
+    }
+
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 16px;
+      cursor: pointer;
+      gap: 10px;
+    }
+
+    .card.disabled .card-head {
+      cursor: default;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .card-range {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .card-preview {
+      font-size: 12px;
+      color: var(--muted);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+      margin-top: 4px;
+    }
+
+    .badge-current {
+      background: #E3F1EC;
+      color: var(--week);
+    }
+
+    .badge-past {
+      background: #EDEDEA;
+      color: var(--muted);
+    }
+
+    .badge-future {
+      background: #EDEDEA;
+      color: var(--muted);
+    }
+
+    .chevron {
+      font-size: 12px;
+      color: var(--muted);
+      transition: transform 0.15s ease;
+    }
+
+    .card-body {
+      padding: 0 16px 16px;
+      display: none;
+    }
+
+    .card-body.open {
+      display: block;
+    }
+
+    .big-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin: 4px 0 12px;
+    }
+
+    .big-number {
+      font-size: 20px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .small-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .progress-track {
+      height: 7px;
+      background: var(--bg);
+      border-radius: 999px;
+      margin: 8px 0 4px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+    }
+
+    .inline-form {
+      display: flex;
+      gap: 8px;
+    }
+
+    input,
+    select,
+    button {
+      font-family: inherit;
+      font-size: 15px;
+    }
+
+    .field {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    .row2 {
+      display: flex;
+      gap: 8px;
+    }
+
+    .form-col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .segment-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .segment {
+      flex: 1;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .segment.active-week {
+      background: var(--week);
+      color: #fff;
+      border-color: var(--week);
+    }
+
+    .segment.active-month {
+      background: var(--month);
+      color: #fff;
+      border-color: var(--month);
+    }
+
+    .btn-primary {
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      background: var(--ink);
+      color: #fff;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    .btn-small {
+      padding: 9px 14px;
+      border-radius: 8px;
+      border: none;
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* rows d'articles */
+    ul.list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-top: 1px solid var(--border);
+      gap: 10px;
+    }
+
+    .item-row:first-child {
+      border-top: none;
+    }
+
+    .item-name {
+      font-size: 14px;
+      font-weight: 600;
+      flex: 1;
+    }
+
+    .item-amount {
+      font-size: 14px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .item-actions {
+      display: flex;
+      gap: 4px;
+    }
+
+    .icon-btn {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      border: none;
+      background: var(--bg);
+      color: var(--ink);
+      cursor: pointer;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .icon-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .icon-btn.add {
+      background: #E3F1EC;
+      color: var(--week);
+    }
+
+    .btn-delete {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 4px;
+    }
+
+    .list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+
+    .list-item:first-child {
+      padding-top: 0;
+      border-top: none;
+    }
+
+    .list-item-name {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .list-item-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .list-item-price {
+      font-size: 14px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* bottom nav (mobile) */
+    nav.bottom {
+      position: fixed;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 32px);
+      max-width: 448px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+      display: flex;
+    }
+
+    .nav-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 999px;
+      border: none;
+      background: var(--pill-bg);
+      color: var(--week);
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    /* overlay / modal / bottom sheet */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 50;
+    }
+
+    .sheet {
+      background: var(--surface);
+      width: 100%;
+      max-width: 480px;
+      border-radius: 16px 16px 0 0;
+      padding: 18px 16px 22px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .sheet-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 18px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      padding: 9px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .chip.is-active {
+      background: var(--week);
+      border-color: var(--week);
+      color: #fff;
+    }
+
+    .chip.is-selected {
+      background: var(--month);
+      border-color: var(--month);
+      color: #fff;
+    }
+
+    .chip.is-disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    #toast {
+      position: fixed;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--ink);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      z-index: 60;
+      display: none;
+    }
+  </style>
 </head>
-<body>
-<div id="app">
-  <header>
-    <div class="header-title" id="header-title">Gestion achats maison</div>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <span id="user-badge" style="display:none;font-size:11px;font-weight:700;padding:4px 8px;border-radius:999px;background:var(--week);color:#fff;"></span>
-      <button class="month-btn" id="logout-btn" style="display:none;background:var(--danger);color:#fff;border:none;">🚪 Déco</button>
-      <button class="month-btn" data-action="open-month-panel">📅 <span id="month-btn-label"></span></button>
-    </div>
-  </header>
-  <div class="subtabs" id="subtabs"></div>
-  <main id="main"></main>
-  <div id="toast"></div>
-  <nav class="bottom">
-    <button class="nav-pill">🏠 Maison</button>
-  </nav>
-</div>
-<style>
-  /* Read-only mode hides all mutation UI */
-  body.read-only-mode form { display: none !important; }
-  body.read-only-mode .add { display: none !important; }
-  body.read-only-mode .btn-delete { display: none !important; }
-  body.read-only-mode [data-action="open-add-purchase"] { display: none !important; }
-  body.read-only-mode [data-form] { display: none !important; }
-</style>
-<div id="modal-root"></div>
 
-<div id="auth-overlay" style="display: flex;">
+<body>
+  <div id="app">
+    <header>
+      <div class="header-title" id="header-title">Gestion achats maison</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="month-btn" id="logout-btn" style="display:none;background:var(--danger);color:#fff;border:none;padding:8px 12px;">🚪</button>
+        <button class="month-btn" data-action="open-month-panel">📅 <span id="month-btn-label"></span></button>
+      </div>
+    </header>
+    <div class="subtabs" id="subtabs"></div>
+    <main id="main"></main>
+    <div id="toast"></div>
+    <nav class="bottom">
+      <button class="nav-pill">🏠 Maison</button>
+    </nav>
+  </div>
+  <style>
+    /* Read-only mode hides all mutation UI */
+    body.read-only-mode form {
+      display: none !important;
+    }
+
+    body.read-only-mode .add {
+      display: none !important;
+    }
+
+    body.read-only-mode .btn-delete {
+      display: none !important;
+    }
+
+    body.read-only-mode [data-action="open-add-purchase"] {
+      display: none !important;
+    }
+
+    body.read-only-mode [data-form] {
+      display: none !important;
+    }
+  </style>
+  <div id="modal-root"></div>
+
+  <div id="auth-overlay" style="display: flex;">
+    <div class="auth-box stack">
+      <h1>Connexion</h1>
+      <form class="form-col" id="auth-form">
+        <input class="field" type="text" id="auth-username" placeholder="Nom d'utilisateur" required />
+        <input class="field" type="password" id="auth-password" placeholder="Mot de passe" required />
+        <button type="submit" class="btn-primary" id="auth-login">Se connecter</button>
+      </form>
+      <div id="auth-msg" class="small-label" style="color:var(--danger);margin-top:10px;"></div>
+    </div>
+  </div>
+
+<!-- Ecran changement de mot de passe obligatoire -->
+<div id="change-pwd-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;">
   <div class="auth-box stack">
-    <h1>Connexion</h1>
-    <form class="form-col" id="auth-form">
-      <input class="field" type="text" id="auth-username" placeholder="Nom d'utilisateur" required />
-      <input class="field" type="password" id="auth-password" placeholder="Mot de passe" required />
-      <button type="submit" class="btn-primary" id="auth-login">Se connecter</button>
-      <button type="button" class="btn-primary" id="auth-signup" style="background:var(--week)">Créer ce compte</button>
+    <h1 style="font-size:18px;">🔒 Changez votre mot de passe</h1>
+    <p class="small-label" style="text-align:center;margin-bottom:12px;">Pour votre sécurité, définissez un nouveau mot de passe avant de continuer.</p>
+    <form class="form-col" id="change-pwd-form">
+      <input class="field" type="password" id="new-pwd" placeholder="Nouveau mot de passe (min. 8 caractères)" required minlength="8" />
+      <input class="field" type="password" id="confirm-pwd" placeholder="Confirmer le mot de passe" required minlength="8" />
+      <button type="submit" class="btn-primary">Valider et accéder</button>
     </form>
-    <div id="auth-msg" class="small-label" style="color:var(--danger);margin-top:10px;"></div>
+    <div id="change-pwd-msg" class="small-label" style="color:var(--danger);margin-top:10px;"></div>
   </div>
 </div>
-<script>
-const STORAGE_KEY = "achats-maison-v2";
-const CATEGORY_SUGGESTIONS = ["Légume", "Fruit", "Hygiène", "Épicerie", "Boisson", "Autre"];
-const APP_START_MONTH = "2026-09";
 
-// ---------- état persisté ----------
-const SUPABASE_URL = "https://ksroqexqagidnhrihmmq.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtzcm9xZXhxYWdpZG5ocmlobW1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3Mjg1MjMsImV4cCI6MjEwNDMwNDUyM30.hRqj2HHBg12kjp1Y_YPv4eoD7KTQ7cZBPeYk9b3k2f0";
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  <script>
+    const STORAGE_KEY = "achats-maison-v2";
+    const CATEGORY_SUGGESTIONS = ["Légume", "Fruit", "Hygiène", "Épicerie", "Boisson", "Autre"];
+    const APP_START_MONTH = "2026-09";
 
-let currentUser = null;
-let isAdmin = false;
-let state = { categories: [], places: [], purchases: [], monthlyBudgets: {}, weeklyBudgets: {} };
+    // ---------- état persisté ----------
+    const SUPABASE_URL = "https://ksroqexqagidnhrihmmq.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtzcm9xZXhxYWdpZG5ocmlobW1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3Mjg1MjMsImV4cCI6MjEwNDMwNDUyM30.hRqj2HHBg12kjp1Y_YPv4eoD7KTQ7cZBPeYk9b3k2f0";
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-function loadLocalState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {}
-  return { categories: [], places: [], purchases: [], monthlyBudgets: {}, weeklyBudgets: {} };
-}
+    let currentUser = null;
+    let isAdmin = false;
+    let state = { categories: [], places: [], purchases: [], monthlyBudgets: {}, weeklyBudgets: {} };
 
-async function fetchStateFromSupabase() {
-  if (!currentUser) return;
-  const [cats, places, purch, mBudgets, wBudgets] = await Promise.all([
-    supabaseClient.from('categories').select('*'),
-    supabaseClient.from('places').select('*'),
-    supabaseClient.from('purchases').select('*').order('date', { ascending: false }),
-    supabaseClient.from('monthly_budgets').select('*'),
-    supabaseClient.from('weekly_budgets').select('*')
-  ]);
-  
-  state.categories = cats.data || [];
-  state.places = places.data || [];
-  state.purchases = purch.data || [];
-  
-  state.monthlyBudgets = {};
-  if (mBudgets.data) mBudgets.data.forEach(b => state.monthlyBudgets[b.month_key] = b.amount);
-  
-  state.weeklyBudgets = {};
-  if (wBudgets.data) wBudgets.data.forEach(b => state.weeklyBudgets[b.week_start] = b.amount);
-}
+    async function fetchStateFromSupabase() {
+      if (!currentUser) return;
+      const [cats, places, purch, mBudgets, wBudgets] = await Promise.all([
+        supabaseClient.from('categories').select('*'),
+        supabaseClient.from('places').select('*'),
+        supabaseClient.from('purchases').select('*').order('date', { ascending: false }),
+        supabaseClient.from('monthly_budgets').select('*'),
+        supabaseClient.from('weekly_budgets').select('*')
+      ]);
 
-function updateAccessRights() {
-  // L'admin est mehdiEz
-  isAdmin = currentUser && currentUser.email === 'mehdiez@ezz-gestion.local';
-  if (!isAdmin) {
-    document.body.classList.add('read-only-mode');
-  } else {
-    document.body.classList.remove('read-only-mode');
-  }
-}
+      state.categories = cats.data || [];
+      state.places = places.data || [];
+      state.purchases = purch.data || [];
 
-// ---------- état d'interface (non persisté) ----------
-const ui = {
-  subTab: "budget",
-  viewedMonthKey: null,
-  monthPanelOpen: false,
-  expanded: new Set(),
-  modal: null,
-};
+      state.monthlyBudgets = {};
+      if (mBudgets.data) mBudgets.data.forEach(b => state.monthlyBudgets[b.month_key] = b.amount);
 
-// ---------- dates ----------
-function pad(n) { return n < 10 ? "0" + n : "" + n; }
-function toISO(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
-function parseISODate(s) { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); }
-function addDays(d, n) { const r = new Date(d); r.setDate(d.getDate() + n); return r; }
-function getWeekStart(d) {
-  const day = d.getDay();
-  const diff = (day - 6 + 7) % 7;
-  const ws = new Date(d); ws.setDate(d.getDate() - diff); ws.setHours(0,0,0,0);
-  return ws;
-}
-function getMonthKey(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1); }
-function monthLabel(monthKey) {
-  const [y, m] = monthKey.split("-").map(Number);
-  const d = new Date(y, m - 1, 1);
-  const s = d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-function monthChipLabel(monthKey) {
-  const [y, m] = monthKey.split("-").map(Number);
-  const d = new Date(y, m - 1, 1);
-  const s = d.toLocaleDateString("fr-FR", { month: "short", year: "2-digit" });
-  return s.charAt(0).toUpperCase() + s.slice(1).replace(".", "");
-}
-function formatDateShort(d) { return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }); }
-function formatDateFull(d) { return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }); }
-function getWeekNumberInMonth(weekStart) {
-  const year = weekStart.getFullYear(), month = weekStart.getMonth();
-  let d = new Date(year, month, 1);
-  while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
-  let n = 1;
-  while (d.getTime() < weekStart.getTime()) { d.setDate(d.getDate() + 7); n++; }
-  return n;
-}
-function getWeeksOfMonth(monthKey) {
-  const [y, m] = monthKey.split("-").map(Number);
-  const last = new Date(y, m, 0);
-  const weeks = [];
-  let d = new Date(y, m - 1, 1);
-  while (d <= last) { if (d.getDay() === 6) weeks.push(new Date(d)); d.setDate(d.getDate() + 1); }
-  return weeks;
-}
-function activeMonthKey() { return getMonthKey(getWeekStart(new Date())); }
-function monthsRange() {
-  const [sy, sm] = APP_START_MONTH.split("-").map(Number);
-  const [ay, am] = activeMonthKey().split("-").map(Number);
-  const end = new Date(ay, am - 1 + 6, 1);
-  let d = new Date(sy, sm - 1, 1);
-  const list = [];
-  while (d <= end) { list.push(getMonthKey(d)); d.setMonth(d.getMonth() + 1); }
-  return list;
-}
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
-function money(n) { const v = Number(n) || 0; return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
-function toTitleCase(s) {
-  return s.split(" ").filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
-}
+      state.weeklyBudgets = {};
+      if (wBudgets.data) wBudgets.data.forEach(b => state.weeklyBudgets[b.week_start] = b.amount);
+    }
 
-if (!ui.viewedMonthKey) ui.viewedMonthKey = activeMonthKey();
+    function updateAccessRights() {
+      const meta = currentUser && currentUser.user_metadata;
+      isAdmin = !!(meta && meta.role === 'admin');
+      if (!isAdmin) {
+        document.body.classList.add('read-only-mode');
+      } else {
+        document.body.classList.remove('read-only-mode');
+      }
+    }
 
-// ---------- toast ----------
-let toastTimer = null;
-function flash(msg) {
-  const el = document.getElementById("toast");
-  el.textContent = msg; el.style.display = "block";
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.style.display = "none"; }, 2200);
-}
+    // ---------- état d'interface (non persisté) ----------
+    const ui = {
+      subTab: "budget",
+      viewedMonthKey: null,
+      monthPanelOpen: false,
+      expanded: new Set(),
+      modal: null,
+    };
 
-// ---------- mutations ----------
-async function setMonthBudget(monthKey, amount) {
-  if (!isAdmin) return;
-  const { error } = await supabaseClient.from('monthly_budgets').upsert({ month_key: monthKey, amount });
-  if (!error) { state.monthlyBudgets[monthKey] = amount; render(); }
-  else flash("Erreur: " + error.message);
-}
-async function setWeekBudget(isoWeekStart, amount) {
-  if (!isAdmin) return;
-  const { error } = await supabaseClient.from('weekly_budgets').upsert({ week_start: isoWeekStart, amount });
-  if (!error) { state.weeklyBudgets[isoWeekStart] = amount; render(); }
-  else flash("Erreur: " + error.message);
-}
-async function addCategory(name, type) {
-  if (!isAdmin) return;
-  const { data, error } = await supabaseClient.from('categories').insert({ name, type }).select().single();
-  if (!error) { state.categories.push(data); render(); flash("Catégorie ajoutée"); }
-  else flash("Erreur: " + error.message);
-}
-async function addPlace(name) {
-  if (!isAdmin) return;
-  const { data, error } = await supabaseClient.from('places').insert({ name }).select().single();
-  if (!error) { state.places.push(data); render(); flash("Lieu ajouté"); }
-  else flash("Erreur: " + error.message);
-}
-async function addPurchase({ categoryId, type, place_id, price }) {
-  if (!isAdmin) return;
-  const date = toISO(new Date());
-  const { data, error } = await supabaseClient.from('purchases').insert({ category_id: categoryId, place_id, price, date, type }).select().single();
-  if (!error) { state.purchases.unshift(data); render(); flash("Achat enregistré"); }
-  else flash("Erreur: " + error.message);
-}
+    // ---------- dates ----------
+    function pad(n) { return n < 10 ? "0" + n : "" + n; }
+    function toISO(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+    function parseISODate(s) { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); }
+    function addDays(d, n) { const r = new Date(d); r.setDate(d.getDate() + n); return r; }
+    function getWeekStart(d) {
+      const day = d.getDay();
+      const diff = (day - 6 + 7) % 7;
+      const ws = new Date(d); ws.setDate(d.getDate() - diff); ws.setHours(0, 0, 0, 0);
+      return ws;
+    }
+    function getMonthKey(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1); }
+    function monthLabel(monthKey) {
+      const [y, m] = monthKey.split("-").map(Number);
+      const d = new Date(y, m - 1, 1);
+      const s = d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    }
+    function monthChipLabel(monthKey) {
+      const [y, m] = monthKey.split("-").map(Number);
+      const d = new Date(y, m - 1, 1);
+      const s = d.toLocaleDateString("fr-FR", { month: "short", year: "2-digit" });
+      return s.charAt(0).toUpperCase() + s.slice(1).replace(".", "");
+    }
+    function formatDateShort(d) { return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }); }
+    function formatDateFull(d) { return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }); }
+    function getWeekNumberInMonth(weekStart) {
+      const year = weekStart.getFullYear(), month = weekStart.getMonth();
+      let d = new Date(year, month, 1);
+      while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
+      let n = 1;
+      while (d.getTime() < weekStart.getTime()) { d.setDate(d.getDate() + 7); n++; }
+      return n;
+    }
+    function getWeeksOfMonth(monthKey) {
+      const [y, m] = monthKey.split("-").map(Number);
+      const last = new Date(y, m, 0);
+      const weeks = [];
+      let d = new Date(y, m - 1, 1);
+      while (d <= last) { if (d.getDay() === 6) weeks.push(new Date(d)); d.setDate(d.getDate() + 1); }
+      return weeks;
+    }
+    function activeMonthKey() { return getMonthKey(getWeekStart(new Date())); }
+    function monthsRange() {
+      const [sy, sm] = APP_START_MONTH.split("-").map(Number);
+      const [ay, am] = activeMonthKey().split("-").map(Number);
+      const end = new Date(ay, am - 1 + 6, 1);
+      let d = new Date(sy, sm - 1, 1);
+      const list = [];
+      while (d <= end) { list.push(getMonthKey(d)); d.setMonth(d.getMonth() + 1); }
+      return list;
+    }
+    function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+    function money(n) { const v = Number(n) || 0; return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+    function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+    function toTitleCase(s) {
+      return s.split(" ").filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+    }
 
-// ---------- helpers de calcul ----------
-function categoryTotalForMonth(categoryId, type, monthKey) {
-  return state.purchases.filter(p => p.category_id === categoryId && p.type === type && p.date.slice(0,7) === monthKey)
-    .reduce((s,p)=>s+Number(p.price),0);
-}
-function categoryTotalForWeek(categoryId, type, isoWs, isoWe) {
-  return state.purchases.filter(p => p.category_id === categoryId && p.type === type && p.date >= isoWs && p.date <= isoWe)
-    .reduce((s,p)=>s+Number(p.price),0);
-}
-function purchasesForMonth(categoryId, type, monthKey) {
-  return state.purchases.filter(p => p.category_id === categoryId && p.type === type && p.date.slice(0,7) === monthKey)
-    .sort((a,b)=> a.date < b.date ? 1 : -1);
-}
-function purchasesForWeek(categoryId, type, isoWs, isoWe) {
-  return state.purchases.filter(p => p.category_id === categoryId && p.type === type && p.date >= isoWs && p.date <= isoWe)
-    .sort((a,b)=> a.date < b.date ? 1 : -1);
-}
+    if (!ui.viewedMonthKey) ui.viewedMonthKey = activeMonthKey();
 
-// ---------- rendu racine ----------
-function render() {
-  document.getElementById("header-title").textContent =
-    ui.subTab === "budget" ? "Gestion achats maison" : ui.subTab === "categories" ? "Catégories & lieux" : "Enregistrer un achat";
-  document.getElementById("month-btn-label").textContent = monthChipLabel(ui.viewedMonthKey);
+    // ---------- toast ----------
+    let toastTimer = null;
+    function flash(msg) {
+      const el = document.getElementById("toast");
+      el.textContent = msg; el.style.display = "block";
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { el.style.display = "none"; }, 2200);
+    }
 
-  document.getElementById("subtabs").innerHTML = `
-    <button class="subtab ${ui.subTab==='budget'?'active':''}" data-action="set-subtab" data-tab="budget">Budget</button>
-    <button class="subtab ${ui.subTab==='categories'?'active':''}" data-action="set-subtab" data-tab="categories">Catégories</button>
-    <button class="subtab ${ui.subTab==='achats'?'active':''}" data-action="set-subtab" data-tab="achats">Achats</button>
+    // ---------- mutations ----------
+    async function setMonthBudget(monthKey, amount) {
+      if (!isAdmin) return;
+      const { error } = await supabaseClient.from('monthly_budgets').upsert({ month_key: monthKey, amount });
+      if (!error) { state.monthlyBudgets[monthKey] = amount; render(); }
+      else flash("Erreur: " + error.message);
+    }
+    async function setWeekBudget(isoWeekStart, amount) {
+      if (!isAdmin) return;
+      const { error } = await supabaseClient.from('weekly_budgets').upsert({ week_start: isoWeekStart, amount });
+      if (!error) { state.weeklyBudgets[isoWeekStart] = amount; render(); }
+      else flash("Erreur: " + error.message);
+    }
+    async function addCategory(name, type) {
+      if (!isAdmin) return;
+      const { data, error } = await supabaseClient.from('categories').insert({ name, type }).select().single();
+      if (!error) { state.categories.push(data); render(); flash("Catégorie ajoutée"); }
+      else flash("Erreur: " + error.message);
+    }
+    async function addPlace(name) {
+      if (!isAdmin) return;
+      const { data, error } = await supabaseClient.from('places').insert({ name }).select().single();
+      if (!error) { state.places.push(data); render(); flash("Lieu ajouté"); }
+      else flash("Erreur: " + error.message);
+    }
+    async function addPurchase({ categoryId, type, place_id, price }) {
+      if (!isAdmin) return;
+      const date = toISO(new Date());
+      const { data, error } = await supabaseClient.from('purchases').insert({ category_id: categoryId, place_id, price, date, type }).select().single();
+      if (!error) { state.purchases.unshift(data); render(); flash("Achat enregistré"); }
+      else flash("Erreur: " + error.message);
+    }
+
+    // ---------- helpers de calcul ----------
+    function categoryTotalForMonth(categoryId, type, monthKey) {
+      return state.purchases.filter(p => p.category_id === categoryId && p.type === type && p.date.slice(0, 7) === monthKey)
+        .reduce((s, p) => s + Number(p.price), 0);
+    }
+    function categoryTotalForWeek(categoryId, type, isoWs, isoWe) {
+      return state.purchases.filter(p => p.category_id === categoryId && p.type === type && p.date >= isoWs && p.date <= isoWe)
+        .reduce((s, p) => s + Number(p.price), 0);
+    }
+    function purchasesForMonth(categoryId, type, monthKey) {
+      return state.purchases.filter(p => p.category_id === categoryId && p.type === type && p.date.slice(0, 7) === monthKey)
+        .sort((a, b) => a.date < b.date ? 1 : -1);
+    }
+    function purchasesForWeek(categoryId, type, isoWs, isoWe) {
+      return state.purchases.filter(p => p.category_id === categoryId && p.type === type && p.date >= isoWs && p.date <= isoWe)
+        .sort((a, b) => a.date < b.date ? 1 : -1);
+    }
+
+    // ---------- rendu racine ----------
+    function render() {
+      document.getElementById("header-title").textContent =
+        ui.subTab === "budget" ? "Gestion achats maison" : ui.subTab === "categories" ? "Catégories & lieux" : "Enregistrer un achat";
+      document.getElementById("month-btn-label").textContent = monthChipLabel(ui.viewedMonthKey);
+
+      document.getElementById("subtabs").innerHTML = `
+    <button class="subtab ${ui.subTab === 'budget' ? 'active' : ''}" data-action="set-subtab" data-tab="budget">Budget</button>
+    <button class="subtab ${ui.subTab === 'categories' ? 'active' : ''}" data-action="set-subtab" data-tab="categories">Catégories</button>
+    <button class="subtab ${ui.subTab === 'achats' ? 'active' : ''}" data-action="set-subtab" data-tab="achats">Achats</button>
   `;
 
-  const main = document.getElementById("main");
-  if (ui.subTab === "budget") main.innerHTML = renderBudgetTab();
-  else if (ui.subTab === "categories") main.innerHTML = renderCategoriesTab();
-  else main.innerHTML = renderAchatsTab();
+      const main = document.getElementById("main");
+      if (ui.subTab === "budget") main.innerHTML = renderBudgetTab();
+      else if (ui.subTab === "categories") main.innerHTML = renderCategoriesTab();
+      else main.innerHTML = renderAchatsTab();
 
-  document.getElementById("modal-root").innerHTML = ui.monthPanelOpen ? renderMonthPanel() : (ui.modal ? renderModal() : "");
-}
+      document.getElementById("modal-root").innerHTML = ui.monthPanelOpen ? renderMonthPanel() : (ui.modal ? renderModal() : "");
+    }
 
-// ---------- onglet Budget (accordéons : uniquement infos budget, pas de detail achats) ----------
-function renderBudgetTab() {
-  return renderMonthAccordion(ui.viewedMonthKey);
-}
+    // ---------- onglet Budget (accordéons : uniquement infos budget, pas de detail achats) ----------
+    function renderBudgetTab() {
+      return renderMonthAccordion(ui.viewedMonthKey);
+    }
 
-function renderMonthAccordion(monthKey) {
-  const isActiveMonth = monthKey === activeMonthKey();
-  const monthBudget = state.monthlyBudgets[monthKey];
-  const mensuelCats = state.categories.filter(c => c.type === "mensuel");
-  const monthTotal = mensuelCats.reduce((s,c)=> s + categoryTotalForMonth(c.id, "mensuel", monthKey), 0);
-  const monthKeyStr = "month:" + monthKey;
-  const monthOpen = ui.expanded.has(monthKeyStr);
+    function renderMonthAccordion(monthKey) {
+      const isActiveMonth = monthKey === activeMonthKey();
+      const monthBudget = state.monthlyBudgets[monthKey];
+      const mensuelCats = state.categories.filter(c => c.type === "mensuel");
+      const monthTotal = mensuelCats.reduce((s, c) => s + categoryTotalForMonth(c.id, "mensuel", monthKey), 0);
+      const monthKeyStr = "month:" + monthKey;
+      const monthOpen = ui.expanded.has(monthKeyStr);
 
-  const monthCard = `
+      const monthCard = `
     <div class="card" style="border-color:var(--month)">
-      <div class="card-head" data-action="${monthBudget===undefined?'toggle-card':''}" data-key="${monthKeyStr}">
+      <div class="card-head" data-action="${monthBudget === undefined ? 'toggle-card' : ''}" data-key="${monthKeyStr}">
         <div>
           <div class="card-title" style="color:var(--month)">Budget mensuel</div>
           <div class="card-range">${monthLabel(monthKey)}</div>
-          <span class="badge ${isActiveMonth?'badge-current':'badge-past'}">${isActiveMonth?'Mois en cours':'Consultation'}</span>
+          <span class="badge ${isActiveMonth ? 'badge-current' : 'badge-past'}">${isActiveMonth ? 'Mois en cours' : 'Consultation'}</span>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
-          <div class="card-preview">${monthBudget!==undefined ? money(monthBudget)+" DH<br>"+money(monthTotal)+" DH consommé" : "budget non défini"}</div>
-          ${monthBudget===undefined ? `<span class="chevron">${monthOpen?'▲':'▼'}</span>` : ''}
+          <div class="card-preview">${monthBudget !== undefined ? money(monthBudget) + " DH<br>" + money(monthTotal) + " DH consommé" : "budget non défini"}</div>
+          ${monthBudget === undefined ? `<span class="chevron">${monthOpen ? '▲' : '▼'}</span>` : ''}
         </div>
       </div>
-      <div class="card-body ${monthBudget!==undefined || monthOpen?'open':''}">
-        ${monthBudget===undefined ? (
+      <div class="card-body ${monthBudget !== undefined || monthOpen ? 'open' : ''}">
+        ${monthBudget === undefined ? (
           isActiveMonth ? `
             <form class="inline-form" data-form="set-month-budget">
               <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Définir le budget en DH" required />
               <button type="submit" class="btn-small" style="background:var(--month)">Fixer</button>
             </form>` : `<div class="small-label">Budget non défini pour ce mois.</div>`
         ) : `
-          <div class="progress-track"><div class="progress-fill" style="width:${Math.min(100,(monthTotal/Number(monthBudget))*100)}%;background:${monthTotal>Number(monthBudget)?'var(--danger)':'var(--month)'}"></div></div>
+          <div class="progress-track"><div class="progress-fill" style="width:${Math.min(100, (monthTotal / Number(monthBudget)) * 100)}%;background:${monthTotal > Number(monthBudget) ? 'var(--danger)' : 'var(--month)'}"></div></div>
         `}
       </div>
     </div>`;
 
-  const weeks = getWeeksOfMonth(monthKey);
-  const todayWeekISO = toISO(getWeekStart(new Date()));
-  const hebdoCats = state.categories.filter(c => c.type === "hebdo");
+      const weeks = getWeeksOfMonth(monthKey);
+      const todayWeekISO = toISO(getWeekStart(new Date()));
+      const hebdoCats = state.categories.filter(c => c.type === "hebdo");
 
-  const weekCards = weeks.map(wStart => {
-    const isoWs = toISO(wStart), isoWe = toISO(addDays(wStart, 6));
-    const n = getWeekNumberInMonth(wStart);
-    let status;
-    if (!isActiveMonth) status = "past";
-    else if (isoWs === todayWeekISO) status = "current";
-    else if (isoWs < todayWeekISO) status = "past";
-    else status = "future";
+      const weekCards = weeks.map(wStart => {
+        const isoWs = toISO(wStart), isoWe = toISO(addDays(wStart, 6));
+        const n = getWeekNumberInMonth(wStart);
+        let status;
+        if (!isActiveMonth) status = "past";
+        else if (isoWs === todayWeekISO) status = "current";
+        else if (isoWs < todayWeekISO) status = "past";
+        else status = "future";
 
-    const budget = state.weeklyBudgets[isoWs];
-    const total = hebdoCats.reduce((s,c)=> s + categoryTotalForWeek(c.id, "hebdo", isoWs, isoWe), 0);
-    const key = "week:" + isoWs;
-    const canToggle = status !== "future" && budget === undefined;
-    const open = budget !== undefined ? status !== "future" : (canToggle && ui.expanded.has(key));
-    const badgeClass = status==="current"?"badge-current":status==="past"?"badge-past":"badge-future";
-    const badgeText = status==="current"?"Semaine active":status==="past"?"Consultation":"Verrouillée";
+        const budget = state.weeklyBudgets[isoWs];
+        const total = hebdoCats.reduce((s, c) => s + categoryTotalForWeek(c.id, "hebdo", isoWs, isoWe), 0);
+        const key = "week:" + isoWs;
+        const canToggle = status !== "future" && budget === undefined;
+        const open = budget !== undefined ? status !== "future" : (canToggle && ui.expanded.has(key));
+        const badgeClass = status === "current" ? "badge-current" : status === "past" ? "badge-past" : "badge-future";
+        const badgeText = status === "current" ? "Semaine active" : status === "past" ? "Consultation" : "Verrouillée";
 
-    return `
-      <div class="card ${status==='future'?'disabled':''}" style="border-color:var(--week)">
-        <div class="card-head" data-action="${canToggle?'toggle-card':''}" data-key="${key}">
+        return `
+      <div class="card ${status === 'future' ? 'disabled' : ''}" style="border-color:var(--week)">
+        <div class="card-head" data-action="${canToggle ? 'toggle-card' : ''}" data-key="${key}">
           <div>
             <div class="card-title" style="color:var(--week)">Semaine ${n}</div>
-            <div class="card-range">${formatDateShort(wStart)} → ${formatDateShort(addDays(wStart,6))}</div>
+            <div class="card-range">${formatDateShort(wStart)} → ${formatDateShort(addDays(wStart, 6))}</div>
             <span class="badge ${badgeClass}">${badgeText}</span>
           </div>
           <div style="display:flex;align-items:center;gap:10px">
-            <div class="card-preview">${budget!==undefined ? money(budget)+" DH<br>"+money(total)+" DH consommé" : "budget non défini"}</div>
-            ${canToggle ? `<span class="chevron">${open?'▲':'▼'}</span>` : ''}
+            <div class="card-preview">${budget !== undefined ? money(budget) + " DH<br>" + money(total) + " DH consommé" : "budget non défini"}</div>
+            ${canToggle ? `<span class="chevron">${open ? '▲' : '▼'}</span>` : ''}
           </div>
         </div>
-        <div class="card-body ${open?'open':''}">
-          ${budget===undefined ? (
-            status==="current" ? `
+        <div class="card-body ${open ? 'open' : ''}">
+          ${budget === undefined ? (
+            status === "current" ? `
               <form class="inline-form" data-form="set-week-budget" data-week-start="${isoWs}">
                 <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Définir le budget en DH" required />
                 <button type="submit" class="btn-small" style="background:var(--week)">Fixer</button>
               </form>` : `<div class="small-label">Budget non défini pour cette semaine.</div>`
           ) : `
-            <div class="progress-track"><div class="progress-fill" style="width:${Math.min(100,(total/Number(budget))*100)}%;background:${total>Number(budget)?'var(--danger)':'var(--week)'}"></div></div>
+            <div class="progress-track"><div class="progress-fill" style="width:${Math.min(100, (total / Number(budget)) * 100)}%;background:${total > Number(budget) ? 'var(--danger)' : 'var(--week)'}"></div></div>
           `}
         </div>
       </div>`;
-  }).join("");
+      }).join("");
 
-  return `<div class="stack">${monthCard}${weekCards}</div>`;
-}
+      return `<div class="stack">${monthCard}${weekCards}</div>`;
+    }
 
-// ligne d'article réutilisable : nom — montant — [détails] [ajouter]
-function renderItemRow(cat, type, editable, ctx) {
-  const total = type === "mensuel"
-    ? categoryTotalForMonth(cat.id, type, ctx.monthKey)
-    : categoryTotalForWeek(cat.id, type, ctx.weekStart, toISO(addDays(parseISODate(ctx.weekStart),6)));
-  const ctxAttr = type === "mensuel" ? `data-month-key="${ctx.monthKey}"` : `data-week-start="${ctx.weekStart}"`;
-  return `
+    // ligne d'article réutilisable : nom — montant — [détails] [ajouter]
+    function renderItemRow(cat, type, editable, ctx) {
+      const total = type === "mensuel"
+        ? categoryTotalForMonth(cat.id, type, ctx.monthKey)
+        : categoryTotalForWeek(cat.id, type, ctx.weekStart, toISO(addDays(parseISODate(ctx.weekStart), 6)));
+      const ctxAttr = type === "mensuel" ? `data-month-key="${ctx.monthKey}"` : `data-week-start="${ctx.weekStart}"`;
+      return `
     <li class="item-row">
       <div class="item-name">${esc(cat.name)}</div>
       <div class="item-amount">${money(total)} DH</div>
       <div class="item-actions">
-        <button class="icon-btn" ${total===0?'disabled':''} data-action="open-details" data-category-id="${cat.id}" data-type="${type}" ${ctxAttr} title="Détails">🧾</button>
+        <button class="icon-btn" ${total === 0 ? 'disabled' : ''} data-action="open-details" data-category-id="${cat.id}" data-type="${type}" ${ctxAttr} title="Détails">🧾</button>
         ${editable ? `<button class="icon-btn add" data-action="open-add-purchase" data-category-id="${cat.id}" data-type="${type}" ${ctxAttr} title="Ajouter">＋</button>` : ""}
       </div>
     </li>`;
-}
+    }
 
-// ---------- onglet Catégories & lieux ----------
-function renderCategoriesTab() {
-  const hebdo = state.categories.filter(c => c.type === "hebdo");
-  const mensuel = state.categories.filter(c => c.type === "mensuel");
-  const hebdoOpen = ui.expanded.has("cats:hebdo");
-  const mensuelOpen = ui.expanded.has("cats:mensuel");
-  const placesOpen = ui.expanded.has("places:list");
+    // ---------- onglet Catégories & lieux ----------
+    function renderCategoriesTab() {
+      const hebdo = state.categories.filter(c => c.type === "hebdo");
+      const mensuel = state.categories.filter(c => c.type === "mensuel");
+      const hebdoOpen = ui.expanded.has("cats:hebdo");
+      const mensuelOpen = ui.expanded.has("cats:mensuel");
+      const placesOpen = ui.expanded.has("places:list");
 
-  return `
+      return `
     <div class="stack">
       <div class="card">
         <div style="padding:16px 16px 4px" class="card-title">Ajouter une catégorie</div>
@@ -488,13 +954,13 @@ function renderCategoriesTab() {
         <div class="card-head" data-action="toggle-card" data-key="cats:hebdo">
           <div class="card-title" style="color:var(--week)">Catégories hebdo</div>
           <div style="display:flex;align-items:center;gap:10px">
-            <div class="card-preview">${hebdo.length} catégorie${hebdo.length>1?'s':''}</div>
-            <span class="chevron">${hebdoOpen?'▲':'▼'}</span>
+            <div class="card-preview">${hebdo.length} catégorie${hebdo.length > 1 ? 's' : ''}</div>
+            <span class="chevron">${hebdoOpen ? '▲' : '▼'}</span>
           </div>
         </div>
-        <div class="card-body ${hebdoOpen?'open':''}">
-          ${hebdo.length===0 ? `<div class="small-label">Aucune catégorie hebdo.</div>` : `
-            <ul class="list">${hebdo.map(c=>`
+        <div class="card-body ${hebdoOpen ? 'open' : ''}">
+          ${hebdo.length === 0 ? `<div class="small-label">Aucune catégorie hebdo.</div>` : `
+            <ul class="list">${hebdo.map(c => `
               <li class="list-item"><div class="list-item-name">${esc(c.name)}</div></li>`).join("")}</ul>
           `}
         </div>
@@ -504,13 +970,13 @@ function renderCategoriesTab() {
         <div class="card-head" data-action="toggle-card" data-key="cats:mensuel">
           <div class="card-title" style="color:var(--month)">Catégories mensuelles</div>
           <div style="display:flex;align-items:center;gap:10px">
-            <div class="card-preview">${mensuel.length} catégorie${mensuel.length>1?'s':''}</div>
-            <span class="chevron">${mensuelOpen?'▲':'▼'}</span>
+            <div class="card-preview">${mensuel.length} catégorie${mensuel.length > 1 ? 's' : ''}</div>
+            <span class="chevron">${mensuelOpen ? '▲' : '▼'}</span>
           </div>
         </div>
-        <div class="card-body ${mensuelOpen?'open':''}">
-          ${mensuel.length===0 ? `<div class="small-label">Aucune catégorie mensuelle.</div>` : `
-            <ul class="list">${mensuel.map(c=>`
+        <div class="card-body ${mensuelOpen ? 'open' : ''}">
+          ${mensuel.length === 0 ? `<div class="small-label">Aucune catégorie mensuelle.</div>` : `
+            <ul class="list">${mensuel.map(c => `
               <li class="list-item"><div class="list-item-name">${esc(c.name)}</div></li>`).join("")}</ul>
           `}
         </div>
@@ -530,142 +996,142 @@ function renderCategoriesTab() {
         <div class="card-head" data-action="toggle-card" data-key="places:list">
           <div class="card-title">Lieux d'achat</div>
           <div style="display:flex;align-items:center;gap:10px">
-            <div class="card-preview">${state.places.length} lieu${state.places.length>1?'x':''}</div>
-            <span class="chevron">${placesOpen?'▲':'▼'}</span>
+            <div class="card-preview">${state.places.length} lieu${state.places.length > 1 ? 'x' : ''}</div>
+            <span class="chevron">${placesOpen ? '▲' : '▼'}</span>
           </div>
         </div>
-        <div class="card-body ${placesOpen?'open':''}">
-          ${state.places.length===0 ? `<div class="small-label">Aucun lieu créé pour l'instant.</div>` : `
-            <ul class="list">${state.places.map(p=>`
+        <div class="card-body ${placesOpen ? 'open' : ''}">
+          ${state.places.length === 0 ? `<div class="small-label">Aucun lieu créé pour l'instant.</div>` : `
+            <ul class="list">${state.places.map(p => `
               <li class="list-item"><div class="list-item-name">${esc(p.name)}</div></li>`).join("")}</ul>
           `}
         </div>
       </div>
     </div>`;
-}
+    }
 
-// ---------- onglet Achats (detail par categorie, verrouillé tant que le budget n'est pas fixé) ----------
-function renderAchatsTab() {
-  const monthKey = activeMonthKey();
-  const monthBudget = state.monthlyBudgets[monthKey];
-  const mensuelCats = state.categories.filter(c => c.type === "mensuel");
-  const monthTotal = mensuelCats.reduce((s,c)=> s + categoryTotalForMonth(c.id, "mensuel", monthKey), 0);
-  const monthKeyStr = "achat-month:" + monthKey;
-  const monthOpen = monthBudget !== undefined && ui.expanded.has(monthKeyStr);
+    // ---------- onglet Achats (detail par categorie, verrouillé tant que le budget n'est pas fixé) ----------
+    function renderAchatsTab() {
+      const monthKey = activeMonthKey();
+      const monthBudget = state.monthlyBudgets[monthKey];
+      const mensuelCats = state.categories.filter(c => c.type === "mensuel");
+      const monthTotal = mensuelCats.reduce((s, c) => s + categoryTotalForMonth(c.id, "mensuel", monthKey), 0);
+      const monthKeyStr = "achat-month:" + monthKey;
+      const monthOpen = monthBudget !== undefined && ui.expanded.has(monthKeyStr);
 
-  const monthCard = `
+      const monthCard = `
     <div class="card" style="border-color:var(--month)">
-      <div class="card-head" data-action="${monthBudget!==undefined?'toggle-card':''}" data-key="${monthKeyStr}">
+      <div class="card-head" data-action="${monthBudget !== undefined ? 'toggle-card' : ''}" data-key="${monthKeyStr}">
         <div>
           <div class="card-title" style="color:var(--month)">Achat Mensuel</div>
           <div class="card-range">${monthLabel(monthKey)}</div>
           <span class="badge badge-current">Mois en cours</span>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
-          <div class="card-preview">${monthBudget!==undefined ? money(monthTotal)+" DH consommé" : "Budget non défini"}</div>
-          ${monthBudget!==undefined ? `<span class="chevron">${monthOpen?'▲':'▼'}</span>` : ''}
+          <div class="card-preview">${monthBudget !== undefined ? money(monthTotal) + " DH consommé" : "Budget non défini"}</div>
+          ${monthBudget !== undefined ? `<span class="chevron">${monthOpen ? '▲' : '▼'}</span>` : ''}
         </div>
       </div>
-      ${monthBudget===undefined ? `
+      ${monthBudget === undefined ? `
         <div style="padding:0 16px 16px" class="small-label">Définis d'abord le budget de ce mois dans l'onglet Budget.</div>
       ` : `
-        <div class="card-body ${monthOpen?'open':''}">
-          ${mensuelCats.length===0 ? `<div class="small-label">Aucune catégorie mensuelle créée.</div>` : `
+        <div class="card-body ${monthOpen ? 'open' : ''}">
+          ${mensuelCats.length === 0 ? `<div class="small-label">Aucune catégorie mensuelle créée.</div>` : `
             <ul class="list">${mensuelCats.map(c => renderItemRow(c, "mensuel", true, { monthKey })).join("")}</ul>
           `}
         </div>
       `}
     </div>`;
 
-  const weeks = getWeeksOfMonth(monthKey);
-  const todayWeekISO = toISO(getWeekStart(new Date()));
-  const hebdoCats = state.categories.filter(c => c.type === "hebdo");
+      const weeks = getWeeksOfMonth(monthKey);
+      const todayWeekISO = toISO(getWeekStart(new Date()));
+      const hebdoCats = state.categories.filter(c => c.type === "hebdo");
 
-  const weekCards = weeks.map(wStart => {
-    const isoWs = toISO(wStart), isoWe = toISO(addDays(wStart, 6));
-    const n = getWeekNumberInMonth(wStart);
-    let status;
-    if (isoWs === todayWeekISO) status = "current";
-    else if (isoWs < todayWeekISO) status = "past";
-    else status = "future";
+      const weekCards = weeks.map(wStart => {
+        const isoWs = toISO(wStart), isoWe = toISO(addDays(wStart, 6));
+        const n = getWeekNumberInMonth(wStart);
+        let status;
+        if (isoWs === todayWeekISO) status = "current";
+        else if (isoWs < todayWeekISO) status = "past";
+        else status = "future";
 
-    const budget = state.weeklyBudgets[isoWs];
-    const total = hebdoCats.reduce((s,c)=> s + categoryTotalForWeek(c.id, "hebdo", isoWs, isoWe), 0);
-    const key = "achat-week:" + isoWs;
-    const canExpand = status !== "future" && budget !== undefined;
-    const open = canExpand && ui.expanded.has(key);
-    const badgeClass = status==="current"?"badge-current":status==="past"?"badge-past":"badge-future";
-    const badgeText = status==="current"?"Semaine active":status==="past"?"Consultation":"Verrouillée";
+        const budget = state.weeklyBudgets[isoWs];
+        const total = hebdoCats.reduce((s, c) => s + categoryTotalForWeek(c.id, "hebdo", isoWs, isoWe), 0);
+        const key = "achat-week:" + isoWs;
+        const canExpand = status !== "future" && budget !== undefined;
+        const open = canExpand && ui.expanded.has(key);
+        const badgeClass = status === "current" ? "badge-current" : status === "past" ? "badge-past" : "badge-future";
+        const badgeText = status === "current" ? "Semaine active" : status === "past" ? "Consultation" : "Verrouillée";
 
-    return `
-      <div class="card ${status==='future'?'disabled':''}" style="border-color:var(--week)">
-        <div class="card-head" data-action="${canExpand?'toggle-card':''}" data-key="${key}">
+        return `
+      <div class="card ${status === 'future' ? 'disabled' : ''}" style="border-color:var(--week)">
+        <div class="card-head" data-action="${canExpand ? 'toggle-card' : ''}" data-key="${key}">
           <div>
             <div class="card-title" style="color:var(--week)">Achat Semaine ${n}</div>
-            <div class="card-range">${formatDateShort(wStart)} → ${formatDateShort(addDays(wStart,6))}</div>
+            <div class="card-range">${formatDateShort(wStart)} → ${formatDateShort(addDays(wStart, 6))}</div>
             <span class="badge ${badgeClass}">${badgeText}</span>
           </div>
           <div style="display:flex;align-items:center;gap:10px">
-            <div class="card-preview">${status==='future' ? '' : budget!==undefined ? money(total)+" DH consommé" : "Budget non défini"}</div>
-            ${canExpand ? `<span class="chevron">${open?'▲':'▼'}</span>` : ''}
+            <div class="card-preview">${status === 'future' ? '' : budget !== undefined ? money(total) + " DH consommé" : "Budget non défini"}</div>
+            ${canExpand ? `<span class="chevron">${open ? '▲' : '▼'}</span>` : ''}
           </div>
         </div>
-        ${status!=='future' && budget===undefined ? `
+        ${status !== 'future' && budget === undefined ? `
           <div style="padding:0 16px 16px" class="small-label">Définis d'abord le budget de cette semaine dans l'onglet Budget.</div>
-        ` : status!=='future' ? `
-          <div class="card-body ${open?'open':''}">
-            ${hebdoCats.length===0 ? `<div class="small-label">Aucune catégorie hebdo créée.</div>` : `
-              <ul class="list">${hebdoCats.map(c => renderItemRow(c, "hebdo", status==="current", { weekStart: isoWs })).join("")}</ul>
+        ` : status !== 'future' ? `
+          <div class="card-body ${open ? 'open' : ''}">
+            ${hebdoCats.length === 0 ? `<div class="small-label">Aucune catégorie hebdo créée.</div>` : `
+              <ul class="list">${hebdoCats.map(c => renderItemRow(c, "hebdo", status === "current", { weekStart: isoWs })).join("")}</ul>
             `}
           </div>
         ` : ``}
       </div>`;
-  }).join("");
+      }).join("");
 
-  return `<div class="stack">${monthCard}${weekCards}</div>`;
-}
+      return `<div class="stack">${monthCard}${weekCards}</div>`;
+    }
 
 
-// ---------- panel Mois ----------
-function renderMonthPanel() {
-  const active = activeMonthKey();
-  const months = monthsRange();
-  return `
+    // ---------- panel Mois ----------
+    function renderMonthPanel() {
+      const active = activeMonthKey();
+      const months = monthsRange();
+      return `
     <div class="overlay" data-overlay-close="month">
       <div class="sheet">
         <div class="sheet-title">Choisir un mois <button class="close-btn" data-action="close-month-panel">✕</button></div>
         <div class="chip-row">
           ${months.map(mk => {
-            const isFuture = mk > active;
-            const isActive = mk === active;
-            const isSelected = mk === ui.viewedMonthKey && !isActive;
-            const cls = isFuture ? "chip is-disabled" : isActive ? "chip is-active" : isSelected ? "chip is-selected" : "chip";
-            return `<button class="${cls}" ${isFuture?'':`data-action="select-month" data-month="${mk}"`}>${monthChipLabel(mk)}</button>`;
-          }).join("")}
+        const isFuture = mk > active;
+        const isActive = mk === active;
+        const isSelected = mk === ui.viewedMonthKey && !isActive;
+        const cls = isFuture ? "chip is-disabled" : isActive ? "chip is-active" : isSelected ? "chip is-selected" : "chip";
+        return `<button class="${cls}" ${isFuture ? '' : `data-action="select-month" data-month="${mk}"`}>${monthChipLabel(mk)}</button>`;
+      }).join("")}
         </div>
       </div>
     </div>`;
-}
+    }
 
-// ---------- modal ajout / détails ----------
-function renderModal() {
-  const m = ui.modal;
-  const cat = state.categories.find(c => c.id === m.categoryId);
-  if (!cat) return "";
+    // ---------- modal ajout / détails ----------
+    function renderModal() {
+      const m = ui.modal;
+      const cat = state.categories.find(c => c.id === m.categoryId);
+      if (!cat) return "";
 
-  if (m.type === "add") {
-    return `
+      if (m.type === "add") {
+        return `
       <div class="overlay" data-overlay-close="modal">
         <div class="sheet">
           <div class="sheet-title">${esc(cat.name)} <button class="close-btn" data-action="close-modal">✕</button></div>
-          ${state.places.length===0 ? `
+          ${state.places.length === 0 ? `
             <div class="small-label">Ajoute d'abord un lieu d'achat dans l'onglet Catégories.</div>
           ` : `
-            <form class="form-col" data-form="add-purchase" data-category-id="${cat.id}" data-type="${m.type_}" ${m.monthKey?`data-month-key="${m.monthKey}"`:''} ${m.weekStart?`data-week-start="${m.weekStart}"`:''}>
+            <form class="form-col" data-form="add-purchase" data-category-id="${cat.id}" data-type="${m.type_}" ${m.monthKey ? `data-month-key="${m.monthKey}"` : ''} ${m.weekStart ? `data-week-start="${m.weekStart}"` : ''}>
               <input class="field" name="price" type="number" min="0" step="0.01" placeholder="Prix en DH" required />
               <select class="field" name="place" required>
                 <option value="">Choisir un lieu…</option>
-                ${state.places.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}
+                ${state.places.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}
               </select>
               <div class="small-label">Date : aujourd'hui (${formatDateFull(new Date())})</div>
               <button type="submit" class="btn-primary">Enregistrer</button>
@@ -673,15 +1139,15 @@ function renderModal() {
           `}
         </div>
       </div>`;
-  }
+      }
 
-  // details (lecture seule, pas de suppression)
-  const list = m.periodType === "mensuel"
-    ? purchasesForMonth(cat.id, "mensuel", m.monthKey)
-    : purchasesForWeek(cat.id, "hebdo", m.weekStart, toISO(addDays(parseISODate(m.weekStart),6)));
-  const total = list.reduce((s,p)=>s+Number(p.price),0);
+      // details (lecture seule, pas de suppression)
+      const list = m.periodType === "mensuel"
+        ? purchasesForMonth(cat.id, "mensuel", m.monthKey)
+        : purchasesForWeek(cat.id, "hebdo", m.weekStart, toISO(addDays(parseISODate(m.weekStart), 6)));
+      const total = list.reduce((s, p) => s + Number(p.price), 0);
 
-  return `
+      return `
     <div class="overlay" data-overlay-close="modal">
       <div class="sheet">
         <div class="sheet-title">${esc(cat.name)} — ${money(total)} DH <button class="close-btn" data-action="close-modal">✕</button></div>
@@ -697,181 +1163,188 @@ function renderModal() {
         </ul>
       </div>
     </div>`;
-}
+    }
 
-// ---------- délégation d'événements ----------
-document.addEventListener("click", (e) => {
-  if (e.target.classList && e.target.classList.contains("overlay")) {
-    const type = e.target.dataset.overlayClose;
-    if (type === "month") ui.monthPanelOpen = false;
-    else if (type === "modal") ui.modal = null;
-    render();
-    return;
-  }
+    // ---------- délégation d'événements ----------
+    document.addEventListener("click", (e) => {
+      if (e.target.classList && e.target.classList.contains("overlay")) {
+        const type = e.target.dataset.overlayClose;
+        if (type === "month") ui.monthPanelOpen = false;
+        else if (type === "modal") ui.modal = null;
+        render();
+        return;
+      }
 
-  const target = e.target.closest("[data-action]");
-  if (!target) return;
-  const action = target.dataset.action;
+      const target = e.target.closest("[data-action]");
+      if (!target) return;
+      const action = target.dataset.action;
 
-  if (action === "set-subtab") { ui.subTab = target.dataset.tab; render(); }
-  else if (action === "open-month-panel") { ui.monthPanelOpen = true; render(); }
-  else if (action === "close-month-panel") { ui.monthPanelOpen = false; render(); }
-  else if (action === "select-month") { ui.viewedMonthKey = target.dataset.month; ui.monthPanelOpen = false; ui.subTab = "budget"; render(); }
-  else if (action === "toggle-card") {
-    const key = target.dataset.key;
-    if (ui.expanded.has(key)) ui.expanded.delete(key); else ui.expanded.add(key);
-    render();
-  }
-  else if (action === "pick-cat-type") {
-    const form = target.closest("form");
-    form.querySelectorAll("[data-action='pick-cat-type']").forEach(b => b.classList.remove("active-week","active-month"));
-    target.classList.add(target.dataset.value === "hebdo" ? "active-week" : "active-month");
-    form.querySelector("[name='type']").value = target.dataset.value;
-  }
-  else if (action === "open-add-purchase") {
-    ui.modal = {
-      type: "add",
-      categoryId: target.dataset.categoryId,
-      type_: target.dataset.type,
-      monthKey: target.dataset.monthKey || null,
-      weekStart: target.dataset.weekStart || null,
-    };
-    render();
-  }
-  else if (action === "open-details") {
-    const type = target.dataset.type;
-    const monthKey = target.dataset.monthKey || null;
-    const weekStart = target.dataset.weekStart || null;
-    const editable = type === "mensuel" ? monthKey === activeMonthKey() : weekStart === toISO(getWeekStart(new Date()));
-    ui.modal = { type: "details", categoryId: target.dataset.categoryId, periodType: type, monthKey, weekStart, editable };
-    render();
-  }
-  else if (action === "close-modal") { ui.modal = null; render(); }
-});
+      if (action === "set-subtab") { ui.subTab = target.dataset.tab; render(); }
+      else if (action === "open-month-panel") { ui.monthPanelOpen = true; render(); }
+      else if (action === "close-month-panel") { ui.monthPanelOpen = false; render(); }
+      else if (action === "select-month") { ui.viewedMonthKey = target.dataset.month; ui.monthPanelOpen = false; ui.subTab = "budget"; render(); }
+      else if (action === "toggle-card") {
+        const key = target.dataset.key;
+        if (ui.expanded.has(key)) ui.expanded.delete(key); else ui.expanded.add(key);
+        render();
+      }
+      else if (action === "pick-cat-type") {
+        const form = target.closest("form");
+        form.querySelectorAll("[data-action='pick-cat-type']").forEach(b => b.classList.remove("active-week", "active-month"));
+        target.classList.add(target.dataset.value === "hebdo" ? "active-week" : "active-month");
+        form.querySelector("[name='type']").value = target.dataset.value;
+      }
+      else if (action === "open-add-purchase") {
+        ui.modal = {
+          type: "add",
+          categoryId: target.dataset.categoryId,
+          type_: target.dataset.type,
+          monthKey: target.dataset.monthKey || null,
+          weekStart: target.dataset.weekStart || null,
+        };
+        render();
+      }
+      else if (action === "open-details") {
+        const type = target.dataset.type;
+        const monthKey = target.dataset.monthKey || null;
+        const weekStart = target.dataset.weekStart || null;
+        const editable = type === "mensuel" ? monthKey === activeMonthKey() : weekStart === toISO(getWeekStart(new Date()));
+        ui.modal = { type: "details", categoryId: target.dataset.categoryId, periodType: type, monthKey, weekStart, editable };
+        render();
+      }
+      else if (action === "close-modal") { ui.modal = null; render(); }
+    });
 
-document.addEventListener("submit", async (e) => {
-  const form = e.target.closest("[data-form]");
-  if (!form) return;
-  e.preventDefault();
-  const type = form.dataset.form;
+    document.addEventListener("submit", async (e) => {
+      const form = e.target.closest("[data-form]");
+      if (!form) return;
+      e.preventDefault();
+      const type = form.dataset.form;
 
-  if (type === "set-month-budget") {
-    const n = parseFloat(form.amount.value);
-    if (!isNaN(n) && n >= 0) await setMonthBudget(ui.viewedMonthKey, n);
-  }
-  else if (type === "set-week-budget") {
-    const n = parseFloat(form.amount.value);
-    if (!isNaN(n) && n >= 0) await setWeekBudget(form.dataset.weekStart, n);
-  }
-  else if (type === "add-category") {
-    const name = toTitleCase(form.name.value.trim());
-    const t = form.type.value;
-    if (name) await addCategory(name, t);
-    form.reset();
-  }
-  else if (type === "add-place") {
-    const name = toTitleCase(form.name.value.trim());
-    if (name) await addPlace(name);
-    form.reset();
-  }
-  else if (type === "add-purchase") {
-    const price = parseFloat(form.price.value);
-    const place_id = form.place.value;
-    const categoryId = form.dataset.categoryId;
-    const cat = state.categories.find(c => c.id === categoryId);
-    if (!cat || isNaN(price) || price < 0 || !place_id) return;
-    await addPurchase({ categoryId: cat.id, type: cat.type, place_id, price });
-    ui.modal = null;
-    render();
-  }
-});
+      if (type === "set-month-budget") {
+        const n = parseFloat(form.amount.value);
+        if (!isNaN(n) && n >= 0) await setMonthBudget(ui.viewedMonthKey, n);
+      }
+      else if (type === "set-week-budget") {
+        const n = parseFloat(form.amount.value);
+        if (!isNaN(n) && n >= 0) await setWeekBudget(form.dataset.weekStart, n);
+      }
+      else if (type === "add-category") {
+        const name = toTitleCase(form.name.value.trim());
+        const t = form.type.value;
+        if (name) await addCategory(name, t);
+        form.reset();
+      }
+      else if (type === "add-place") {
+        const name = toTitleCase(form.name.value.trim());
+        if (name) await addPlace(name);
+        form.reset();
+      }
+      else if (type === "add-purchase") {
+        const price = parseFloat(form.price.value);
+        const place_id = form.place.value;
+        const categoryId = form.dataset.categoryId;
+        const cat = state.categories.find(c => c.id === categoryId);
+        if (!cat || isNaN(price) || price < 0 || !place_id) return;
+        await addPurchase({ categoryId: cat.id, type: cat.type, place_id, price });
+        ui.modal = null;
+        render();
+      }
+    });
 
-// ---------- AUTHENTIFICATION ET INIT ----------
-async function initApp() {
-  const { data: { session } } = await supabaseClient.auth.getSession();
-  if (session) {
-    currentUser = session.user;
-    updateAccessRights();
-    await fetchStateFromSupabase();
-    document.getElementById("auth-overlay").style.display = "none";
-    document.getElementById("logout-btn").style.display = "block";
-    const username = currentUser.email.split('@')[0];
-    const badge = document.getElementById("user-badge");
-    badge.style.display = "inline-block";
-    badge.textContent = username + (isAdmin ? " 👑" : " 👁");
-    badge.style.background = isAdmin ? "var(--month)" : "var(--muted)";
-    render();
-  }
+    // ---------- AUTHENTIFICATION ET INIT ----------
+    function getFakeEmail(username) {
+      return username.trim().toLowerCase() + "@ezz-gestion.app";
+    }
 
-  supabaseClient.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_IN') {
-      currentUser = session.user;
-      updateAccessRights();
+    async function showApp() {
       await fetchStateFromSupabase();
       document.getElementById("auth-overlay").style.display = "none";
+      document.getElementById("change-pwd-overlay").style.display = "none";
       document.getElementById("logout-btn").style.display = "block";
-      const username = currentUser.email.split('@')[0];
-      const badge = document.getElementById("user-badge");
-      badge.style.display = "inline-block";
-      badge.textContent = username + (isAdmin ? " 👑" : " 👁");
-      badge.style.background = isAdmin ? "var(--month)" : "var(--muted)";
       render();
-    } else if (event === 'SIGNED_OUT') {
-      currentUser = null;
-      updateAccessRights();
-      state = { categories: [], places: [], purchases: [], monthlyBudgets: {}, weeklyBudgets: {} };
-      document.getElementById("auth-overlay").style.display = "flex";
-      document.getElementById("logout-btn").style.display = "none";
-      document.getElementById("user-badge").style.display = "none";
     }
-  });
-}
 
-function getFakeEmail(username) {
-  return username.trim().toLowerCase() + "@ezz-gestion.app";
-}
+    async function handleSession(user) {
+      currentUser = user;
+      updateAccessRights();
+      const mustChange = user.user_metadata && user.user_metadata.must_change_password;
+      if (mustChange) {
+        document.getElementById("auth-overlay").style.display = "none";
+        document.getElementById("change-pwd-overlay").style.display = "flex";
+      } else {
+        await showApp();
+      }
+    }
 
-document.getElementById("auth-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const username = document.getElementById("auth-username").value;
-  const email = getFakeEmail(username);
-  const password = document.getElementById("auth-password").value;
-  const msgEl = document.getElementById("auth-msg");
-  msgEl.textContent = "Connexion en cours...";
-  
-  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-  if (error) {
-    msgEl.textContent = "Erreur : Utilisateur ou mot de passe incorrect.";
-  } else {
-    msgEl.textContent = "";
-  }
-});
+    async function initApp() {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session) await handleSession(session.user);
 
-document.getElementById("auth-signup").addEventListener("click", async () => {
-  const username = document.getElementById("auth-username").value;
-  const email = getFakeEmail(username);
-  const password = document.getElementById("auth-password").value;
-  const msgEl = document.getElementById("auth-msg");
-  
-  if (!username || !password) {
-    msgEl.textContent = "Veuillez remplir le nom d'utilisateur et le mot de passe.";
-    return;
-  }
-  
-  msgEl.textContent = "Création du compte en cours...";
-  const { error } = await supabaseClient.auth.signUp({ email, password });
-  if (error) {
-    msgEl.textContent = error.message;
-  } else {
-    msgEl.textContent = "Compte créé et connecté !";
-  }
-});
+      supabaseClient.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN') {
+          await handleSession(session.user);
+        } else if (event === 'SIGNED_OUT') {
+          currentUser = null;
+          isAdmin = false;
+          document.body.classList.add('read-only-mode');
+          state = { categories: [], places: [], purchases: [], monthlyBudgets: {}, weeklyBudgets: {} };
+          document.getElementById("auth-overlay").style.display = "flex";
+          document.getElementById("change-pwd-overlay").style.display = "none";
+          document.getElementById("logout-btn").style.display = "none";
+        }
+      });
+    }
 
-document.getElementById("logout-btn").addEventListener("click", async () => {
-  await supabaseClient.auth.signOut();
-});
+    // Connexion
+    document.getElementById("auth-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const username = document.getElementById("auth-username").value;
+      const email = getFakeEmail(username);
+      const password = document.getElementById("auth-password").value;
+      const msgEl = document.getElementById("auth-msg");
+      msgEl.textContent = "Connexion en cours...";
+      const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) {
+        msgEl.textContent = "Nom d'utilisateur ou mot de passe incorrect.";
+      } else {
+        msgEl.textContent = "";
+      }
+    });
 
-initApp();
-</script>
+    // Changement de mot de passe obligatoire
+    document.getElementById("change-pwd-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const newPwd = document.getElementById("new-pwd").value;
+      const confirmPwd = document.getElementById("confirm-pwd").value;
+      const msgEl = document.getElementById("change-pwd-msg");
+      if (newPwd !== confirmPwd) {
+        msgEl.textContent = "Les mots de passe ne correspondent pas.";
+        return;
+      }
+      msgEl.textContent = "Mise à jour en cours...";
+      const { error } = await supabaseClient.auth.updateUser({
+        password: newPwd,
+        data: { must_change_password: false }
+      });
+      if (error) {
+        msgEl.textContent = "Erreur : " + error.message;
+      } else {
+        // Rafraîchir l'utilisateur en mémoire
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        currentUser = user;
+        flash("Mot de passe modifié ! Bienvenue 🎉");
+        await showApp();
+      }
+    });
+
+    // Déconnexion
+    document.getElementById("logout-btn").addEventListener("click", async () => {
+      await supabaseClient.auth.signOut();
+    });
+
+    initApp();
+  </script>
 </body>
+
 </html>
