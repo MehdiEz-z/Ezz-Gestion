@@ -4,10 +4,15 @@ import { render } from "./render.js";
 import { setupEvents } from "./events.js";
 
 let eventsReady = false;
+let dataLoaded = false;
 
 export function deactivate() {
   ui.modal = null;
   ui.monthPanelOpen = false;
+}
+
+export function resetModule() {
+  dataLoaded = false;
 }
 
 export async function activate() {
@@ -16,7 +21,10 @@ export async function activate() {
     setupEvents();
     eventsReady = true;
   }
-  await fetchStateFromSupabase();
+  if (!dataLoaded) {
+    await fetchStateFromSupabase();
+    dataLoaded = true;
+  }
   render();
 }
 
