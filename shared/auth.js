@@ -38,7 +38,11 @@ export function initAuth({ onAuthenticated, onSignedOut, onBeforeShowApp }) {
 
   async function initSession() {
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session) await handleSession(session.user);
+    if (session) {
+      await handleSession(session.user);
+    } else {
+      document.getElementById("auth-overlay").style.display = "flex";
+    }
 
     supabaseClient.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_IN" && session) await handleSession(session.user);
