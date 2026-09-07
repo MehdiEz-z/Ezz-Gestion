@@ -2,9 +2,8 @@ import { supabaseClient } from "../shared/supabase.js";
 import { flash, getErrorMessage, activeMonthKey } from "../shared/utils.js";
 import {
   ui, resetState, updateAccessRights,
-  fetchStateFromSupabase, getFakeEmail,
+  fetchStateFromSupabase, getFakeEmail, setCurrentUser,
 } from "./data.js";
-import * as data from "./data.js";
 import { render } from "./render.js";
 import { setupEvents } from "./events.js";
 
@@ -19,7 +18,7 @@ async function showApp() {
 }
 
 async function handleSession(user) {
-  data.currentUser = user;
+  setCurrentUser(user);
   updateAccessRights();
   const mustChange = user.user_metadata && user.user_metadata.must_change_password;
   if (mustChange) {
@@ -37,7 +36,7 @@ async function initApp() {
   supabaseClient.auth.onAuthStateChange(async (event, session) => {
     if (event === "SIGNED_IN") await handleSession(session.user);
     else if (event === "SIGNED_OUT") {
-      data.currentUser = null;
+      setCurrentUser(null);
       updateAccessRights();
       resetState();
       document.getElementById("auth-overlay").style.display = "flex";
@@ -87,7 +86,7 @@ document.getElementById("change-pwd-form").addEventListener("submit", async (e) 
     msgEl.textContent = getErrorMessage(error, "Erreur lors du changement de mot de passe.");
   } else {
     const { data: { user } } = await supabaseClient.auth.getUser();
-    data.currentUser = user;
+    setCurrentUser(user);
     flash("Mot de passe modifié ! Bienvenue 🎉");
     await showApp();
   }
