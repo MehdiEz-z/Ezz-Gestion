@@ -43,6 +43,21 @@ header {
   letter-spacing: -0.01em;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+#main {
+  transition: opacity 0.12s ease;
+}
+
+#main.is-switching {
+  opacity: 0.35;
+}
+
 .month-btn {
   display: flex;
   align-items: center;
@@ -326,7 +341,7 @@ nav.bottom-nav {
   background: transparent;
   color: rgba(255, 255, 255, 0.45);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.15s ease, background 0.15s ease;
 }
 
 .nav-item .nav-indicator {
@@ -348,6 +363,7 @@ nav.bottom-nav {
 .nav-item.active .nav-indicator {
   background: var(--week);
   box-shadow: 0 0 8px rgba(47, 110, 91, 0.8);
+  transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .nav-item.disabled {
@@ -579,4 +595,39 @@ body.module-maladie.read-only-mode [data-action="open-add-action"],
 body.module-maladie.read-only-mode .btn-delete { display: none !important; }
 
 .card.disabled .card-head { opacity: 0.85; }
+
+.card-add {
+  border-color: var(--border) !important;
+}
+
+.card-places {
+  border-color: var(--month) !important;
+}
+
+.progress-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.progress-edit-track {
+  flex: 1;
+  min-width: 0;
+}
+
+.field[type="date"] {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 44px;
+  color: var(--ink);
+}
+
+.field[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.55;
+  cursor: pointer;
+}
+
+select.field option[disabled] {
+  color: var(--muted);
+}
 
