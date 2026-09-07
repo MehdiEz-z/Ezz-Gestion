@@ -600,8 +600,8 @@ body.module-maladie.read-only-mode .btn-delete { display: none !important; }
   border-color: var(--border) !important;
 }
 
-.card-places {
-  border-color: var(--month) !important;
+.card-list-neutral {
+  border-color: var(--ink) !important;
 }
 
 .progress-edit-row {
@@ -625,6 +625,25 @@ body.module-maladie.read-only-mode .btn-delete { display: none !important; }
 .field[type="date"]::-webkit-calendar-picker-indicator {
   opacity: 0.55;
   cursor: pointer;
+}
+
+.date-field {
+  position: relative;
+}
+
+.date-field-placeholder {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+  font-size: 14px;
+}
+
+.date-field:focus-within .date-field-placeholder,
+.date-field input:valid + .date-field-placeholder {
+  display: none;
 }
 
 select.field option[disabled] {
