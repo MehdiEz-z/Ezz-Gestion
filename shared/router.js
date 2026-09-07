@@ -45,6 +45,9 @@ export async function switchModule(id) {
     return;
   }
 
+  const main = document.getElementById("main");
+  main.classList.add("is-switching");
+
   if (activeBoot?.deactivate) activeBoot.deactivate();
 
   activeModule = id;
@@ -55,6 +58,7 @@ export async function switchModule(id) {
   const mod = await LOADERS[id]();
   activeBoot = mod;
   await mod.activate();
+  requestAnimationFrame(() => main.classList.remove("is-switching"));
 }
 
 export function initNav() {
