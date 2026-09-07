@@ -23,7 +23,6 @@ export function render() {
 
 function renderDualProgress(spent, cnss, ass) {
   const total = spent || 0;
-  const reimbursed = cnss + ass;
   if (total <= 0) {
     return `<div class="progress-row"><div class="progress-track"><div class="progress-fill" style="width:0"></div></div></div>`;
   }
@@ -39,8 +38,23 @@ function renderDualProgress(spent, cnss, ass) {
     <div class="progress-legend">
       <span><i class="dot dot-cnss"></i> CNSS ${money(cnss)} DH</span>
       <span><i class="dot dot-ass"></i> Assurance ${money(ass)} DH</span>
-      <span class="${reimbursed >= total ? "success" : "danger"}">Reste ${money(Math.max(0, total - reimbursed))} DH</span>
     </div>`;
+}
+
+function renderExpandableAddCard(key, title, bodyHtml) {
+  const open = ui.expanded.has(key);
+  return `
+    <div class="card card-add">
+      <div class="card-head" data-action="toggle-card" data-key="${key}">
+        <div class="card-title">${title}</div>
+        <span class="chevron">${open ? "▲" : "▼"}</span>
+      </div>
+      <div class="card-body ${open ? "open" : ""}">${bodyHtml}</div>
+    </div>`;
+}
+
+function renderSelectPlaceholder(optionsHtml) {
+  return `<option value="" disabled selected hidden>Choisir…</option>${optionsHtml}`;
 }
 
 function renderSyntheseTab() {
@@ -64,21 +78,12 @@ function renderSyntheseTab() {
         <div class="card-head">
           <div>
             <div class="card-title" style="color:var(--danger)">Total dépensé</div>
-            <span class="badge badge-danger">Charge globale : ${money(s.globalCharge)} DH</span>
-          </div>
-          <div class="card-preview" style="text-align:right">
-            <div style="color:var(--month)">${money(s.totalCnss)} DH</div>
-            <div style="color:var(--week);font-size:11px">CNSS</div>
-            <div style="color:var(--week);margin-top:4px">${money(s.totalAss)} DH</div>
-            <div style="color:var(--week);font-size:11px">Assurance</div>
+            <div class="small-label">${money(s.totalSpent)} DH dépensés · ${money(s.totalCnss + s.totalAss)} DH remboursés</div>
           </div>
         </div>
         <div class="card-body open">
-          <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-            <span class="small-label">${money(s.totalSpent)} DH dépensés</span>
-            <span class="small-label">${money(s.totalCnss + s.totalAss)} DH remboursés</span>
-          </div>
           ${renderDualProgress(s.totalSpent, s.totalCnss, s.totalAss)}
+          <span class="badge badge-danger" style="margin-top:10px;display:inline-block">Charge globale : ${money(s.globalCharge)} DH</span>
         </div>
       </div>
 
@@ -99,7 +104,6 @@ function renderSyntheseTab() {
               <div class="progress-fill" style="width:${dossierPct}%;background:var(--month)"></div>
             </div>
           </div>
-          <div class="small-label" style="margin-top:6px">En attente : ${money(s.totalPending)} DH</div>
         </div>
       </div>
 
@@ -158,24 +162,42 @@ function renderReferentielTab() {
   const docOpen = ui.expanded.has("ref:doctors");
   const catOpen = ui.expanded.has("ref:care-cats");
 
+  const addBenForm = `
+    <form class="form-col" data-form="add-beneficiary">
+      <input class="field" name="first_name" placeholder="Prénom" required />
+      <input class="field" name="last_name" placeholder="Nom" required />
+      <input class="field field-date" name="birth_date" type="date" required />
+      <div class="segment-row">
+        <button type="button" class="segment active-week" data-action="pick-gender" data-value="M">Homme</button>
+        <button type="button" class="segment" data-action="pick-gender" data-value="F">Femme</button>
+      </div>
+      <input type="hidden" name="gender" value="M" />
+      <button type="submit" class="btn-primary">Ajouter le membre</button>
+    </form>`;
+
+  const addDocForm = `
+    <form class="form-col" data-form="add-doctor">
+      <input class="field" name="name" placeholder="Nom du médecin" required />
+      <div class="segment-row">
+        <button type="button" class="segment active-week" data-action="pick-facility" data-value="cabinet">Cabinet</button>
+        <button type="button" class="segment" data-action="pick-facility" data-value="clinique">Clinique</button>
+        <button type="button" class="segment" data-action="pick-facility" data-value="hopital">Hôpital</button>
+      </div>
+      <input type="hidden" name="facility_type" value="cabinet" />
+      <input class="field" name="phone" placeholder="Numéro de téléphone" />
+      <input class="field" name="specialty" placeholder="Nature" required />
+      <button type="submit" class="btn-primary">Ajouter le médecin</button>
+    </form>`;
+
+  const addCatForm = `
+    <form class="inline-form" data-form="add-care-category">
+      <input class="field" name="name" placeholder="Nom de la catégorie" required />
+      <button type="submit" class="btn-small" style="background:var(--ink)">Ajouter</button>
+    </form>`;
+
   return `
     <div class="stack">
-      <div class="card">
-        <div style="padding:16px 16px 4px" class="card-title">Ajouter un membre de famille</div>
-        <div style="padding:0 16px 16px">
-          <form class="form-col" data-form="add-beneficiary">
-            <input class="field" name="first_name" placeholder="Prénom" required />
-            <input class="field" name="last_name" placeholder="Nom" required />
-            <input class="field" name="birth_date" placeholder="Date de naissance (AAAA-MM-JJ)" required pattern="\\d{4}-\\d{2}-\\d{2}" />
-            <div class="segment-row">
-              <button type="button" class="segment active-week" data-action="pick-gender" data-value="M">Homme</button>
-              <button type="button" class="segment" data-action="pick-gender" data-value="F">Femme</button>
-            </div>
-            <input type="hidden" name="gender" value="M" />
-            <button type="submit" class="btn-primary">Ajouter le membre</button>
-          </form>
-        </div>
-      </div>
+      ${renderExpandableAddCard("ref:add-ben", "Ajouter un membre de famille", addBenForm)}
       <div class="card" style="border-color:var(--week)">
         <div class="card-head" data-action="toggle-card" data-key="ref:famille">
           <div class="card-title" style="color:var(--week)">Famille</div>
@@ -189,23 +211,7 @@ function renderReferentielTab() {
         </div>
       </div>
 
-      <div class="card">
-        <div style="padding:16px 16px 4px" class="card-title">Ajouter un médecin</div>
-        <div style="padding:0 16px 16px">
-          <form class="form-col" data-form="add-doctor">
-            <input class="field" name="name" placeholder="Nom du médecin" required />
-            <div class="segment-row">
-              <button type="button" class="segment active-week" data-action="pick-facility" data-value="cabinet">Cabinet</button>
-              <button type="button" class="segment" data-action="pick-facility" data-value="clinique">Clinique</button>
-              <button type="button" class="segment" data-action="pick-facility" data-value="hopital">Hôpital</button>
-            </div>
-            <input type="hidden" name="facility_type" value="cabinet" />
-            <input class="field" name="phone" placeholder="Numéro de téléphone" />
-            <input class="field" name="specialty" placeholder="Nature (Chirurgien, Dentiste, Anesthésiste…)" required />
-            <button type="submit" class="btn-primary">Ajouter le médecin</button>
-          </form>
-        </div>
-      </div>
+      ${renderExpandableAddCard("ref:add-doc", "Ajouter un médecin", addDocForm)}
       <div class="card" style="border-color:var(--month)">
         <div class="card-head" data-action="toggle-card" data-key="ref:doctors">
           <div class="card-title" style="color:var(--month)">Médecins</div>
@@ -219,16 +225,8 @@ function renderReferentielTab() {
         </div>
       </div>
 
-      <div class="card">
-        <div style="padding:16px 16px 4px" class="card-title">Ajouter une catégorie de soin</div>
-        <div style="padding:0 16px 16px">
-          <form class="inline-form" data-form="add-care-category">
-            <input class="field" name="name" placeholder="Consultation, Pharmacie, IRM…" required />
-            <button type="submit" class="btn-small" style="background:var(--ink)">Ajouter</button>
-          </form>
-        </div>
-      </div>
-      <div class="card">
+      ${renderExpandableAddCard("ref:add-cat", "Ajouter une catégorie de soin", addCatForm)}
+      <div class="card card-add">
         <div class="card-head" data-action="toggle-card" data-key="ref:care-cats">
           <div class="card-title">Catégories de soins</div>
           <div style="display:flex;align-items:center;gap:10px">
@@ -268,8 +266,8 @@ function renderDossierCard(d) {
           <div class="item-name">${esc(cat.name)}</div>
           <div class="item-amount">${money(total)} DH</div>
           <div class="item-actions">
-            <button class="icon-btn" ${total === 0 ? "disabled" : ""} data-action="open-action-details" data-dossier-id="${d.id}" data-category-id="${cat.id}" title="Détails">🧾</button>
-            ${editable ? `<button class="icon-btn add" data-action="open-add-action" data-dossier-id="${d.id}" data-category-id="${cat.id}" title="Ajouter">＋</button>` : ""}
+            <button type="button" class="icon-btn" ${total === 0 ? "disabled" : ""} data-action="open-action-details" data-dossier-id="${d.id}" data-category-id="${cat.id}" title="Détails">🧾</button>
+            ${editable ? `<button type="button" class="icon-btn add" data-action="open-add-action" data-dossier-id="${d.id}" data-category-id="${cat.id}" title="Ajouter">＋</button>` : ""}
           </div>
         </li>`;
     }).join("")}</ul>`;
@@ -280,23 +278,19 @@ function renderDossierCard(d) {
         <div class="reimb-title" style="color:var(--month)">CNSS</div>
         ${editable ? `
           <form class="form-col" data-form="update-reimb" data-dossier-id="${d.id}" data-block="cnss">
-            <input class="field" name="expected" type="number" min="0" step="0.01" placeholder="Montant attendu" value="${d.cnss_expected != null ? d.cnss_expected : ""}" />
-            <input class="field" name="received" type="number" min="0" step="0.01" placeholder="Montant remboursé" value="${d.cnss_received != null ? d.cnss_received : ""}" />
-            <button type="submit" class="btn-small" style="background:var(--month)">Enregistrer CNSS</button>
+            <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant" value="${d.cnss_received != null ? d.cnss_received : ""}" />
+            <button type="submit" class="btn-small" style="background:var(--month)">Enregistrer</button>
           </form>` : `
-          <div class="small-label">Attendu : ${d.cnss_expected != null ? money(d.cnss_expected) + " DH" : "—"}</div>
-          <div class="small-label">Reçu : ${d.cnss_received != null ? money(d.cnss_received) + " DH" : "—"}</div>`}
+          <div class="small-label">Montant : ${d.cnss_received != null ? money(d.cnss_received) + " DH" : "—"}</div>`}
       </div>
       <div class="reimb-block" style="border-color:var(--week)">
         <div class="reimb-title" style="color:var(--week)">Assurance</div>
         ${editable ? `
           <form class="form-col" data-form="update-reimb" data-dossier-id="${d.id}" data-block="assurance">
-            <input class="field" name="expected" type="number" min="0" step="0.01" placeholder="Montant attendu" value="${d.assurance_expected != null ? d.assurance_expected : ""}" />
-            <input class="field" name="received" type="number" min="0" step="0.01" placeholder="Montant remboursé" value="${d.assurance_received != null ? d.assurance_received : ""}" />
-            <button type="submit" class="btn-small" style="background:var(--week)">Enregistrer Assurance</button>
+            <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant" value="${d.assurance_received != null ? d.assurance_received : ""}" />
+            <button type="submit" class="btn-small" style="background:var(--week)">Enregistrer</button>
           </form>` : `
-          <div class="small-label">Attendu : ${d.assurance_expected != null ? money(d.assurance_expected) + " DH" : "—"}</div>
-          <div class="small-label">Reçu : ${d.assurance_received != null ? money(d.assurance_received) + " DH" : "—"}</div>`}
+          <div class="small-label">Montant : ${d.assurance_received != null ? money(d.assurance_received) + " DH" : "—"}</div>`}
       </div>
     </div>`;
 
@@ -337,7 +331,7 @@ function renderDossierCard(d) {
 
 function renderDossiersTab() {
   const initBtn = isAdmin
-    ? `<button class="btn-primary" style="width:100%;margin-bottom:12px" data-action="open-init-dossier">＋ Initier un dossier</button>`
+    ? `<button type="button" class="btn-primary" style="width:100%;margin-bottom:12px" data-action="open-init-dossier">＋ Initier un dossier</button>`
     : "";
 
   return `
@@ -358,19 +352,19 @@ function renderModal() {
       `<option value="${d.id}">${esc(d.name)} — ${facilityLabel(d.facility_type)}</option>`).join("");
     return `
       <div class="overlay" data-overlay-close="modal">
-        <div class="sheet" onclick="event.stopPropagation()">
-          <div class="sheet-title">Initier un dossier<button class="close-btn" data-action="close-modal">✕</button></div>
+        <div class="sheet">
+          <div class="sheet-title">Initier un dossier<button type="button" class="close-btn" data-action="close-modal">✕</button></div>
           <form class="form-col" data-form="init-dossier">
             <label class="small-label">Bénéficiaire</label>
-            <select class="field" name="beneficiary_id" required>${benOpts || '<option value="">Aucun membre</option>'}</select>
+            <select class="field" name="beneficiary_id" required>${renderSelectPlaceholder(benOpts)}</select>
             <label class="small-label">Médecin</label>
-            <select class="field" name="doctor_id" required>${docOpts || '<option value="">Aucun médecin</option>'}</select>
+            <select class="field" name="doctor_id" required>${renderSelectPlaceholder(docOpts)}</select>
             <label class="small-label">Date consultation</label>
-            <input class="field" name="consultation_date" placeholder="AAAA-MM-JJ" required pattern="\\d{4}-\\d{2}-\\d{2}" />
+            <input class="field field-date" name="consultation_date" type="date" required />
             <label class="small-label">Date dépôt CNSS</label>
-            <input class="field" name="cnss_deposit_date" placeholder="AAAA-MM-JJ" required pattern="\\d{4}-\\d{2}-\\d{2}" />
+            <input class="field field-date" name="cnss_deposit_date" type="date" required />
             <label class="small-label">Date envoi assurance</label>
-            <input class="field" name="assurance_sent_date" placeholder="AAAA-MM-JJ" required pattern="\\d{4}-\\d{2}-\\d{2}" />
+            <input class="field field-date" name="assurance_sent_date" type="date" required />
             <button type="submit" class="btn-primary">Enregistrer</button>
           </form>
         </div>
@@ -382,12 +376,12 @@ function renderModal() {
     if (!b) return "";
     return `
       <div class="overlay" data-overlay-close="modal">
-        <div class="sheet" onclick="event.stopPropagation()">
-          <div class="sheet-title">Modifier membre<button class="close-btn" data-action="close-modal">✕</button></div>
+        <div class="sheet">
+          <div class="sheet-title">Modifier membre<button type="button" class="close-btn" data-action="close-modal">✕</button></div>
           <form class="form-col" data-form="edit-beneficiary" data-beneficiary-id="${b.id}">
             <input class="field" name="first_name" value="${esc(b.first_name)}" required />
             <input class="field" name="last_name" value="${esc(b.last_name)}" required />
-            <input class="field" name="birth_date" value="${b.birth_date}" required pattern="\\d{4}-\\d{2}-\\d{2}" />
+            <input class="field field-date" name="birth_date" type="date" value="${b.birth_date}" required />
             <div class="segment-row">
               <button type="button" class="segment ${b.gender === "M" ? "active-week" : ""}" data-action="pick-gender" data-value="M">Homme</button>
               <button type="button" class="segment ${b.gender === "F" ? "active-week" : ""}" data-action="pick-gender" data-value="F">Femme</button>
@@ -405,8 +399,8 @@ function renderModal() {
     const types = ["cabinet", "clinique", "hopital"];
     return `
       <div class="overlay" data-overlay-close="modal">
-        <div class="sheet" onclick="event.stopPropagation()">
-          <div class="sheet-title">Modifier médecin<button class="close-btn" data-action="close-modal">✕</button></div>
+        <div class="sheet">
+          <div class="sheet-title">Modifier médecin<button type="button" class="close-btn" data-action="close-modal">✕</button></div>
           <form class="form-col" data-form="edit-doctor" data-doctor-id="${d.id}">
             <input class="field" name="name" value="${esc(d.name)}" required />
             <div class="segment-row">
@@ -426,8 +420,8 @@ function renderModal() {
     if (!c) return "";
     return `
       <div class="overlay" data-overlay-close="modal">
-        <div class="sheet" onclick="event.stopPropagation()">
-          <div class="sheet-title">Modifier catégorie<button class="close-btn" data-action="close-modal">✕</button></div>
+        <div class="sheet">
+          <div class="sheet-title">Modifier catégorie<button type="button" class="close-btn" data-action="close-modal">✕</button></div>
           <form class="form-col" data-form="edit-care-category" data-category-id="${c.id}">
             <input class="field" name="name" value="${esc(c.name)}" required />
             <button type="submit" class="btn-primary">Enregistrer</button>
@@ -439,12 +433,12 @@ function renderModal() {
   if (m.type === "add-action") {
     return `
       <div class="overlay" data-overlay-close="modal">
-        <div class="sheet" onclick="event.stopPropagation()">
-          <div class="sheet-title">Ajouter une action<button class="close-btn" data-action="close-modal">✕</button></div>
+        <div class="sheet">
+          <div class="sheet-title">Ajouter une action<button type="button" class="close-btn" data-action="close-modal">✕</button></div>
           <form class="form-col" data-form="add-action" data-dossier-id="${m.dossierId}" data-category-id="${m.categoryId}">
             <input class="field" name="price" type="number" min="0" step="0.01" placeholder="Prix en DH" required />
             <input class="field" name="place" placeholder="Lieu" required />
-            <input class="field" name="action_date" placeholder="Date d'action (AAAA-MM-JJ)" required pattern="\\d{4}-\\d{2}-\\d{2}" />
+            <input class="field field-date" name="action_date" type="date" required />
             <button type="submit" class="btn-primary">Enregistrer</button>
           </form>
         </div>
@@ -465,14 +459,14 @@ function renderModal() {
             <div class="small-label">${esc(a.place)} · ${formatDateFull(parseISODate(a.action_date))}</div>
           </div>
           ${editable ? `<div class="purchase-detail-actions">
-            <button class="icon-btn edit" data-action="open-edit-action" data-action-id="${a.id}" title="Modifier">✏️</button>
-            <button class="btn-delete" data-action="open-delete-action" data-action-id="${a.id}" title="Supprimer">🗑️</button>
+            <button type="button" class="icon-btn edit" data-action="open-edit-action" data-id="${a.id}" title="Modifier">✏️</button>
+            <button type="button" class="btn-delete" data-action="open-delete-action" data-id="${a.id}" title="Supprimer">🗑️</button>
           </div>` : ""}
         </div>`).join("");
     return `
       <div class="overlay" data-overlay-close="modal">
-        <div class="sheet" onclick="event.stopPropagation()">
-          <div class="sheet-title">${cat ? esc(cat.name) : "Détails"}<button class="close-btn" data-action="close-modal">✕</button></div>
+        <div class="sheet">
+          <div class="sheet-title">${cat ? esc(cat.name) : "Détails"}<button type="button" class="close-btn" data-action="close-modal">✕</button></div>
           ${rows}
         </div>
       </div>`;
@@ -483,12 +477,12 @@ function renderModal() {
     if (!a) return "";
     return `
       <div class="overlay" data-overlay-close="modal">
-        <div class="sheet" onclick="event.stopPropagation()">
-          <div class="sheet-title">Modifier action<button class="close-btn" data-action="close-modal">✕</button></div>
-          <form class="form-col" data-form="edit-action" data-action-id="${a.id}">
+        <div class="sheet">
+          <div class="sheet-title">Modifier action<button type="button" class="close-btn" data-action="close-modal">✕</button></div>
+          <form class="form-col" data-form="edit-action" data-id="${a.id}">
             <input class="field" name="price" type="number" min="0" step="0.01" value="${a.amount}" required />
             <input class="field" name="place" value="${esc(a.place)}" required />
-            <input class="field" name="action_date" value="${a.action_date}" required pattern="\\d{4}-\\d{2}-\\d{2}" />
+            <input class="field field-date" name="action_date" type="date" value="${a.action_date}" required />
             <button type="submit" class="btn-primary">Enregistrer</button>
           </form>
         </div>
@@ -496,14 +490,16 @@ function renderModal() {
   }
 
   if (m.type === "confirm-delete-action") {
+    const a = state.careActions.find(x => x.id === m.actionId);
+    const label = a ? `${money(a.amount)} DH — ${a.place}` : "";
     return `
       <div class="overlay" data-overlay-close="modal">
-        <div class="sheet" onclick="event.stopPropagation()">
-          <div class="sheet-title">Supprimer<button class="close-btn" data-action="close-modal">✕</button></div>
-          <p class="confirm-text">Supprimer cette action de soin ?</p>
+        <div class="sheet">
+          <div class="sheet-title">Confirmer la suppression<button type="button" class="close-btn" data-action="close-modal">✕</button></div>
+          <p class="confirm-text">Voulez-vous vraiment supprimer cette action <strong>${esc(label)}</strong> ? Cette action est irréversible.</p>
           <div class="btn-row">
-            <button class="btn-primary" style="background:var(--danger)" data-action="confirm-delete-action" data-action-id="${m.actionId}">Supprimer</button>
-            <button class="btn-primary" data-action="close-modal">Annuler</button>
+            <button type="button" class="btn-danger" data-action="confirm-delete-action" data-id="${m.actionId}">Supprimer</button>
+            <button type="button" class="btn-secondary" data-action="close-modal">Annuler</button>
           </div>
         </div>
       </div>`;
