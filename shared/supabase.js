@@ -1,0 +1,4 @@
+export const SUPABASE_URL = "https://ksroqexqagidnhrihmmq.supabase.co";
+export const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtzcm9xZXhxYWdpZG5ocmlobW1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3Mjg1MjMsImV4cCI6MjEwNDMwNDUyM30.hRqj2HHBg12kjp1Y_YPv4eoD7KTQ7cZBPeYk9b3k2f0";
+
+export const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
