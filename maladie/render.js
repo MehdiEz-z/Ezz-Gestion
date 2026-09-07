@@ -5,7 +5,7 @@ import {
   categoryTotalForDossier, actionsForCategory, facilityLabel, genderLabel,
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
-import { esc, formatDateFull, money, parseISODate } from "../shared/utils.js";
+import { esc, formatDateFull, money, parseISODate, renderDateField } from "../shared/utils.js";
 
 export function render() {
   document.getElementById("subtabs").innerHTML = `
@@ -72,18 +72,20 @@ function renderSyntheseTab() {
       </div>`;
     }).join("");
 
+  const totalReimb = s.totalCnss + s.totalAss;
+
   return `
     <div class="stack">
       <div class="card" style="border-color:var(--danger)">
         <div class="card-head">
           <div>
             <div class="card-title" style="color:var(--danger)">Total dépensé</div>
-            <div class="small-label">${money(s.totalSpent)} DH dépensés · ${money(s.totalCnss + s.totalAss)} DH remboursés</div>
+            <span class="badge badge-danger">Charge globale : ${money(s.globalCharge)} DH</span>
           </div>
+          <div class="card-preview">${money(s.totalSpent)} DH dépensé<br>${money(totalReimb)} DH remboursé</div>
         </div>
         <div class="card-body open">
           ${renderDualProgress(s.totalSpent, s.totalCnss, s.totalAss)}
-          <span class="badge badge-danger" style="margin-top:10px;display:inline-block">Charge globale : ${money(s.globalCharge)} DH</span>
         </div>
       </div>
 
@@ -94,8 +96,8 @@ function renderSyntheseTab() {
             <span class="badge badge-current">${s.totalDossiers} dossier${s.totalDossiers > 1 ? "s" : ""}</span>
           </div>
           <div class="card-preview" style="text-align:right">
-            <div>${s.rembourseCount} remboursé${s.rembourseCount > 1 ? "s" : ""}</div>
-            <div style="font-size:11px;color:var(--muted)">${s.pendingCount} en attente</div>
+            <div>${s.pendingCount} en attente</div>
+            <div style="font-size:11px;color:var(--muted)">${s.rembourseCount} remboursé${s.rembourseCount > 1 ? "s" : ""}</div>
           </div>
         </div>
         <div class="card-body open">
@@ -166,7 +168,7 @@ function renderReferentielTab() {
     <form class="form-col" data-form="add-beneficiary">
       <input class="field" name="first_name" placeholder="Prénom" required />
       <input class="field" name="last_name" placeholder="Nom" required />
-      <input class="field field-date" name="birth_date" type="date" required />
+      ${renderDateField("birth_date")}
       <div class="segment-row">
         <button type="button" class="segment active-week" data-action="pick-gender" data-value="M">Homme</button>
         <button type="button" class="segment" data-action="pick-gender" data-value="F">Femme</button>
@@ -226,7 +228,7 @@ function renderReferentielTab() {
       </div>
 
       ${renderExpandableAddCard("ref:add-cat", "Ajouter une catégorie de soin", addCatForm)}
-      <div class="card card-add">
+      <div class="card card-list-neutral">
         <div class="card-head" data-action="toggle-card" data-key="ref:care-cats">
           <div class="card-title">Catégories de soins</div>
           <div style="display:flex;align-items:center;gap:10px">
@@ -312,7 +314,7 @@ function renderDossierCard(d) {
           <span class="badge ${statusBadgeClass(d.status)}">${STATUS_LABELS[d.status] || d.status}</span>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
-          <div class="card-preview">${money(spent)} DH<br><span class="small-label ${remCls}">Reste : ${money(remainder)} DH</span></div>
+          <div class="card-preview">${money(spent)} DH<br><span class="small-label ${remCls}">Charge finale : ${money(remainder)} DH</span></div>
           <span class="chevron">${open ? "▲" : "▼"}</span>
         </div>
       </div>
@@ -360,11 +362,11 @@ function renderModal() {
             <label class="small-label">Médecin</label>
             <select class="field" name="doctor_id" required>${renderSelectPlaceholder(docOpts)}</select>
             <label class="small-label">Date consultation</label>
-            <input class="field field-date" name="consultation_date" type="date" required />
+            ${renderDateField("consultation_date")}
             <label class="small-label">Date dépôt CNSS</label>
-            <input class="field field-date" name="cnss_deposit_date" type="date" required />
+            ${renderDateField("cnss_deposit_date")}
             <label class="small-label">Date envoi assurance</label>
-            <input class="field field-date" name="assurance_sent_date" type="date" required />
+            ${renderDateField("assurance_sent_date")}
             <button type="submit" class="btn-primary">Enregistrer</button>
           </form>
         </div>
@@ -381,7 +383,7 @@ function renderModal() {
           <form class="form-col" data-form="edit-beneficiary" data-beneficiary-id="${b.id}">
             <input class="field" name="first_name" value="${esc(b.first_name)}" required />
             <input class="field" name="last_name" value="${esc(b.last_name)}" required />
-            <input class="field field-date" name="birth_date" type="date" value="${b.birth_date}" required />
+            ${renderDateField("birth_date", { value: b.birth_date })}
             <div class="segment-row">
               <button type="button" class="segment ${b.gender === "M" ? "active-week" : ""}" data-action="pick-gender" data-value="M">Homme</button>
               <button type="button" class="segment ${b.gender === "F" ? "active-week" : ""}" data-action="pick-gender" data-value="F">Femme</button>
@@ -438,7 +440,7 @@ function renderModal() {
           <form class="form-col" data-form="add-action" data-dossier-id="${m.dossierId}" data-category-id="${m.categoryId}">
             <input class="field" name="price" type="number" min="0" step="0.01" placeholder="Prix en DH" required />
             <input class="field" name="place" placeholder="Lieu" required />
-            <input class="field field-date" name="action_date" type="date" required />
+            ${renderDateField("action_date")}
             <button type="submit" class="btn-primary">Enregistrer</button>
           </form>
         </div>
@@ -482,7 +484,7 @@ function renderModal() {
           <form class="form-col" data-form="edit-action" data-id="${a.id}">
             <input class="field" name="price" type="number" min="0" step="0.01" value="${a.amount}" required />
             <input class="field" name="place" value="${esc(a.place)}" required />
-            <input class="field field-date" name="action_date" type="date" value="${a.action_date}" required />
+            ${renderDateField("action_date", { value: a.action_date })}
             <button type="submit" class="btn-primary">Enregistrer</button>
           </form>
         </div>

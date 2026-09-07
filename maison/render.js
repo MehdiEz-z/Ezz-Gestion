@@ -257,9 +257,9 @@ function renderCategoriesTab() {
         </div>
       </div>
       ${renderExpandableAddCard("places:add", "Ajouter un lieu", addPlaceForm)}
-      <div class="card card-places">
+      <div class="card card-list-neutral">
         <div class="card-head" data-action="toggle-card" data-key="places:list">
-          <div class="card-title" style="color:var(--month)">Lieux d'achat</div>
+          <div class="card-title">Lieux d'achat</div>
           <div style="display:flex;align-items:center;gap:10px">
             <div class="card-preview">${state.places.length} lieu${state.places.length > 1 ? "x" : ""}</div>
             <span class="chevron">${placesOpen ? "▲" : "▼"}</span>
