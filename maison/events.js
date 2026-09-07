@@ -1,5 +1,7 @@
+import { isAdmin } from "../shared/auth.js";
+import { getActiveModule } from "../shared/router.js";
 import {
-  ui, state, isAdmin,
+  ui, state,
   setMonthBudget, setWeekBudget,
   addCategory, updateCategory, deleteCategory,
   addPlace, updatePlace, deletePlace,
@@ -14,6 +16,7 @@ export function setupEvents() {
 }
 
 function onClick(e) {
+  if (getActiveModule() !== "maison") return;
   if (e.target.classList && e.target.classList.contains("overlay")) {
     const type = e.target.dataset.overlayClose;
     if (type === "month") ui.monthPanelOpen = false;
@@ -124,6 +127,7 @@ async function handleConfirmDelete(entity, id) {
 }
 
 async function onSubmit(e) {
+  if (getActiveModule() !== "maison") return;
   const form = e.target.closest("[data-form]");
   if (!form) return;
   e.preventDefault();
