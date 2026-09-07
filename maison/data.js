@@ -5,6 +5,10 @@ export let currentUser = null;
 export let isAdmin = false;
 export let state = { categories: [], places: [], purchases: [], monthlyBudgets: {}, weeklyBudgets: {} };
 
+export function setCurrentUser(user) {
+  currentUser = user;
+}
+
 export const ui = {
   subTab: "budget",
   viewedMonthKey: null,
