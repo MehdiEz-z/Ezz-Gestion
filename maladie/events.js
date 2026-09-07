@@ -70,15 +70,22 @@ function onClick(e) {
     render();
   }
   else if (action === "open-edit-action") {
-    ui.modal = { type: "edit-action", actionId: target.dataset.actionId };
+    const prev = ui.modal && ui.modal.type === "action-details" ? { ...ui.modal } : null;
+    ui.modal = { type: "edit-action", actionId: target.dataset.id, returnTo: prev };
     render();
   }
   else if (action === "open-delete-action") {
-    ui.modal = { type: "confirm-delete-action", actionId: target.dataset.actionId };
+    const prev = ui.modal && ui.modal.type === "action-details" ? { ...ui.modal } : null;
+    ui.modal = { type: "confirm-delete-action", actionId: target.dataset.id, returnTo: prev };
     render();
   }
   else if (action === "confirm-delete-action") {
-    deleteCareAction(target.dataset.actionId).then(() => { ui.modal = null; render(); });
+    const returnTo = ui.modal && ui.modal.returnTo;
+    deleteCareAction(target.dataset.id).then((ok) => {
+      if (!ok) return;
+      ui.modal = returnTo || null;
+      render();
+    });
   }
   else if (action === "close-modal") { ui.modal = null; render(); }
 }
@@ -141,11 +148,10 @@ async function onSubmit(e) {
   else if (type === "update-reimb") {
     const dossierId = form.dataset.dossierId;
     const block = form.dataset.block;
-    const expected = form.expected.value;
-    const received = form.received.value;
+    const amount = form.amount.value;
     const payload = block === "cnss"
-      ? { cnssExpected: expected, cnssReceived: received }
-      : { assuranceExpected: expected, assuranceReceived: received };
+      ? { cnssReceived: amount }
+      : { assuranceReceived: amount };
     await updateReimbursements(dossierId, payload);
     render();
   }
@@ -157,8 +163,9 @@ async function onSubmit(e) {
   }
   else if (type === "edit-action") {
     const price = parseFloat(form.price.value);
-    const ok = await updateCareAction(form.dataset.actionId, price, form.place.value, form.action_date.value);
-    if (ok) ui.modal = null;
+    const returnTo = ui.modal && ui.modal.returnTo;
+    const ok = await updateCareAction(form.dataset.id, price, form.place.value, form.action_date.value);
+    if (ok) ui.modal = returnTo || null;
     render();
   }
 }
