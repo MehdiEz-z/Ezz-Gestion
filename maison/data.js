@@ -1,13 +1,8 @@
 import { supabaseClient } from "../shared/supabase.js";
+import { isAdmin, currentUser } from "../shared/auth.js";
 import { flash, getErrorMessage, normalizeName, toISO, getWeekStart, activeMonthKey, money } from "../shared/utils.js";
 
-export let currentUser = null;
-export let isAdmin = false;
 export let state = { categories: [], places: [], purchases: [], monthlyBudgets: {}, weeklyBudgets: {} };
-
-export function setCurrentUser(user) {
-  currentUser = user;
-}
 
 export const ui = {
   subTab: "budget",
@@ -19,12 +14,6 @@ export const ui = {
 
 export function resetState() {
   state = { categories: [], places: [], purchases: [], monthlyBudgets: {}, weeklyBudgets: {} };
-}
-
-export function updateAccessRights() {
-  const meta = currentUser && currentUser.user_metadata;
-  isAdmin = !!(meta && meta.role === "admin");
-  document.body.classList.toggle("read-only-mode", !isAdmin);
 }
 
 export async function fetchStateFromSupabase() {
@@ -291,8 +280,4 @@ function checkBudgetAlert(type, date) {
     const we = toISO(new Date(new Date(ws).getTime() + 6 * 86400000));
     if (weekSpentTotal(ws, we) > budget) flash("Alerte : budget hebdo dépassé !", true);
   }
-}
-
-export function getFakeEmail(username) {
-  return username.trim().toLowerCase() + "@ezz-gestion.app";
 }
