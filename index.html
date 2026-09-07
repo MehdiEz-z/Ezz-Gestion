@@ -114,8 +114,9 @@
 <div id="app">
   <header>
     <div class="header-title" id="header-title">Gestion achats maison</div>
-    <div style="display:flex;gap:8px;">
-      <button class="month-btn" id="logout-btn" style="display:none;background:var(--danger);color:#fff;border:none;">🚪</button>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span id="user-badge" style="display:none;font-size:11px;font-weight:700;padding:4px 8px;border-radius:999px;background:var(--week);color:#fff;"></span>
+      <button class="month-btn" id="logout-btn" style="display:none;background:var(--danger);color:#fff;border:none;">🚪 Déco</button>
       <button class="month-btn" data-action="open-month-panel">📅 <span id="month-btn-label"></span></button>
     </div>
   </header>
@@ -794,6 +795,11 @@ async function initApp() {
     await fetchStateFromSupabase();
     document.getElementById("auth-overlay").style.display = "none";
     document.getElementById("logout-btn").style.display = "block";
+    const username = currentUser.email.split('@')[0];
+    const badge = document.getElementById("user-badge");
+    badge.style.display = "inline-block";
+    badge.textContent = username + (isAdmin ? " 👑" : " 👁");
+    badge.style.background = isAdmin ? "var(--month)" : "var(--muted)";
     render();
   }
 
@@ -804,6 +810,11 @@ async function initApp() {
       await fetchStateFromSupabase();
       document.getElementById("auth-overlay").style.display = "none";
       document.getElementById("logout-btn").style.display = "block";
+      const username = currentUser.email.split('@')[0];
+      const badge = document.getElementById("user-badge");
+      badge.style.display = "inline-block";
+      badge.textContent = username + (isAdmin ? " 👑" : " 👁");
+      badge.style.background = isAdmin ? "var(--month)" : "var(--muted)";
       render();
     } else if (event === 'SIGNED_OUT') {
       currentUser = null;
@@ -811,6 +822,7 @@ async function initApp() {
       state = { categories: [], places: [], purchases: [], monthlyBudgets: {}, weeklyBudgets: {} };
       document.getElementById("auth-overlay").style.display = "flex";
       document.getElementById("logout-btn").style.display = "none";
+      document.getElementById("user-badge").style.display = "none";
     }
   });
 }
