@@ -54,11 +54,18 @@ document.getElementById("auth-form").addEventListener("submit", async (e) => {
   const password = document.getElementById("auth-password").value;
   const msgEl = document.getElementById("auth-msg");
   msgEl.textContent = "Connexion en cours...";
-  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  const { data: authData, error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if (error) {
     msgEl.textContent = getErrorMessage(error, "Nom d'utilisateur ou mot de passe incorrect.");
-  } else {
+  } else if (authData.session?.user) {
     msgEl.textContent = "";
+    try {
+      await handleSession(authData.session.user);
+    } catch (err) {
+      msgEl.textContent = getErrorMessage(err, "Erreur lors de la connexion.");
+    }
+  } else {
+    msgEl.textContent = "Connexion impossible. Réessayez.";
   }
 });
 
