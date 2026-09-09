@@ -351,11 +351,13 @@ function renderAchatsTab() {
     const weekRows = getPeriodDisplayRows("hebdo", isoWs);
     const catRows = weekRows.map(r => renderPeriodRow(r, "hebdo", status === "current", { weekStart: isoWs }, isPast)).filter(Boolean).join("");
     const hasCatRows = catRows.length > 0;
+    const hasPurchases = total > 0;
     const isCurrent = status === "current";
+    const canShowWeekBody = canExpand && (isCurrent || hasCatRows || hasPurchases);
 
     return `
       <div class="card ${status === "future" ? "disabled" : ""}" style="border-color:var(--week)">
-        <div class="card-head" data-action="${canExpand && (isCurrent || hasCatRows) ? "toggle-card" : ""}" data-key="${key}">
+        <div class="card-head" data-action="${canShowWeekBody ? "toggle-card" : ""}" data-key="${key}">
           <div>
             <div class="card-title" style="color:var(--week)">Achat Semaine ${n}</div>
             <div class="card-range">${formatDateShort(wStart)} → ${formatDateShort(addDays(wStart, 6))}</div>
@@ -364,7 +366,7 @@ function renderAchatsTab() {
           </div>
           <div style="display:flex;align-items:center;gap:10px">
             <div class="card-preview">${status === "future" ? "" : budget !== undefined ? money(total) + " DH consommé" + (budget !== undefined ? `<br><span class="small-label ${remCls}">Reste : ${money(remaining)} DH</span>` : "") : "Budget non défini"}</div>
-            ${canExpand && (isCurrent || hasCatRows) ? `<span class="chevron">${open ? "▲" : "▼"}</span>` : ""}
+            ${canShowWeekBody ? `<span class="chevron">${open ? "▲" : "▼"}</span>` : ""}
           </div>
         </div>
         ${status !== "future" && budget === undefined ? `
@@ -376,7 +378,7 @@ function renderAchatsTab() {
             ${state.categories.filter(c => c.type === "hebdo").length === 0 && weekRows.length === 0 ? `<div class="small-label">Aucune catégorie hebdo créée.</div>` : weekRows.length === 0 ? `<div class="small-label">Sélectionne une catégorie ci-dessus.</div>` : `
               <ul class="list">${catRows}</ul>`}
           </div>
-        ` : status !== "future" && hasCatRows ? `
+        ` : status !== "future" && isPast && canShowWeekBody ? `
           <div class="card-body ${open ? "open" : ""}">
             ${weekOver ? `<div class="alert-banner">Budget hebdo dépassé !</div>` : ""}
             <ul class="list">${catRows}</ul>
