@@ -282,6 +282,58 @@ function statusBadgeClass(status) {
   return "badge-current";
 }
 
+function renderCnssDepositRow(d, editable) {
+  if (d.cnss_deposit_date && d.dossier_number) {
+    return `<div class="small-label" style="margin-bottom:8px">Dépôt CNSS : ${formatDateFull(parseISODate(d.cnss_deposit_date))}</div>`;
+  }
+  if (!editable) {
+    return `<div class="small-label" style="margin-bottom:8px">Dépôt CNSS : ${d.cnss_deposit_date ? formatDateFull(parseISODate(d.cnss_deposit_date)) : "—"}</div>`;
+  }
+  if (!d.cnss_deposit_date) {
+    return `
+      <form class="inline-form dossier-date-row" data-form="save-cnss-deposit-date" data-dossier-id="${d.id}" style="margin-bottom:8px">
+        ${renderDateField("cnss_deposit_date", { required: true })}
+        <button type="submit" class="btn-check" style="background:var(--month)" title="Enregistrer">✓</button>
+      </form>`;
+  }
+  return `
+    <form class="inline-form dossier-date-row" data-form="assign-dossier-number" data-dossier-id="${d.id}" style="margin-bottom:8px">
+      <input class="field" name="dossier_number" placeholder="N° dossier CNSS" required />
+      <button type="submit" class="btn-check" style="background:var(--month)" title="Attribuer N°">✓</button>
+    </form>`;
+}
+
+function renderAssuranceDepositRow(d, editable) {
+  if (d.assurance_sent_date) {
+    return `<div class="small-label" style="margin-bottom:12px">Dépôt assurance : ${formatDateFull(parseISODate(d.assurance_sent_date))}</div>`;
+  }
+  if (!editable) {
+    return `<div class="small-label" style="margin-bottom:12px">Dépôt assurance : —</div>`;
+  }
+  return `
+    <form class="inline-form dossier-date-row" data-form="save-assurance-sent-date" data-dossier-id="${d.id}" style="margin-bottom:12px">
+      ${renderDateField("assurance_sent_date", { required: true })}
+      <button type="submit" class="btn-check" style="background:var(--week)" title="Enregistrer">✓</button>
+    </form>`;
+}
+
+function renderReimbBlock(d, block, editable) {
+  const isCnss = block === "cnss";
+  const color = isCnss ? "var(--month)" : "var(--week)";
+  const label = isCnss ? "CNSS" : "Assurance";
+  const received = isCnss ? d.cnss_received : d.assurance_received;
+  return `
+    <div class="reimb-block" style="border-color:${color}">
+      <div class="reimb-title" style="color:${color}">${label}</div>
+      ${editable ? `
+        <form class="inline-form" data-form="update-reimb" data-dossier-id="${d.id}" data-block="${block}">
+          <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant" value="${received != null ? received : ""}" />
+          <button type="submit" class="btn-check" style="background:${color}" title="Enregistrer">✓</button>
+        </form>` : `
+        <div class="small-label">Montant : ${received != null ? money(received) + " DH" : "—"}</div>`}
+    </div>`;
+}
+
 function renderDossierCard(d) {
   const key = "dossier:" + d.id;
   const open = ui.expanded.has(key);
@@ -293,40 +345,13 @@ function renderDossierCard(d) {
   const doctor = state.doctors.find(doc => doc.id === d.doctor_id);
   const activeCats = getActiveCategoriesForDossier(d.id);
 
-  const datesHtml = editable ? `
-    <form class="form-col" data-form="update-dossier-dates" data-dossier-id="${d.id}" style="margin-bottom:12px">
-      ${renderDateField("cnss_deposit_date", { value: d.cnss_deposit_date || "", required: false })}
-      ${renderDateField("assurance_sent_date", { value: d.assurance_sent_date || "", required: false })}
-      <button type="submit" class="btn-small" style="background:var(--month);align-self:flex-start">Enregistrer les dates</button>
-    </form>` : `
-    <div class="small-label" style="margin-bottom:8px">Dépôt CNSS : ${d.cnss_deposit_date ? formatDateFull(parseISODate(d.cnss_deposit_date)) : "—"}</div>
-    <div class="small-label" style="margin-bottom:12px">Dépôt assurance : ${d.assurance_sent_date ? formatDateFull(parseISODate(d.assurance_sent_date)) : "—"}</div>`;
+  const cnssRowHtml = renderCnssDepositRow(d, editable);
+  const assuranceRowHtml = renderAssuranceDepositRow(d, editable);
 
-  const cnssBlock = d.cnss_deposit_date ? `
-    <div class="reimb-block" style="border-color:var(--month);margin-bottom:12px">
-      <div class="reimb-title" style="color:var(--month)">CNSS</div>
-      ${editable && !d.dossier_number ? `
-        <form class="inline-form" data-form="assign-dossier-number" data-dossier-id="${d.id}" style="margin-bottom:8px">
-          <input class="field" name="dossier_number" placeholder="N° dossier CNSS" required />
-          <button type="submit" class="btn-small" style="background:var(--month)">Attribuer N°</button>
-        </form>` : d.dossier_number ? `<div class="small-label" style="margin-bottom:8px">N° ${esc(d.dossier_number)}</div>` : ""}
-      ${editable ? `
-        <form class="form-col" data-form="update-reimb" data-dossier-id="${d.id}" data-block="cnss">
-          <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant CNSS en DH" value="${d.cnss_received != null ? d.cnss_received : ""}" />
-          <button type="submit" class="btn-small" style="background:var(--month)">Enregistrer</button>
-        </form>` : `
-        <div class="small-label">Montant : ${d.cnss_received != null ? money(d.cnss_received) + " DH" : "—"}</div>`}
-    </div>` : "";
-
-  const assBlock = d.assurance_sent_date ? `
-    <div class="reimb-block" style="border-color:var(--week);margin-bottom:12px">
-      <div class="reimb-title" style="color:var(--week)">Assurance</div>
-      ${editable ? `
-        <form class="form-col" data-form="update-reimb" data-dossier-id="${d.id}" data-block="assurance">
-          <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant assurance en DH" value="${d.assurance_received != null ? d.assurance_received : ""}" />
-          <button type="submit" class="btn-small" style="background:var(--week)">Enregistrer</button>
-        </form>` : `
-        <div class="small-label">Montant : ${d.assurance_received != null ? money(d.assurance_received) + " DH" : "—"}</div>`}
+  const reimbHtml = (d.cnss_deposit_date || d.assurance_sent_date) ? `
+    <div class="reimb-grid">
+      ${d.cnss_deposit_date ? renderReimbBlock(d, "cnss", editable) : ""}
+      ${d.assurance_sent_date ? renderReimbBlock(d, "assurance", editable) : ""}
     </div>` : "";
 
   const categoriesHtml = state.careCategories.length === 0
@@ -357,9 +382,9 @@ function renderDossierCard(d) {
           <div class="small-label"><strong>Médecin :</strong> ${doctor ? esc(doctor.name) : "—"}</div>
           <div class="small-label"><strong>Consultation :</strong> ${formatDateFull(parseISODate(d.consultation_date))}</div>
         </div>
-        ${datesHtml}
-        ${cnssBlock}
-        ${assBlock}
+        ${cnssRowHtml}
+        ${assuranceRowHtml}
+        ${reimbHtml}
         <div class="card-title" style="margin:16px 0 8px;font-size:14px">Soins par catégorie</div>
         ${renderDossierCategoryPicker(d.id)}
         ${categoriesHtml}
