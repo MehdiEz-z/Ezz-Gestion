@@ -1,8 +1,10 @@
 import {
   state, ui, STATUS_LABELS, globalStats, alertDossiers,
   beneficiaryName, beneficiaryDossierCount, dossierSpentTotal, dossierRemainder,
-  dossierReimbursedTotal, isDossierEditable, isDossierLocked,
+  isDossierEditable, isDossierLocked, isDossierCareLocked, canEditCareActions,
   categoryTotalForDossier, actionsForCategory, facilityLabel, genderLabel,
+  getActiveCategoriesForDossier, getAvailableCategoriesForDossier,
+  isDossierCategoryAssigned,
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
 import { esc, formatDateFull, money, parseISODate, renderDateField } from "../shared/utils.js";
@@ -53,8 +55,38 @@ function renderExpandableAddCard(key, title, bodyHtml) {
     </div>`;
 }
 
-function renderSelectPlaceholder(optionsHtml) {
-  return `<option value="" disabled selected hidden>Choisir…</option>${optionsHtml}`;
+function renderSelectPlaceholder(optionsHtml, label = "Choisir…") {
+  return `<option value="" disabled selected hidden>${esc(label)}</option>${optionsHtml}`;
+}
+
+function renderDossierCategoryPicker(dossierId) {
+  if (!isAdmin || isDossierCareLocked(state.dossiers.find(x => x.id === dossierId))) return "";
+  const available = getAvailableCategoriesForDossier(dossierId);
+  if (available.length === 0) return "";
+  return `
+    <div class="period-cat-picker">
+      <div class="chip-row period-cat-scroll">
+        ${available.map(c => `
+          <button type="button" class="chip chip-pick chip-pick-month" data-action="assign-dossier-category" data-dossier-id="${dossierId}" data-category-id="${c.id}">${esc(c.name)}</button>
+        `).join("")}
+      </div>
+    </div>`;
+}
+
+function renderDossierCategoryRow(d, cat) {
+  const total = categoryTotalForDossier(cat.id, d.id);
+  const careEditable = canEditCareActions(d);
+  const canUnassign = careEditable && total === 0 && isDossierCategoryAssigned(d.id, cat.id);
+  return `
+    <li class="item-row">
+      <div class="item-name">${esc(cat.name)}</div>
+      <div class="item-amount">${money(total)} DH</div>
+      <div class="item-actions">
+        <button type="button" class="icon-btn" ${total === 0 ? "disabled" : ""} data-action="open-action-details" data-dossier-id="${d.id}" data-category-id="${cat.id}" title="Détails">🧾</button>
+        ${careEditable ? `<button type="button" class="icon-btn add" data-action="open-add-action" data-dossier-id="${d.id}" data-category-id="${cat.id}" title="Ajouter">＋</button>` : ""}
+        ${canUnassign ? `<button type="button" class="btn-delete" data-action="unassign-dossier-category" data-dossier-id="${d.id}" data-category-id="${cat.id}" title="Retirer">✕</button>` : ""}
+      </div>
+    </li>`;
 }
 
 function renderSyntheseTab() {
@@ -258,51 +290,53 @@ function renderDossierCard(d) {
   const remainder = dossierRemainder(d);
   const editable = isDossierEditable(d);
   const remCls = remainder > 0 ? "danger" : "success";
+  const doctor = state.doctors.find(doc => doc.id === d.doctor_id);
+  const activeCats = getActiveCategoriesForDossier(d.id);
+
+  const datesHtml = editable ? `
+    <form class="form-col" data-form="update-dossier-dates" data-dossier-id="${d.id}" style="margin-bottom:12px">
+      ${renderDateField("cnss_deposit_date", { value: d.cnss_deposit_date || "", required: false })}
+      ${renderDateField("assurance_sent_date", { value: d.assurance_sent_date || "", required: false })}
+      <button type="submit" class="btn-small" style="background:var(--month);align-self:flex-start">Enregistrer les dates</button>
+    </form>` : `
+    <div class="small-label" style="margin-bottom:8px">Dépôt CNSS : ${d.cnss_deposit_date ? formatDateFull(parseISODate(d.cnss_deposit_date)) : "—"}</div>
+    <div class="small-label" style="margin-bottom:12px">Dépôt assurance : ${d.assurance_sent_date ? formatDateFull(parseISODate(d.assurance_sent_date)) : "—"}</div>`;
+
+  const cnssBlock = d.cnss_deposit_date ? `
+    <div class="reimb-block" style="border-color:var(--month);margin-bottom:12px">
+      <div class="reimb-title" style="color:var(--month)">CNSS</div>
+      ${editable && !d.dossier_number ? `
+        <form class="inline-form" data-form="assign-dossier-number" data-dossier-id="${d.id}" style="margin-bottom:8px">
+          <input class="field" name="dossier_number" placeholder="N° dossier CNSS" required />
+          <button type="submit" class="btn-small" style="background:var(--month)">Attribuer N°</button>
+        </form>` : d.dossier_number ? `<div class="small-label" style="margin-bottom:8px">N° ${esc(d.dossier_number)}</div>` : ""}
+      ${editable ? `
+        <form class="form-col" data-form="update-reimb" data-dossier-id="${d.id}" data-block="cnss">
+          <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant CNSS en DH" value="${d.cnss_received != null ? d.cnss_received : ""}" />
+          <button type="submit" class="btn-small" style="background:var(--month)">Enregistrer</button>
+        </form>` : `
+        <div class="small-label">Montant : ${d.cnss_received != null ? money(d.cnss_received) + " DH" : "—"}</div>`}
+    </div>` : "";
+
+  const assBlock = d.assurance_sent_date ? `
+    <div class="reimb-block" style="border-color:var(--week);margin-bottom:12px">
+      <div class="reimb-title" style="color:var(--week)">Assurance</div>
+      ${editable ? `
+        <form class="form-col" data-form="update-reimb" data-dossier-id="${d.id}" data-block="assurance">
+          <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant assurance en DH" value="${d.assurance_received != null ? d.assurance_received : ""}" />
+          <button type="submit" class="btn-small" style="background:var(--week)">Enregistrer</button>
+        </form>` : `
+        <div class="small-label">Montant : ${d.assurance_received != null ? money(d.assurance_received) + " DH" : "—"}</div>`}
+    </div>` : "";
 
   const categoriesHtml = state.careCategories.length === 0
     ? `<div class="small-label">Créez des catégories de soins dans Référentiel.</div>`
-    : `<ul class="list">${state.careCategories.map(cat => {
-      const total = categoryTotalForDossier(cat.id, d.id);
-      return `
-        <li class="item-row">
-          <div class="item-name">${esc(cat.name)}</div>
-          <div class="item-amount">${money(total)} DH</div>
-          <div class="item-actions">
-            <button type="button" class="icon-btn" ${total === 0 ? "disabled" : ""} data-action="open-action-details" data-dossier-id="${d.id}" data-category-id="${cat.id}" title="Détails">🧾</button>
-            ${editable ? `<button type="button" class="icon-btn add" data-action="open-add-action" data-dossier-id="${d.id}" data-category-id="${cat.id}" title="Ajouter">＋</button>` : ""}
-          </div>
-        </li>`;
-    }).join("")}</ul>`;
+    : activeCats.length === 0
+      ? `<div class="small-label">Sélectionne une catégorie ci-dessus.</div>`
+      : `<ul class="list">${activeCats.map(cat => renderDossierCategoryRow(d, cat)).join("")}</ul>`;
 
-  const reimbHtml = `
-    <div class="reimb-grid">
-      <div class="reimb-block" style="border-color:var(--month)">
-        <div class="reimb-title" style="color:var(--month)">CNSS</div>
-        ${editable ? `
-          <form class="form-col" data-form="update-reimb" data-dossier-id="${d.id}" data-block="cnss">
-            <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant" value="${d.cnss_received != null ? d.cnss_received : ""}" />
-            <button type="submit" class="btn-small" style="background:var(--month)">Enregistrer</button>
-          </form>` : `
-          <div class="small-label">Montant : ${d.cnss_received != null ? money(d.cnss_received) + " DH" : "—"}</div>`}
-      </div>
-      <div class="reimb-block" style="border-color:var(--week)">
-        <div class="reimb-title" style="color:var(--week)">Assurance</div>
-        ${editable ? `
-          <form class="form-col" data-form="update-reimb" data-dossier-id="${d.id}" data-block="assurance">
-            <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant" value="${d.assurance_received != null ? d.assurance_received : ""}" />
-            <button type="submit" class="btn-small" style="background:var(--week)">Enregistrer</button>
-          </form>` : `
-          <div class="small-label">Montant : ${d.assurance_received != null ? money(d.assurance_received) + " DH" : "—"}</div>`}
-      </div>
-    </div>`;
-
-  const assignNumHtml = editable && !d.dossier_number ? `
-    <form class="inline-form" data-form="assign-dossier-number" data-dossier-id="${d.id}" style="margin-bottom:12px">
-      <input class="field" name="dossier_number" placeholder="N° dossier CNSS" required />
-      <button type="submit" class="btn-small" style="background:var(--month)">Attribuer N°</button>
-    </form>` : "";
-
-  const doctor = state.doctors.find(doc => doc.id === d.doctor_id);
+  const cancelBtn = editable && d.cnss_received == null && d.dossier_number ? `
+    <button type="button" class="btn-danger" style="width:100%;margin-top:16px" data-action="cancel-dossier" data-dossier-id="${d.id}">Dossier annulé</button>` : "";
 
   return `
     <div class="card ${isDossierLocked(d) ? "disabled" : ""}" style="border-color:var(--month)">
@@ -323,10 +357,13 @@ function renderDossierCard(d) {
           <div class="small-label"><strong>Médecin :</strong> ${doctor ? esc(doctor.name) : "—"}</div>
           <div class="small-label"><strong>Consultation :</strong> ${formatDateFull(parseISODate(d.consultation_date))}</div>
         </div>
-        ${assignNumHtml}
-        ${reimbHtml}
+        ${datesHtml}
+        ${cnssBlock}
+        ${assBlock}
         <div class="card-title" style="margin:16px 0 8px;font-size:14px">Soins par catégorie</div>
+        ${renderDossierCategoryPicker(d.id)}
         ${categoriesHtml}
+        ${cancelBtn}
       </div>
     </div>`;
 }
@@ -357,16 +394,9 @@ function renderModal() {
         <div class="sheet">
           <div class="sheet-title">Initier un dossier<button type="button" class="close-btn" data-action="close-modal">✕</button></div>
           <form class="form-col" data-form="init-dossier">
-            <label class="small-label">Bénéficiaire</label>
-            <select class="field" name="beneficiary_id" required>${renderSelectPlaceholder(benOpts)}</select>
-            <label class="small-label">Médecin</label>
-            <select class="field" name="doctor_id" required>${renderSelectPlaceholder(docOpts)}</select>
-            <label class="small-label">Date consultation</label>
-            ${renderDateField("consultation_date")}
-            <label class="small-label">Date dépôt CNSS</label>
-            ${renderDateField("cnss_deposit_date")}
-            <label class="small-label">Date envoi assurance</label>
-            ${renderDateField("assurance_sent_date")}
+            <select class="field" name="beneficiary_id" required>${renderSelectPlaceholder(benOpts, "Choisir un bénéficiaire…")}</select>
+            <select class="field" name="doctor_id" required>${renderSelectPlaceholder(docOpts, "Choisir un médecin…")}</select>
+            ${renderDateField("consultation_date", { required: true })}
             <button type="submit" class="btn-primary">Enregistrer</button>
           </form>
         </div>
@@ -451,7 +481,7 @@ function renderModal() {
     const actions = actionsForCategory(m.dossierId, m.categoryId);
     const cat = state.careCategories.find(c => c.id === m.categoryId);
     const d = state.dossiers.find(x => x.id === m.dossierId);
-    const editable = d && isDossierEditable(d);
+    const editable = d && canEditCareActions(d);
     const rows = actions.length === 0
       ? `<div class="small-label">Aucune action.</div>`
       : actions.map(a => `

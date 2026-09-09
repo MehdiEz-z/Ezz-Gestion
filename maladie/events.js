@@ -4,7 +4,9 @@ import {
   addBeneficiary, updateBeneficiary,
   addDoctor, updateDoctor,
   addCareCategory, updateCareCategory,
-  createDossier, assignDossierNumber, updateReimbursements,
+  createDossier, updateDossierDates, cancelDossier,
+  assignDossierNumber, updateReimbursements,
+  assignDossierCategory, unassignDossierCategory,
   addCareAction, updateCareAction, deleteCareAction,
 } from "./data.js";
 import { render } from "./render.js";
@@ -60,6 +62,15 @@ function onClick(e) {
   else if (action === "open-edit-care-category") {
     ui.modal = { type: "edit-care-category", categoryId: target.dataset.categoryId };
     render();
+  }
+  else if (action === "assign-dossier-category") {
+    assignDossierCategory(target.dataset.dossierId, target.dataset.categoryId).then(() => render());
+  }
+  else if (action === "unassign-dossier-category") {
+    unassignDossierCategory(target.dataset.dossierId, target.dataset.categoryId).then(() => render());
+  }
+  else if (action === "cancel-dossier") {
+    cancelDossier(target.dataset.dossierId).then(() => render());
   }
   else if (action === "open-add-action") {
     ui.modal = { type: "add-action", dossierId: target.dataset.dossierId, categoryId: target.dataset.categoryId };
@@ -134,10 +145,15 @@ async function onSubmit(e) {
       beneficiaryId: form.beneficiary_id.value,
       doctorId: form.doctor_id.value,
       consultationDate: form.consultation_date.value,
+    });
+    if (ok) ui.modal = null;
+    render();
+  }
+  else if (type === "update-dossier-dates") {
+    await updateDossierDates(form.dataset.dossierId, {
       cnssDepositDate: form.cnss_deposit_date.value,
       assuranceSentDate: form.assurance_sent_date.value,
     });
-    if (ok) ui.modal = null;
     render();
   }
   else if (type === "assign-dossier-number") {
