@@ -8,6 +8,7 @@ export let state = {
   careCategories: [],
   dossiers: [],
   careActions: [],
+  dossierCareCategories: [],
 };
 
 export const ui = {
@@ -25,17 +26,21 @@ export const STATUS_LABELS = {
 };
 
 export function resetState() {
-  state = { beneficiaries: [], doctors: [], careCategories: [], dossiers: [], careActions: [] };
+  state = {
+    beneficiaries: [], doctors: [], careCategories: [],
+    dossiers: [], careActions: [], dossierCareCategories: [],
+  };
 }
 
 export async function fetchStateFromSupabase() {
   if (!currentUser) return;
-  const [ben, docs, cats, doss, actions] = await Promise.all([
+  const [ben, docs, cats, doss, actions, dossCats] = await Promise.all([
     supabaseClient.from("beneficiaries").select("*").order("last_name"),
     supabaseClient.from("doctors").select("*").order("name"),
     supabaseClient.from("care_categories").select("*").order("name"),
     supabaseClient.from("medical_dossiers").select("*").order("created_at", { ascending: false }),
     supabaseClient.from("care_actions").select("*").order("action_date", { ascending: false }),
+    supabaseClient.from("dossier_care_categories").select("*"),
   ]);
 
   if (ben.error) { flash(getErrorMessage(ben.error, "Erreur chargement bénéficiaires."), true); return; }
@@ -43,12 +48,14 @@ export async function fetchStateFromSupabase() {
   if (cats.error) { flash(getErrorMessage(cats.error, "Erreur chargement catégories soins."), true); return; }
   if (doss.error) { flash(getErrorMessage(doss.error, "Erreur chargement dossiers."), true); return; }
   if (actions.error) { flash(getErrorMessage(actions.error, "Erreur chargement actions."), true); return; }
+  if (dossCats.error) { flash(getErrorMessage(dossCats.error, "Erreur chargement catégories dossier."), true); return; }
 
   state.beneficiaries = ben.data || [];
   state.doctors = docs.data || [];
   state.careCategories = cats.data || [];
   state.dossiers = doss.data || [];
   state.careActions = actions.data || [];
+  state.dossierCareCategories = dossCats.data || [];
 }
 
 export function beneficiaryName(b) {
@@ -81,8 +88,43 @@ export function isDossierLocked(d) {
   return d.status === "rembourse";
 }
 
+/** Soins verrouillés : N° dossier renseigné et statut autre que initié */
+export function isDossierCareLocked(d) {
+  if (isDossierLocked(d)) return true;
+  return !!d.dossier_number && d.status !== "initie";
+}
+
 export function isDossierEditable(d) {
   return isAdmin && !isDossierLocked(d);
+}
+
+export function canEditCareActions(d) {
+  return isAdmin && !isDossierCareLocked(d);
+}
+
+export function isDossierCategoryAssigned(dossierId, categoryId) {
+  return state.dossierCareCategories.some(
+    dc => dc.dossier_id === dossierId && dc.category_id === categoryId
+  );
+}
+
+export function categoryHasActionsInDossier(categoryId, dossierId) {
+  return state.careActions.some(
+    a => a.category_id === categoryId && a.dossier_id === dossierId
+  );
+}
+
+export function isCategoryActiveInDossier(cat, dossierId) {
+  return categoryHasActionsInDossier(cat.id, dossierId)
+    || isDossierCategoryAssigned(dossierId, cat.id);
+}
+
+export function getActiveCategoriesForDossier(dossierId) {
+  return state.careCategories.filter(c => isCategoryActiveInDossier(c, dossierId));
+}
+
+export function getAvailableCategoriesForDossier(dossierId) {
+  return state.careCategories.filter(c => !isCategoryActiveInDossier(c, dossierId));
 }
 
 export function computeDossierStatus(d) {
@@ -264,20 +306,19 @@ export async function updateCareCategory(id, name) {
   return true;
 }
 
-export async function createDossier({ beneficiaryId, doctorId, consultationDate, cnssDepositDate, assuranceSentDate }) {
+export async function createDossier({ beneficiaryId, doctorId, consultationDate }) {
   if (!isAdmin) return false;
   const cd = parseDateInput(consultationDate);
-  const cdd = parseDateInput(cnssDepositDate);
-  const asd = parseDateInput(assuranceSentDate);
-  if (!beneficiaryId || !doctorId || !cd || !cdd || !asd) {
-    flash("Tous les champs sont obligatoires.", true); return false;
+  if (!beneficiaryId || !doctorId || !cd) {
+    flash("Bénéficiaire, médecin et date de consultation sont obligatoires.", true);
+    return false;
   }
   const { data, error } = await supabaseClient.from("medical_dossiers").insert({
     beneficiary_id: beneficiaryId,
     doctor_id: doctorId,
     consultation_date: cd,
-    cnss_deposit_date: cdd,
-    assurance_sent_date: asd,
+    cnss_deposit_date: null,
+    assurance_sent_date: null,
     status: "initie",
     locked: false,
   }).select().single();
@@ -287,10 +328,85 @@ export async function createDossier({ beneficiaryId, doctorId, consultationDate,
   return true;
 }
 
+export async function updateDossierDates(dossierId, { cnssDepositDate, assuranceSentDate }) {
+  if (!isAdmin) return false;
+  const d = state.dossiers.find(x => x.id === dossierId);
+  if (!d || isDossierLocked(d)) { flash("Dossier non modifiable.", true); return false; }
+
+  const payload = {};
+  if (cnssDepositDate !== undefined) {
+    payload.cnss_deposit_date = cnssDepositDate ? parseDateInput(cnssDepositDate) : null;
+    if (cnssDepositDate && !payload.cnss_deposit_date) {
+      flash("Date dépôt CNSS invalide.", true); return false;
+    }
+  }
+  if (assuranceSentDate !== undefined) {
+    payload.assurance_sent_date = assuranceSentDate ? parseDateInput(assuranceSentDate) : null;
+    if (assuranceSentDate && !payload.assurance_sent_date) {
+      flash("Date dépôt assurance invalide.", true); return false;
+    }
+  }
+
+  const { data, error } = await supabaseClient.from("medical_dossiers")
+    .update(payload).eq("id", dossierId).select().single();
+  if (error) { flash(getErrorMessage(error, "Erreur mise à jour dates."), true); return false; }
+  Object.assign(d, data);
+  flash("Dates enregistrées.");
+  return true;
+}
+
+export async function cancelDossier(dossierId) {
+  if (!isAdmin) return false;
+  const d = state.dossiers.find(x => x.id === dossierId);
+  if (!d || isDossierLocked(d)) { flash("Dossier non modifiable.", true); return false; }
+  if (d.cnss_received != null) {
+    flash("Impossible : le montant CNSS est déjà enregistré.", true); return false;
+  }
+  const { data, error } = await supabaseClient.from("medical_dossiers")
+    .update({ status: "initie", locked: false }).eq("id", dossierId).select().single();
+  if (error) { flash(getErrorMessage(error, "Erreur annulation dossier."), true); return false; }
+  Object.assign(d, data);
+  flash("Dossier réouvert (statut initié).");
+  return true;
+}
+
+export async function assignDossierCategory(dossierId, categoryId) {
+  if (!isAdmin) return false;
+  const d = state.dossiers.find(x => x.id === dossierId);
+  const cat = state.careCategories.find(c => c.id === categoryId);
+  if (!d || !cat || isDossierCareLocked(d)) return false;
+  if (isCategoryActiveInDossier(cat, dossierId)) return true;
+
+  const { data, error } = await supabaseClient.from("dossier_care_categories")
+    .insert({ dossier_id: dossierId, category_id: categoryId }).select().single();
+  if (error) { flash(getErrorMessage(error, "Erreur affectation catégorie."), true); return false; }
+  state.dossierCareCategories.push(data);
+  return true;
+}
+
+export async function unassignDossierCategory(dossierId, categoryId) {
+  if (!isAdmin) return false;
+  if (categoryHasActionsInDossier(categoryId, dossierId)) {
+    flash("Impossible : des soins existent pour cette catégorie.", true); return false;
+  }
+  const row = state.dossierCareCategories.find(
+    dc => dc.dossier_id === dossierId && dc.category_id === categoryId
+  );
+  if (!row) return true;
+
+  const { error } = await supabaseClient.from("dossier_care_categories").delete().eq("id", row.id);
+  if (error) { flash(getErrorMessage(error, "Erreur retrait catégorie."), true); return false; }
+  state.dossierCareCategories = state.dossierCareCategories.filter(dc => dc.id !== row.id);
+  return true;
+}
+
 export async function assignDossierNumber(dossierId, number) {
   if (!isAdmin) return false;
   const d = state.dossiers.find(x => x.id === dossierId);
   if (!d || isDossierLocked(d)) { flash("Dossier non modifiable.", true); return false; }
+  if (!d.cnss_deposit_date) {
+    flash("Renseigne d'abord la date de dépôt CNSS.", true); return false;
+  }
   const num = number.trim();
   if (!num) { flash("N° dossier obligatoire.", true); return false; }
   if (state.dossiers.some(x => x.id !== dossierId && x.dossier_number === num)) {
@@ -333,7 +449,7 @@ export async function updateReimbursements(dossierId, { cnssExpected, cnssReceiv
 export async function addCareAction(dossierId, categoryId, amount, place, actionDate) {
   if (!isAdmin) return false;
   const d = state.dossiers.find(x => x.id === dossierId);
-  if (!d || isDossierLocked(d)) { flash("Dossier verrouillé.", true); return false; }
+  if (!d || !canEditCareActions(d)) { flash("Soins non modifiables.", true); return false; }
   const ad = parseDateInput(actionDate);
   if (!ad || isNaN(amount) || amount < 0 || !place.trim()) {
     flash("Prix, lieu et date obligatoires.", true); return false;
@@ -356,7 +472,7 @@ export async function updateCareAction(id, amount, place, actionDate) {
   const action = state.careActions.find(a => a.id === id);
   if (!action) return false;
   const d = state.dossiers.find(x => x.id === action.dossier_id);
-  if (!d || isDossierLocked(d)) { flash("Dossier verrouillé.", true); return false; }
+  if (!d || !canEditCareActions(d)) { flash("Soins non modifiables.", true); return false; }
   const ad = parseDateInput(actionDate);
   if (!ad || isNaN(amount) || amount < 0 || !place.trim()) return false;
   const { data, error } = await supabaseClient.from("care_actions")
@@ -373,7 +489,7 @@ export async function deleteCareAction(id) {
   const action = state.careActions.find(a => a.id === id);
   if (!action) return false;
   const d = state.dossiers.find(x => x.id === action.dossier_id);
-  if (!d || isDossierLocked(d)) { flash("Dossier verrouillé.", true); return false; }
+  if (!d || !canEditCareActions(d)) { flash("Soins non modifiables.", true); return false; }
   const { error } = await supabaseClient.from("care_actions").delete().eq("id", id);
   if (error) { flash(getErrorMessage(error, "Erreur suppression action."), true); return false; }
   state.careActions = state.careActions.filter(a => a.id !== id);
