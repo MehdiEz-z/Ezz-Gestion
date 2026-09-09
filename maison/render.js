@@ -1,8 +1,10 @@
 import {
-  state, ui, categoryHasPurchases,
+  state, ui,
   categoryTotalForMonth, categoryTotalForWeek,
   purchasesForMonth, purchasesForWeek,
   monthSpentTotal, weekSpentTotal, isPurchaseEditable,
+  getActiveCategoriesForPeriod, getAvailableCategoriesForPeriod,
+  isPeriodCategoryAssigned,
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
 import {
@@ -164,12 +166,31 @@ function renderRemainingLabel(budget, spent) {
   return `<div class="small-label ${cls}">Reste : ${money(remaining)} DH</div>`;
 }
 
+function renderPeriodCategoryPicker(type, periodKey) {
+  if (!isAdmin) return "";
+  const available = getAvailableCategoriesForPeriod(type, periodKey);
+  if (available.length === 0) return "";
+  const ctxAttr = type === "mensuel" ? `data-month-key="${periodKey}"` : `data-week-start="${periodKey}"`;
+  const chipClass = type === "mensuel" ? "chip-pick-month" : "chip-pick-week";
+  return `
+    <div class="period-cat-picker">
+      <div class="small-label">Ajouter une catégorie</div>
+      <div class="chip-row">
+        ${available.map(c => `
+          <button type="button" class="chip chip-pick ${chipClass}" data-action="assign-category" data-category-id="${c.id}" data-type="${type}" ${ctxAttr}>${esc(c.name)}</button>
+        `).join("")}
+      </div>
+    </div>`;
+}
+
 function renderItemRow(cat, type, editable, ctx, pastOnly = false) {
+  const periodKey = type === "mensuel" ? ctx.monthKey : ctx.weekStart;
   const total = type === "mensuel"
     ? categoryTotalForMonth(cat.id, type, ctx.monthKey)
     : categoryTotalForWeek(cat.id, type, ctx.weekStart, toISO(addDays(parseISODate(ctx.weekStart), 6)));
   if (pastOnly && total === 0) return "";
   const ctxAttr = type === "mensuel" ? `data-month-key="${ctx.monthKey}"` : `data-week-start="${ctx.weekStart}"`;
+  const canUnassign = editable && !pastOnly && total === 0 && isPeriodCategoryAssigned(type, periodKey, cat.id);
   return `
     <li class="item-row">
       <div class="item-name">${esc(cat.name)}</div>
@@ -177,18 +198,18 @@ function renderItemRow(cat, type, editable, ctx, pastOnly = false) {
       <div class="item-actions">
         <button type="button" class="icon-btn" data-action="open-details" data-category-id="${cat.id}" data-type="${type}" ${ctxAttr} title="Détails">🧾</button>
         ${editable && !pastOnly ? `<button type="button" class="icon-btn add" data-action="open-add-purchase" data-category-id="${cat.id}" data-type="${type}" ${ctxAttr} title="Ajouter">＋</button>` : ""}
+        ${canUnassign ? `<button type="button" class="btn-delete" data-action="unassign-category" data-category-id="${cat.id}" data-type="${type}" ${ctxAttr} title="Retirer">✕</button>` : ""}
       </div>
     </li>`;
 }
 
 function renderCategoryRow(c) {
-  const canDelete = !categoryHasPurchases(c.id);
   return `
     <li class="list-item">
       <div class="list-item-name">${esc(c.name)}</div>
       <div class="list-item-right">
         <button class="icon-btn edit" data-action="open-edit-category" data-category-id="${c.id}" title="Modifier">✏️</button>
-        ${canDelete ? `<button class="btn-delete" data-action="open-delete-confirm" data-entity="category" data-id="${c.id}" data-label="${esc(c.name)}" title="Supprimer">🗑️</button>` : ""}
+        ${isAdmin ? `<button class="btn-delete" data-action="open-delete-confirm" data-entity="category" data-id="${c.id}" data-label="${esc(c.name)}" title="Supprimer">🗑️</button>` : ""}
       </div>
     </li>`;
 }
@@ -278,7 +299,7 @@ function renderAchatsTab() {
   const monthTotal = monthSpentTotal(monthKey);
   const monthKeyStr = "achat-month:" + monthKey;
   const monthOpen = monthBudget !== undefined && ui.expanded.has(monthKeyStr);
-  const mensuelCats = state.categories.filter(c => c.type === "mensuel");
+  const mensuelCats = getActiveCategoriesForPeriod("mensuel", monthKey);
   const monthOver = monthBudget !== undefined && monthTotal > Number(monthBudget);
   const monthRemaining = monthBudget !== undefined ? Number(monthBudget) - monthTotal : 0;
   const monthRemCls = monthRemaining < 0 ? "danger" : "success";
@@ -302,7 +323,8 @@ function renderAchatsTab() {
       ` : `
         <div class="card-body ${monthOpen ? "open" : ""}">
           ${monthOver ? `<div class="alert-banner">Budget mensuel dépassé !</div>` : ""}
-          ${mensuelCats.length === 0 ? `<div class="small-label">Aucune catégorie mensuelle créée.</div>` : `
+          ${renderPeriodCategoryPicker("mensuel", monthKey)}
+          ${state.categories.filter(c => c.type === "mensuel").length === 0 ? `<div class="small-label">Aucune catégorie mensuelle créée.</div>` : mensuelCats.length === 0 ? `<div class="small-label">Sélectionne une catégorie ci-dessus.</div>` : `
             <ul class="list">${mensuelCats.map(c => renderItemRow(c, "mensuel", true, { monthKey })).join("")}</ul>`}
         </div>
       `}
@@ -310,8 +332,6 @@ function renderAchatsTab() {
 
   const weeks = getWeeksOfMonth(monthKey);
   const todayWeekISO = toISO(getWeekStart(new Date()));
-  const hebdoCats = state.categories.filter(c => c.type === "hebdo");
-
   const weekCards = weeks.map(wStart => {
     const isoWs = toISO(wStart), isoWe = toISO(addDays(wStart, 6));
     const n = getWeekNumberInMonth(wStart);
@@ -329,12 +349,14 @@ function renderAchatsTab() {
     const weekOver = budget !== undefined && total > Number(budget);
     const remaining = budget !== undefined ? Number(budget) - total : 0;
     const remCls = remaining < 0 ? "danger" : "success";
+    const hebdoCats = getActiveCategoriesForPeriod("hebdo", isoWs);
     const catRows = hebdoCats.map(c => renderItemRow(c, "hebdo", status === "current", { weekStart: isoWs }, isPast)).filter(Boolean).join("");
     const hasCatRows = catRows.length > 0;
+    const isCurrent = status === "current";
 
     return `
       <div class="card ${status === "future" ? "disabled" : ""}" style="border-color:var(--week)">
-        <div class="card-head" data-action="${canExpand && (status === "current" || hasCatRows) ? "toggle-card" : ""}" data-key="${key}">
+        <div class="card-head" data-action="${canExpand && (isCurrent || hasCatRows) ? "toggle-card" : ""}" data-key="${key}">
           <div>
             <div class="card-title" style="color:var(--week)">Achat Semaine ${n}</div>
             <div class="card-range">${formatDateShort(wStart)} → ${formatDateShort(addDays(wStart, 6))}</div>
@@ -343,11 +365,18 @@ function renderAchatsTab() {
           </div>
           <div style="display:flex;align-items:center;gap:10px">
             <div class="card-preview">${status === "future" ? "" : budget !== undefined ? money(total) + " DH consommé" + (budget !== undefined ? `<br><span class="small-label ${remCls}">Reste : ${money(remaining)} DH</span>` : "") : "Budget non défini"}</div>
-            ${canExpand && (status === "current" || hasCatRows) ? `<span class="chevron">${open ? "▲" : "▼"}</span>` : ""}
+            ${canExpand && (isCurrent || hasCatRows) ? `<span class="chevron">${open ? "▲" : "▼"}</span>` : ""}
           </div>
         </div>
         ${status !== "future" && budget === undefined ? `
           <div style="padding:0 16px 16px" class="small-label">Définis d'abord le budget de cette semaine dans l'onglet Budget.</div>
+        ` : status !== "future" && isCurrent ? `
+          <div class="card-body ${open ? "open" : ""}">
+            ${weekOver ? `<div class="alert-banner">Budget hebdo dépassé !</div>` : ""}
+            ${renderPeriodCategoryPicker("hebdo", isoWs)}
+            ${state.categories.filter(c => c.type === "hebdo").length === 0 ? `<div class="small-label">Aucune catégorie hebdo créée.</div>` : hebdoCats.length === 0 ? `<div class="small-label">Sélectionne une catégorie ci-dessus.</div>` : `
+              <ul class="list">${catRows}</ul>`}
+          </div>
         ` : status !== "future" && hasCatRows ? `
           <div class="card-body ${open ? "open" : ""}">
             ${weekOver ? `<div class="alert-banner">Budget hebdo dépassé !</div>` : ""}
@@ -464,7 +493,6 @@ function renderEditBudgetModal(m) {
 function renderEditCategoryModal(m) {
   const cat = state.categories.find(c => c.id === m.categoryId);
   if (!cat) return "";
-  const hasPurchases = categoryHasPurchases(cat.id);
   return `
     <div class="overlay" data-overlay-close="modal">
       <div class="sheet">
@@ -472,11 +500,10 @@ function renderEditCategoryModal(m) {
         <form class="form-col" data-form="edit-category" data-category-id="${cat.id}">
           <input class="field" name="name" value="${esc(cat.name)}" required />
           <div class="segment-row">
-            <button type="button" class="segment ${cat.type === "hebdo" ? "active-week" : ""} ${hasPurchases && cat.type !== "hebdo" ? "disabled" : ""}" data-action="pick-cat-type" data-value="hebdo" ${hasPurchases && cat.type !== "hebdo" ? "disabled" : ""}>Hebdo</button>
-            <button type="button" class="segment ${cat.type === "mensuel" ? "active-month" : ""} ${hasPurchases && cat.type !== "mensuel" ? "disabled" : ""}" data-action="pick-cat-type" data-value="mensuel" ${hasPurchases && cat.type !== "mensuel" ? "disabled" : ""}>Mensuel</button>
+            <button type="button" class="segment ${cat.type === "hebdo" ? "active-week" : ""}" data-action="pick-cat-type" data-value="hebdo">Hebdo</button>
+            <button type="button" class="segment ${cat.type === "mensuel" ? "active-month" : ""}" data-action="pick-cat-type" data-value="mensuel">Mensuel</button>
           </div>
           <input type="hidden" name="type" value="${cat.type}" />
-          ${hasPurchases ? `<div class="small-label">Le type ne peut pas être modifié : des achats existent.</div>` : ""}
           <button type="submit" class="btn-primary">Enregistrer</button>
         </form>
       </div>
