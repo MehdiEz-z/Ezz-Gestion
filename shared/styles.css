@@ -448,6 +448,16 @@ nav.bottom {
 .chip.is-selected { background: var(--month); border-color: var(--month); color: #fff; }
 .chip.is-disabled { opacity: 0.4; cursor: not-allowed; }
 
+.period-cat-picker {
+  padding: 0 16px 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.chip-pick { border-style: dashed; }
+.chip-pick-month:hover { background: #E8F0ED; border-color: var(--month); color: var(--month); }
+.chip-pick-week:hover { background: #E3F1EC; border-color: var(--week); color: var(--week); }
+
 #toast {
   position: fixed;
   bottom: 96px;

@@ -6,6 +6,7 @@ import {
   addCategory, updateCategory, deleteCategory,
   addPlace, updatePlace, deletePlace,
   addPurchase, updatePurchase, deletePurchase,
+  assignPeriodCategory, unassignPeriodCategory,
 } from "./data.js";
 import { render } from "./render.js";
 import { activeMonthKey, getWeekStart, normalizeName, toISO } from "../shared/utils.js";
@@ -15,7 +16,7 @@ export function setupEvents() {
   document.addEventListener("submit", onSubmit);
 }
 
-function onClick(e) {
+async function onClick(e) {
   if (getActiveModule() !== "maison") return;
   if (e.target.classList && e.target.classList.contains("overlay")) {
     const type = e.target.dataset.overlayClose;
@@ -50,6 +51,18 @@ function onClick(e) {
     form.querySelectorAll("[data-action='pick-cat-type']").forEach(b => b.classList.remove("active-week", "active-month"));
     target.classList.add(target.dataset.value === "hebdo" ? "active-week" : "active-month");
     form.querySelector("[name='type']").value = target.dataset.value;
+  }
+  else if (action === "assign-category") {
+    const type = target.dataset.type;
+    const periodKey = type === "mensuel" ? target.dataset.monthKey : target.dataset.weekStart;
+    await assignPeriodCategory(type, periodKey, target.dataset.categoryId);
+    render();
+  }
+  else if (action === "unassign-category") {
+    const type = target.dataset.type;
+    const periodKey = type === "mensuel" ? target.dataset.monthKey : target.dataset.weekStart;
+    await unassignPeriodCategory(type, periodKey, target.dataset.categoryId);
+    render();
   }
   else if (action === "open-add-purchase") {
     ui.modal = {
