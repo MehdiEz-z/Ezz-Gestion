@@ -174,8 +174,7 @@ function renderPeriodCategoryPicker(type, periodKey) {
   const chipClass = type === "mensuel" ? "chip-pick-month" : "chip-pick-week";
   return `
     <div class="period-cat-picker">
-      <div class="small-label">Ajouter une catégorie</div>
-      <div class="chip-row">
+      <div class="chip-row period-cat-scroll">
         ${available.map(c => `
           <button type="button" class="chip chip-pick ${chipClass}" data-action="assign-category" data-category-id="${c.id}" data-type="${type}" ${ctxAttr}>${esc(c.name)}</button>
         `).join("")}
