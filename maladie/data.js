@@ -351,7 +351,13 @@ export async function updateDossierDates(dossierId, { cnssDepositDate, assurance
     .update(payload).eq("id", dossierId).select().single();
   if (error) { flash(getErrorMessage(error, "Erreur mise à jour dates."), true); return false; }
   Object.assign(d, data);
-  flash("Dates enregistrées.");
+  if (payload.cnss_deposit_date !== undefined && payload.assurance_sent_date === undefined) {
+    flash("Date dépôt CNSS enregistrée.");
+  } else if (payload.assurance_sent_date !== undefined && payload.cnss_deposit_date === undefined) {
+    flash("Date dépôt assurance enregistrée.");
+  } else {
+    flash("Dates enregistrées.");
+  }
   return true;
 }
 
