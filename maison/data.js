@@ -314,13 +314,27 @@ export async function updateCategory(id, name, type) {
 
 export async function deleteCategory(id) {
   if (!isAdmin) return false;
+  const cat = state.categories.find(c => c.id === id);
+  if (!cat) return false;
+
+  const linked = state.purchases.filter(p => p.category_id === id);
+  for (const p of linked) {
+    const frozenName = p.category_name || cat.name;
+    const { error: purchErr } = await supabaseClient.from("purchases")
+      .update({ category_id: null, category_name: frozenName })
+      .eq("id", p.id);
+    if (purchErr) {
+      flash(getErrorMessage(purchErr, "Erreur lors de la mise à jour des achats liés."), true);
+      return false;
+    }
+    p.category_id = null;
+    p.category_name = frozenName;
+  }
+
   const { error } = await supabaseClient.from("categories").delete().eq("id", id);
   if (error) { flash(getErrorMessage(error, "Erreur lors de la suppression de la catégorie."), true); return false; }
   state.categories = state.categories.filter(c => c.id !== id);
   state.periodCategories = state.periodCategories.filter(pc => pc.category_id !== id);
-  state.purchases.forEach(p => {
-    if (p.category_id === id) p.category_id = null;
-  });
   flash("Catégorie supprimée.");
   return true;
 }
