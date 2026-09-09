@@ -60,6 +60,29 @@ function weekEndISO(isoWs) {
   return toISO(addDays(parseISODate(isoWs), 6));
 }
 
+function purchasesInPeriod(type, periodKey) {
+  if (type === "mensuel") {
+    return state.purchases.filter(p => p.type === type && p.date.slice(0, 7) === periodKey);
+  }
+  const isoWe = weekEndISO(periodKey);
+  return state.purchases.filter(p => p.type === type && p.date >= periodKey && p.date <= isoWe);
+}
+
+export function isOrphanPurchase(purchase) {
+  if (!purchase.category_id) return true;
+  return !state.categories.some(c => c.id === purchase.category_id);
+}
+
+function orphanCategoryNamesInPeriod(type, periodKey) {
+  const names = new Map();
+  for (const p of purchasesInPeriod(type, periodKey)) {
+    if (!isOrphanPurchase(p) || !p.category_name) continue;
+    const key = nameKey(p.category_name);
+    if (!names.has(key)) names.set(key, p.category_name);
+  }
+  return [...names.values()];
+}
+
 export function isPeriodCategoryAssigned(type, periodKey, categoryId) {
   return state.periodCategories.some(
     pc => pc.type === type && pc.period_key === periodKey && pc.category_id === categoryId
@@ -78,9 +101,36 @@ export function categoryHasPurchasesInPeriod(categoryId, type, periodKey) {
   );
 }
 
+export function categoryHasOrphanPurchasesByNameInPeriod(name, type, periodKey) {
+  const key = nameKey(name);
+  return purchasesInPeriod(type, periodKey).some(
+    p => isOrphanPurchase(p) && p.category_name && nameKey(p.category_name) === key
+  );
+}
+
 export function isCategoryActiveInPeriod(cat, type, periodKey) {
   return categoryHasPurchasesInPeriod(cat.id, type, periodKey)
-    || isPeriodCategoryAssigned(type, periodKey, cat.id);
+    || isPeriodCategoryAssigned(type, periodKey, cat.id)
+    || categoryHasOrphanPurchasesByNameInPeriod(cat.name, type, periodKey);
+}
+
+/** @returns {{ name: string, categoryId: string|null, orphanOnly: boolean }[]} */
+export function getPeriodDisplayRows(type, periodKey) {
+  const rows = [];
+  const coveredNames = new Set();
+
+  for (const cat of state.categories.filter(c => c.type === type)) {
+    if (!isCategoryActiveInPeriod(cat, type, periodKey)) continue;
+    rows.push({ name: cat.name, categoryId: cat.id, orphanOnly: false });
+    coveredNames.add(nameKey(cat.name));
+  }
+
+  for (const name of orphanCategoryNamesInPeriod(type, periodKey)) {
+    if (coveredNames.has(nameKey(name))) continue;
+    rows.push({ name, categoryId: null, orphanOnly: true });
+  }
+
+  return rows.sort((a, b) => a.name.localeCompare(b.name, "fr"));
 }
 
 export function getActiveCategoriesForPeriod(type, periodKey) {
@@ -89,6 +139,21 @@ export function getActiveCategoriesForPeriod(type, periodKey) {
 
 export function getAvailableCategoriesForPeriod(type, periodKey) {
   return state.categories.filter(c => c.type === type && !isCategoryActiveInPeriod(c, type, periodKey));
+}
+
+export function purchasesForPeriodRow(row, type, periodKey) {
+  const key = nameKey(row.name);
+  return purchasesInPeriod(type, periodKey)
+    .filter(p => {
+      if (row.categoryId && p.category_id === row.categoryId) return true;
+      return isOrphanPurchase(p) && p.category_name && nameKey(p.category_name) === key;
+    })
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
+export function totalForPeriodRow(row, type, periodKey) {
+  return purchasesForPeriodRow(row, type, periodKey)
+    .reduce((s, p) => s + Number(p.price), 0);
 }
 
 export function categoryTotalForMonth(categoryId, type, monthKey) {
@@ -253,6 +318,9 @@ export async function deleteCategory(id) {
   if (error) { flash(getErrorMessage(error, "Erreur lors de la suppression de la catégorie."), true); return false; }
   state.categories = state.categories.filter(c => c.id !== id);
   state.periodCategories = state.periodCategories.filter(pc => pc.category_id !== id);
+  state.purchases.forEach(p => {
+    if (p.category_id === id) p.category_id = null;
+  });
   flash("Catégorie supprimée.");
   return true;
 }

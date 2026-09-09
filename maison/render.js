@@ -1,10 +1,8 @@
 import {
   state, ui,
-  categoryTotalForMonth, categoryTotalForWeek,
-  purchasesForMonth, purchasesForWeek,
   monthSpentTotal, weekSpentTotal, isPurchaseEditable,
-  getActiveCategoriesForPeriod, getAvailableCategoriesForPeriod,
-  isPeriodCategoryAssigned,
+  getPeriodDisplayRows, getAvailableCategoriesForPeriod,
+  isPeriodCategoryAssigned, totalForPeriodRow, purchasesForPeriodRow,
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
 import {
@@ -182,22 +180,24 @@ function renderPeriodCategoryPicker(type, periodKey) {
     </div>`;
 }
 
-function renderItemRow(cat, type, editable, ctx, pastOnly = false) {
+function renderPeriodRow(row, type, editable, ctx, pastOnly = false) {
   const periodKey = type === "mensuel" ? ctx.monthKey : ctx.weekStart;
-  const total = type === "mensuel"
-    ? categoryTotalForMonth(cat.id, type, ctx.monthKey)
-    : categoryTotalForWeek(cat.id, type, ctx.weekStart, toISO(addDays(parseISODate(ctx.weekStart), 6)));
+  const total = totalForPeriodRow(row, type, periodKey);
   if (pastOnly && total === 0) return "";
   const ctxAttr = type === "mensuel" ? `data-month-key="${ctx.monthKey}"` : `data-week-start="${ctx.weekStart}"`;
-  const canUnassign = editable && !pastOnly && total === 0 && isPeriodCategoryAssigned(type, periodKey, cat.id);
+  const idAttr = row.categoryId ? `data-category-id="${row.categoryId}"` : `data-category-name="${esc(row.name)}"`;
+  const canAdd = editable && !pastOnly && row.categoryId;
+  const canUnassign = editable && !pastOnly && row.categoryId
+    && isPeriodCategoryAssigned(type, periodKey, row.categoryId)
+    && total === 0;
   return `
-    <li class="item-row">
-      <div class="item-name">${esc(cat.name)}</div>
+    <li class="item-row${row.orphanOnly ? " item-row-orphan" : ""}">
+      <div class="item-name">${esc(row.name)}</div>
       <div class="item-amount">${money(total)} DH</div>
       <div class="item-actions">
-        <button type="button" class="icon-btn" data-action="open-details" data-category-id="${cat.id}" data-type="${type}" ${ctxAttr} title="Détails">🧾</button>
-        ${editable && !pastOnly ? `<button type="button" class="icon-btn add" data-action="open-add-purchase" data-category-id="${cat.id}" data-type="${type}" ${ctxAttr} title="Ajouter">＋</button>` : ""}
-        ${canUnassign ? `<button type="button" class="btn-delete" data-action="unassign-category" data-category-id="${cat.id}" data-type="${type}" ${ctxAttr} title="Retirer">✕</button>` : ""}
+        <button type="button" class="icon-btn" data-action="open-details" data-type="${type}" ${idAttr} ${ctxAttr} title="Détails">🧾</button>
+        ${canAdd ? `<button type="button" class="icon-btn add" data-action="open-add-purchase" data-category-id="${row.categoryId}" data-type="${type}" ${ctxAttr} title="Ajouter">＋</button>` : ""}
+        ${canUnassign ? `<button type="button" class="btn-delete" data-action="unassign-category" data-category-id="${row.categoryId}" data-type="${type}" ${ctxAttr} title="Retirer">✕</button>` : ""}
       </div>
     </li>`;
 }
@@ -298,7 +298,7 @@ function renderAchatsTab() {
   const monthTotal = monthSpentTotal(monthKey);
   const monthKeyStr = "achat-month:" + monthKey;
   const monthOpen = monthBudget !== undefined && ui.expanded.has(monthKeyStr);
-  const mensuelCats = getActiveCategoriesForPeriod("mensuel", monthKey);
+  const monthRows = getPeriodDisplayRows("mensuel", monthKey);
   const monthOver = monthBudget !== undefined && monthTotal > Number(monthBudget);
   const monthRemaining = monthBudget !== undefined ? Number(monthBudget) - monthTotal : 0;
   const monthRemCls = monthRemaining < 0 ? "danger" : "success";
@@ -323,8 +323,8 @@ function renderAchatsTab() {
         <div class="card-body ${monthOpen ? "open" : ""}">
           ${monthOver ? `<div class="alert-banner">Budget mensuel dépassé !</div>` : ""}
           ${renderPeriodCategoryPicker("mensuel", monthKey)}
-          ${state.categories.filter(c => c.type === "mensuel").length === 0 ? `<div class="small-label">Aucune catégorie mensuelle créée.</div>` : mensuelCats.length === 0 ? `<div class="small-label">Sélectionne une catégorie ci-dessus.</div>` : `
-            <ul class="list">${mensuelCats.map(c => renderItemRow(c, "mensuel", true, { monthKey })).join("")}</ul>`}
+          ${state.categories.filter(c => c.type === "mensuel").length === 0 && monthRows.length === 0 ? `<div class="small-label">Aucune catégorie mensuelle créée.</div>` : monthRows.length === 0 ? `<div class="small-label">Sélectionne une catégorie ci-dessus.</div>` : `
+            <ul class="list">${monthRows.map(r => renderPeriodRow(r, "mensuel", true, { monthKey })).join("")}</ul>`}
         </div>
       `}
     </div>`;
@@ -348,8 +348,8 @@ function renderAchatsTab() {
     const weekOver = budget !== undefined && total > Number(budget);
     const remaining = budget !== undefined ? Number(budget) - total : 0;
     const remCls = remaining < 0 ? "danger" : "success";
-    const hebdoCats = getActiveCategoriesForPeriod("hebdo", isoWs);
-    const catRows = hebdoCats.map(c => renderItemRow(c, "hebdo", status === "current", { weekStart: isoWs }, isPast)).filter(Boolean).join("");
+    const weekRows = getPeriodDisplayRows("hebdo", isoWs);
+    const catRows = weekRows.map(r => renderPeriodRow(r, "hebdo", status === "current", { weekStart: isoWs }, isPast)).filter(Boolean).join("");
     const hasCatRows = catRows.length > 0;
     const isCurrent = status === "current";
 
@@ -373,7 +373,7 @@ function renderAchatsTab() {
           <div class="card-body ${open ? "open" : ""}">
             ${weekOver ? `<div class="alert-banner">Budget hebdo dépassé !</div>` : ""}
             ${renderPeriodCategoryPicker("hebdo", isoWs)}
-            ${state.categories.filter(c => c.type === "hebdo").length === 0 ? `<div class="small-label">Aucune catégorie hebdo créée.</div>` : hebdoCats.length === 0 ? `<div class="small-label">Sélectionne une catégorie ci-dessus.</div>` : `
+            ${state.categories.filter(c => c.type === "hebdo").length === 0 && weekRows.length === 0 ? `<div class="small-label">Aucune catégorie hebdo créée.</div>` : weekRows.length === 0 ? `<div class="small-label">Sélectionne une catégorie ci-dessus.</div>` : `
               <ul class="list">${catRows}</ul>`}
           </div>
         ` : status !== "future" && hasCatRows ? `
@@ -418,10 +418,9 @@ function renderModal() {
   if (m.type === "edit-place") return renderEditPlaceModal(m);
   if (m.type === "edit-purchase") return renderEditPurchaseModal(m);
 
-  const cat = state.categories.find(c => c.id === m.categoryId);
-  if (!cat) return "";
-
   if (m.type === "add") {
+    const cat = state.categories.find(c => c.id === m.categoryId);
+    if (!cat) return "";
     return `
       <div class="overlay" data-overlay-close="modal">
         <div class="sheet">
@@ -440,37 +439,45 @@ function renderModal() {
       </div>`;
   }
 
-  const list = m.periodType === "mensuel"
-    ? purchasesForMonth(cat.id, "mensuel", m.monthKey)
-    : purchasesForWeek(cat.id, "hebdo", m.weekStart, toISO(addDays(parseISODate(m.weekStart), 6)));
-  const total = list.reduce((s, p) => s + Number(p.price), 0);
+  if (m.type === "details") {
+    const periodKey = m.periodType === "mensuel" ? m.monthKey : m.weekStart;
+    const row = m.categoryId
+      ? { name: state.categories.find(c => c.id === m.categoryId)?.name || m.displayName, categoryId: m.categoryId, orphanOnly: false }
+      : { name: m.displayName, categoryId: null, orphanOnly: true };
+    if (!row.name) return "";
 
-  return `
-    <div class="overlay" data-overlay-close="modal">
-      <div class="sheet">
-        <div class="sheet-title">${esc(cat.name)} — ${money(total)} DH <button class="close-btn" data-action="close-modal">✕</button></div>
-        <ul class="list">
-          ${list.map(p => {
+    const list = purchasesForPeriodRow(row, m.periodType, periodKey);
+    const total = list.reduce((s, p) => s + Number(p.price), 0);
+
+    return `
+      <div class="overlay" data-overlay-close="modal">
+        <div class="sheet">
+          <div class="sheet-title">${esc(row.name)} — ${money(total)} DH <button class="close-btn" data-action="close-modal">✕</button></div>
+          <ul class="list">
+            ${list.map(p => {
     const placeName = esc(state.places.find(pl => pl.id === p.place_id)?.name || "Inconnu");
     const editable = m.editable && isPurchaseEditable(p);
     return `
-            <li class="list-item" style="flex-direction:column;align-items:stretch;gap:4px">
-              <div class="purchase-detail-row">
-                <div>
-                  <div class="list-item-name">${money(p.price)} DH — ${placeName}</div>
-                  <div class="small-label">${formatDateFull(parseISODate(p.date))}</div>
+              <li class="list-item" style="flex-direction:column;align-items:stretch;gap:4px">
+                <div class="purchase-detail-row">
+                  <div>
+                    <div class="list-item-name">${money(p.price)} DH — ${placeName}</div>
+                    <div class="small-label">${formatDateFull(parseISODate(p.date))}</div>
+                  </div>
+                  ${editable ? `
+                  <div class="purchase-detail-actions">
+                    <button class="icon-btn edit" data-action="open-edit-purchase" data-purchase-id="${p.id}" title="Modifier">✏️</button>
+                    <button class="btn-delete" data-action="open-delete-confirm" data-entity="purchase" data-id="${p.id}" data-label="${money(p.price)} DH" title="Supprimer">🗑️</button>
+                  </div>` : ""}
                 </div>
-                ${editable ? `
-                <div class="purchase-detail-actions">
-                  <button class="icon-btn edit" data-action="open-edit-purchase" data-purchase-id="${p.id}" title="Modifier">✏️</button>
-                  <button class="btn-delete" data-action="open-delete-confirm" data-entity="purchase" data-id="${p.id}" data-label="${money(p.price)} DH" title="Supprimer">🗑️</button>
-                </div>` : ""}
-              </div>
-            </li>`;
+              </li>`;
   }).join("")}
-        </ul>
-      </div>
-    </div>`;
+          </ul>
+        </div>
+      </div>`;
+  }
+
+  return "";
 }
 
 function renderEditBudgetModal(m) {

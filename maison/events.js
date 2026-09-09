@@ -81,7 +81,19 @@ async function onClick(e) {
     const editable = type === "mensuel"
       ? monthKey === activeMonthKey()
       : weekStart === toISO(getWeekStart(new Date()));
-    ui.modal = { type: "details", categoryId: target.dataset.categoryId, periodType: type, monthKey, weekStart, editable };
+    const categoryId = target.dataset.categoryId || null;
+    const displayName = target.dataset.categoryName
+      || state.categories.find(c => c.id === categoryId)?.name
+      || "";
+    ui.modal = {
+      type: "details",
+      categoryId,
+      displayName,
+      periodType: type,
+      monthKey,
+      weekStart,
+      editable,
+    };
     render();
   }
   else if (action === "open-edit-budget") {
