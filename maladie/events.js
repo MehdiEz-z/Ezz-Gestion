@@ -149,9 +149,14 @@ async function onSubmit(e) {
     if (ok) ui.modal = null;
     render();
   }
-  else if (type === "update-dossier-dates") {
+  else if (type === "save-cnss-deposit-date") {
     await updateDossierDates(form.dataset.dossierId, {
       cnssDepositDate: form.cnss_deposit_date.value,
+    });
+    render();
+  }
+  else if (type === "save-assurance-sent-date") {
+    await updateDossierDates(form.dataset.dossierId, {
       assuranceSentDate: form.assurance_sent_date.value,
     });
     render();
