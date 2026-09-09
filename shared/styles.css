@@ -175,7 +175,27 @@ main { padding: 14px 16px 16px; flex: 1; }
 
 .progress-fill { height: 100%; border-radius: 999px; }
 
-.inline-form { display: flex; gap: 8px; }
+.inline-form { display: flex; gap: 8px; align-items: stretch; }
+.inline-form .field,
+.inline-form .date-field { flex: 1; min-width: 0; }
+
+.btn-check {
+  flex-shrink: 0;
+  width: 42px;
+  min-width: 42px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dossier-date-row .date-field input { height: 100%; box-sizing: border-box; }
 
 input, select, button { font-family: inherit; font-size: 15px; }
 
@@ -615,6 +635,8 @@ body.read-only-mode #app [data-form] { display: none !important; }
   margin-bottom: 8px;
 }
 
+body.module-maladie.read-only-mode [data-form="save-cnss-deposit-date"],
+body.module-maladie.read-only-mode [data-form="save-assurance-sent-date"],
 body.module-maladie.read-only-mode [data-form="assign-dossier-number"],
 body.module-maladie.read-only-mode [data-form="update-reimb"],
 body.module-maladie.read-only-mode [data-action="open-init-dossier"],
