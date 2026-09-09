@@ -449,9 +449,26 @@ nav.bottom {
 .chip.is-disabled { opacity: 0.4; cursor: not-allowed; }
 
 .period-cat-picker {
-  padding: 0 16px 12px;
+  padding: 0 0 12px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 8px;
+}
+
+.period-cat-scroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding: 0 16px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.period-cat-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.period-cat-scroll .chip {
+  flex-shrink: 0;
 }
 
 .chip-pick { border-style: dashed; }
