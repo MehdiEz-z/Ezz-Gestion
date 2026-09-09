@@ -283,36 +283,29 @@ function statusBadgeClass(status) {
 }
 
 function renderCnssDepositRow(d, editable) {
-  if (d.cnss_deposit_date && d.dossier_number) {
-    return `<div class="small-label" style="margin-bottom:8px">Dépôt CNSS : ${formatDateFull(parseISODate(d.cnss_deposit_date))}</div>`;
+  if (d.cnss_deposit_date) {
+    if (editable && !d.dossier_number) {
+      return `
+        <form class="inline-form dossier-date-row" data-form="assign-dossier-number" data-dossier-id="${d.id}" style="margin-bottom:8px">
+          <input class="field" name="dossier_number" placeholder="N° dossier CNSS" required />
+          <button type="submit" class="btn-small" style="background:var(--month);white-space:nowrap">Définir N°</button>
+        </form>`;
+    }
+    return "";
   }
-  if (!editable) {
-    return `<div class="small-label" style="margin-bottom:8px">Dépôt CNSS : ${d.cnss_deposit_date ? formatDateFull(parseISODate(d.cnss_deposit_date)) : "—"}</div>`;
-  }
-  if (!d.cnss_deposit_date) {
-    return `
-      <form class="inline-form dossier-date-row" data-form="save-cnss-deposit-date" data-dossier-id="${d.id}" style="margin-bottom:8px">
-        ${renderDateField("cnss_deposit_date", { required: true })}
-        <button type="submit" class="btn-check" style="background:var(--month)" title="Enregistrer">✓</button>
-      </form>`;
-  }
+  if (!editable) return "";
   return `
-    <form class="inline-form dossier-date-row" data-form="assign-dossier-number" data-dossier-id="${d.id}" style="margin-bottom:8px">
-      <input class="field" name="dossier_number" placeholder="N° dossier CNSS" required />
-      <button type="submit" class="btn-check" style="background:var(--month)" title="Attribuer N°">✓</button>
+    <form class="inline-form dossier-date-row" data-form="save-cnss-deposit-date" data-dossier-id="${d.id}" style="margin-bottom:8px">
+      ${renderDateField("cnss_deposit_date", { required: true, placeholder: "Date dépôt CNSS" })}
+      <button type="submit" class="btn-check" style="background:var(--month)" title="Enregistrer">✓</button>
     </form>`;
 }
 
 function renderAssuranceDepositRow(d, editable) {
-  if (d.assurance_sent_date) {
-    return `<div class="small-label" style="margin-bottom:12px">Dépôt assurance : ${formatDateFull(parseISODate(d.assurance_sent_date))}</div>`;
-  }
-  if (!editable) {
-    return `<div class="small-label" style="margin-bottom:12px">Dépôt assurance : —</div>`;
-  }
+  if (d.assurance_sent_date || !editable) return "";
   return `
     <form class="inline-form dossier-date-row" data-form="save-assurance-sent-date" data-dossier-id="${d.id}" style="margin-bottom:12px">
-      ${renderDateField("assurance_sent_date", { required: true })}
+      ${renderDateField("assurance_sent_date", { required: true, placeholder: "Date dépôt assurance" })}
       <button type="submit" class="btn-check" style="background:var(--week)" title="Enregistrer">✓</button>
     </form>`;
 }
@@ -326,9 +319,9 @@ function renderReimbBlock(d, block, editable) {
     <div class="reimb-block" style="border-color:${color}">
       <div class="reimb-title" style="color:${color}">${label}</div>
       ${editable ? `
-        <form class="inline-form" data-form="update-reimb" data-dossier-id="${d.id}" data-block="${block}">
+        <form class="form-col" data-form="update-reimb" data-dossier-id="${d.id}" data-block="${block}">
           <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant" value="${received != null ? received : ""}" />
-          <button type="submit" class="btn-check" style="background:${color}" title="Enregistrer">✓</button>
+          <button type="submit" class="btn-small" style="background:${color}">Enregistrer</button>
         </form>` : `
         <div class="small-label">Montant : ${received != null ? money(received) + " DH" : "—"}</div>`}
     </div>`;
@@ -381,6 +374,7 @@ function renderDossierCard(d) {
         <div style="margin-bottom:10px">
           <div class="small-label"><strong>Médecin :</strong> ${doctor ? esc(doctor.name) : "—"}</div>
           <div class="small-label"><strong>Consultation :</strong> ${formatDateFull(parseISODate(d.consultation_date))}</div>
+          ${d.assurance_sent_date ? `<div class="small-label" style="color:var(--week)"><strong>Dépôt assurance :</strong> ${formatDateFull(parseISODate(d.assurance_sent_date))}</div>` : ""}
         </div>
         ${cnssRowHtml}
         ${assuranceRowHtml}
