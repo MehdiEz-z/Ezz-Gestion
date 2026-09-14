@@ -1,4 +1,5 @@
 export const APP_START_MONTH = "2026-09";
+export const EAU_START_MONTH = "2026-08";
 
 export function pad(n) { return n < 10 ? "0" + n : "" + n; }
 export function toISO(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
@@ -51,14 +52,24 @@ export function getWeeksOfMonth(monthKey) {
 
 export function activeMonthKey() { return getMonthKey(getWeekStart(new Date())); }
 
-export function monthsRange() {
-  const [sy, sm] = APP_START_MONTH.split("-").map(Number);
+export function monthsRange(startMonth = APP_START_MONTH) {
+  return monthsRangeFrom(startMonth);
+}
+
+export function monthsRangeFrom(startMonth) {
+  const [sy, sm] = startMonth.split("-").map(Number);
   const [ay, am] = activeMonthKey().split("-").map(Number);
   const end = new Date(ay, am - 1 + 6, 1);
   let d = new Date(sy, sm - 1, 1);
   const list = [];
   while (d <= end) { list.push(getMonthKey(d)); d.setMonth(d.getMonth() + 1); }
   return list;
+}
+
+export function previousMonthKey(monthKey) {
+  const [y, m] = monthKey.split("-").map(Number);
+  const d = new Date(y, m - 2, 1);
+  return getMonthKey(d);
 }
 
 export function money(n) {
