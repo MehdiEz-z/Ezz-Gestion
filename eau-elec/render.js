@@ -1,13 +1,13 @@
 import {
   state, ui,
   personName, getBill, elecReading, waterShare,
-  getPrevMeter, isFirstEauMonth,
+  getPrevMeter, isFirstEauMonth, isPrevMonthElecComplete,
   monthElecStats, monthWaterStats, personRecap, personGlobalSummary,
   recapBadge,
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
 import {
-  activeMonthKey, esc, monthChipLabel, monthLabel,
+  activeMonthKey, esc, EAU_START_MONTH, monthChipLabel, monthLabel,
   monthsRangeFrom, money, previousMonthKey,
 } from "../shared/utils.js";
 
@@ -133,17 +133,22 @@ function renderElecPersonBlock(monthKey, p, bill) {
   const share = reading && reading.share_amount != null ? Number(reading.share_amount) : null;
   const canEdit = isAdmin && !isPaid;
   const showPrevInput = isFirstEauMonth(monthKey);
+  const prevReady = isFirstEauMonth(monthKey) || prev != null;
 
   const meterLines = hasMeters
     ? renderElecMeterLines(monthKey, prev, curr, labels)
     : (!showPrevInput && prev != null ? `<div class="small-label">${labels.prev} ${prev} kWh</div>` : "");
 
-  const meterForm = !hasMeters && canEdit ? `
+  const meterForm = !hasMeters && canEdit && prevReady ? `
     <form class="form-col utility-meter-col" data-form="save-elec-meters" data-month-key="${monthKey}" data-person-id="${p.id}">
       ${showPrevInput ? `<input class="field" name="prev_meter" type="number" min="0" step="1" placeholder="${esc(labels.prev)}" value="" required />` : ""}
       <input class="field" name="curr_meter" type="number" min="0" step="1" placeholder="${esc(labels.curr)}" value="" required />
       <button type="submit" class="btn-small" style="background:var(--month)">Enregistrer</button>
     </form>` : "";
+
+  const prevMissingMsg = !hasMeters && canEdit && !prevReady
+    ? `<div class="small-label" style="color:var(--danger)">Relevé ${labels.prev} manquant — saisissez d'abord ${labels.prev}.</div>`
+    : "";
 
   const partLine = share != null
     ? `<div class="small-label"><strong>Part : ${money(share)} DH</strong></div>`
@@ -159,6 +164,7 @@ function renderElecPersonBlock(monthKey, p, bill) {
     <div class="reimb-block" style="border-color:var(--month)">
       <div class="reimb-title" style="color:var(--month)">${esc(personName(p))}</div>
       ${meterLines}
+      ${prevMissingMsg}
       ${meterForm}
       ${partLine}
       ${isPaid ? paidBadge : payBtn}
@@ -220,10 +226,19 @@ function renderElecCard(monthKey) {
   const open = ui.expanded.has(key);
   const bill = getBill(monthKey);
   const stats = monthElecStats(monthKey);
+  const prevComplete = isPrevMonthElecComplete(monthKey);
+  const prevKey = previousMonthKey(monthKey);
+
+  const prevBanner = !prevComplete ? `
+    <div class="alert-banner" style="margin-bottom:12px">
+      Complétez d'abord l'électricité de ${monthLabel(prevKey)}.
+      <button type="button" class="btn-small" style="background:var(--month);margin-top:8px;width:100%" data-action="go-prev-month" data-month="${prevKey}">Aller à ${monthChipLabel(prevKey)}</button>
+    </div>` : "";
 
   const openBody = state.persons.length === 0
     ? `<div class="small-label">Ajoutez des personnes dans le Référentiel.</div>`
     : `
+      ${prevBanner}
       ${renderBillForm(monthKey, bill?.elec_bill_total, "save-elec-bill", "var(--month)")}
       <div class="reimb-grid">
         ${state.persons.map(p => renderElecPersonBlock(monthKey, p, bill)).join("")}
