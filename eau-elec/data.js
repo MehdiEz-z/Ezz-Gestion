@@ -131,7 +131,7 @@ export function monthElecStats(monthKey) {
   let paid = 0;
   for (const p of state.persons) {
     const r = elecReading(bill.id, p.id);
-    if (!r) continue;
+    if (!r || r.share_amount == null) continue;
     const share = Number(r.share_amount);
     if (r.paid_at) paid += share;
     else toPay += share;
@@ -282,95 +282,122 @@ export async function saveElecBillTotal(monthKey, billTotal) {
   if (billErr) { flash(getErrorMessage(billErr, "Erreur enregistrement facture élec."), true); return false; }
   bill.elec_bill_total = total;
 
-  const inputs = {};
-  for (const p of state.persons) {
-    const r = elecReading(bill.id, p.id);
-    if (r && !r.paid_at) {
-      inputs[p.id] = { prevMeter: r.prev_meter, currMeter: r.curr_meter };
-    }
-  }
-  if (Object.keys(inputs).length > 0) {
-    return saveElecMeters(monthKey, inputs, true);
-  }
+  await recalcElecShares(monthKey, true);
   flash("Facture électricité enregistrée.");
   return true;
 }
 
-function buildElecEntries(monthKey, bill, personInputs) {
+function buildSingleElecEntry(monthKey, bill, personId, inp) {
+  const p = state.persons.find(x => x.id === personId);
+  if (!p) return null;
+  if (elecReading(bill.id, personId)?.paid_at) return null;
+
+  const existing = elecReading(bill.id, personId);
+  let prev = getPrevMeter(monthKey, personId);
+  if (isFirstEauMonth(monthKey)) {
+    const rawPrev = inp?.prevMeter ?? (existing ? existing.prev_meter : null);
+    prev = Number(rawPrev);
+    if (!Number.isFinite(prev) || prev < 0) {
+      flash(`Relevé ${monthLabel(previousMonthKey(monthKey))} invalide pour ${personName(p)}.`, true);
+      return null;
+    }
+  } else if (prev == null) {
+    flash(`Relevé précédent manquant pour ${personName(p)}.`, true);
+    return null;
+  }
+
+  const rawCurr = inp?.currMeter ?? (existing ? existing.curr_meter : null);
+  const curr = Number(rawCurr);
+  if (!Number.isFinite(curr) || curr < prev) {
+    flash(`Relevé ${monthLabel(monthKey)} invalide pour ${personName(p)}.`, true);
+    return null;
+  }
+  return { personId, conso: calcElecConso(prev, curr), prev, curr };
+}
+
+function collectElecEntriesFromSaved(bill) {
   const entries = [];
   for (const p of state.persons) {
     if (elecReading(bill.id, p.id)?.paid_at) continue;
-
-    const inp = personInputs[p.id];
-    const existing = elecReading(bill.id, p.id);
-    let prev = getPrevMeter(monthKey, p.id);
-    if (isFirstEauMonth(monthKey)) {
-      const rawPrev = inp?.prevMeter ?? (existing ? existing.prev_meter : null);
-      prev = Number(rawPrev);
-      if (!Number.isFinite(prev) || prev < 0) {
-        flash(`Relevé ${monthLabel(previousMonthKey(monthKey))} invalide pour ${personName(p)}.`, true);
-        return null;
-      }
-    } else if (prev == null) {
-      flash(`Relevé précédent manquant pour ${personName(p)}.`, true);
-      return null;
-    }
-
-    const rawCurr = inp?.currMeter ?? (existing ? existing.curr_meter : null);
-    const curr = Number(rawCurr);
-    if (!Number.isFinite(curr) || curr < prev) {
-      flash(`Relevé ${monthLabel(monthKey)} invalide pour ${personName(p)}.`, true);
-      return null;
-    }
+    const r = elecReading(bill.id, p.id);
+    if (!r || r.curr_meter == null || r.prev_meter == null) return null;
+    const prev = Number(r.prev_meter);
+    const curr = Number(r.curr_meter);
+    if (!Number.isFinite(prev) || !Number.isFinite(curr) || curr < prev) return null;
     entries.push({ personId: p.id, conso: calcElecConso(prev, curr), prev, curr });
   }
-
   const unpaidCount = state.persons.filter(x => !elecReading(bill.id, x.id)?.paid_at).length;
-  if (entries.length !== unpaidCount) {
-    flash("Renseignez tous les relevés non payés.", true);
-    return null;
-  }
+  if (entries.length !== unpaidCount || unpaidCount === 0) return null;
   return entries;
 }
 
-export async function saveElecMeters(monthKey, personInputs, silent = false) {
-  if (!isAdmin) return false;
-  if (state.persons.length === 0) { flash("Ajoutez des personnes dans le Référentiel.", true); return false; }
+async function upsertElecReading(bill, personId, prev, curr, shareAmount) {
+  const existing = elecReading(bill.id, personId);
+  const payload = {
+    bill_id: bill.id,
+    person_id: personId,
+    prev_meter: prev,
+    curr_meter: curr,
+    share_amount: shareAmount,
+  };
 
+  if (existing) {
+    const { data, error } = await supabaseClient.from("utility_elec_readings")
+      .update(payload).eq("id", existing.id).select().single();
+    if (error) { flash(getErrorMessage(error, "Erreur enregistrement relevé."), true); return false; }
+    Object.assign(existing, data);
+  } else {
+    const { data, error } = await supabaseClient.from("utility_elec_readings")
+      .insert(payload).select().single();
+    if (error) { flash(getErrorMessage(error, "Erreur enregistrement relevé."), true); return false; }
+    state.elecReadings.push(data);
+  }
+  return true;
+}
+
+async function recalcElecShares(monthKey, silent = false) {
   const bill = getBill(monthKey);
-  if (!bill?.elec_bill_total) { flash("Enregistrez d'abord le montant de la facture.", true); return false; }
+  if (!bill?.elec_bill_total) return true;
 
-  const entries = buildElecEntries(monthKey, bill, personInputs);
-  if (!entries) return false;
+  const entries = collectElecEntriesFromSaved(bill);
+  if (!entries) return true;
 
   const shares = calcElecShares(bill.elec_bill_total, entries);
-  if (!shares) { flash("Impossible de calculer les parts électricité.", true); return false; }
+  if (!shares) {
+    if (!silent) flash("Impossible de calculer les parts électricité.", true);
+    return false;
+  }
 
   for (const sh of shares) {
     const entry = entries.find(e => e.personId === sh.personId);
-    const existing = elecReading(bill.id, sh.personId);
-    const payload = {
-      bill_id: bill.id,
-      person_id: sh.personId,
-      prev_meter: entry.prev,
-      curr_meter: entry.curr,
-      share_amount: Math.round(sh.share * 100) / 100,
-    };
+    const ok = await upsertElecReading(
+      bill, sh.personId, entry.prev, entry.curr,
+      Math.round(sh.share * 100) / 100,
+    );
+    if (!ok) return false;
+  }
+  return true;
+}
 
-    if (existing) {
-      const { data, error } = await supabaseClient.from("utility_elec_readings")
-        .update(payload).eq("id", existing.id).select().single();
-      if (error) { flash(getErrorMessage(error, "Erreur enregistrement relevé."), true); return false; }
-      Object.assign(existing, data);
-    } else {
-      const { data, error } = await supabaseClient.from("utility_elec_readings")
-        .insert(payload).select().single();
-      if (error) { flash(getErrorMessage(error, "Erreur enregistrement relevé."), true); return false; }
-      state.elecReadings.push(data);
-    }
+export async function saveElecMeters(monthKey, personId, inp, silent = false) {
+  if (!isAdmin) return false;
+  if (state.persons.length === 0) { flash("Ajoutez des personnes dans le Référentiel.", true); return false; }
+
+  const bill = await ensureBill(monthKey);
+  if (!bill) return false;
+
+  const entry = buildSingleElecEntry(monthKey, bill, personId, inp);
+  if (!entry) return false;
+
+  const ok = await upsertElecReading(bill, personId, entry.prev, entry.curr, null);
+  if (!ok) return false;
+
+  if (bill.elec_bill_total != null) {
+    const recalcOk = await recalcElecShares(monthKey, true);
+    if (!recalcOk) return false;
   }
 
-  if (!silent) flash("Relevés électricité enregistrés.");
+  if (!silent) flash("Relevé enregistré.");
   return true;
 }
 
@@ -378,14 +405,14 @@ export async function saveElecMonth(monthKey, billTotal, personInputs) {
   if (!isAdmin) return false;
   const ok = await saveElecBillTotal(monthKey, billTotal);
   if (!ok) return false;
-  const bill = getBill(monthKey);
-  if (!bill) return false;
-  const hasMeterInput = state.persons.some(p => {
+  for (const p of state.persons) {
     const inp = personInputs[p.id];
-    return inp && (inp.currMeter || inp.prevMeter);
-  });
-  if (!hasMeterInput) return true;
-  return saveElecMeters(monthKey, personInputs, true);
+    if (inp && (inp.currMeter || inp.prevMeter)) {
+      const meterOk = await saveElecMeters(monthKey, p.id, inp, true);
+      if (!meterOk) return false;
+    }
+  }
+  return true;
 }
 
 export async function saveWaterMonth(monthKey, billTotal) {

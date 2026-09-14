@@ -36,12 +36,6 @@ function onClick(e) {
     ui.subTab = "factures";
     render();
   }
-  else if (action === "go-prev-month") {
-    ui.viewedMonthKey = target.dataset.month;
-    ui.subTab = "factures";
-    ui.expanded.add("elec:" + target.dataset.month);
-    render();
-  }
   else if (action === "toggle-card") {
     const key = target.dataset.key;
     if (ui.expanded.has(key)) ui.expanded.delete(key);
@@ -83,17 +77,10 @@ async function onSubmit(e) {
     render();
   }
   else if (type === "save-elec-meters") {
-    const monthKey = form.dataset.monthKey;
-    const card = form.closest(".card");
-    const allForms = card ? card.querySelectorAll('[data-form="save-elec-meters"]') : [form];
-    const inputs = {};
-    for (const f of allForms) {
-      inputs[f.dataset.personId] = {
-        prevMeter: f.prev_meter?.value,
-        currMeter: f.curr_meter?.value,
-      };
-    }
-    await saveElecMeters(monthKey, inputs);
+    await saveElecMeters(form.dataset.monthKey, form.dataset.personId, {
+      prevMeter: form.prev_meter?.value,
+      currMeter: form.curr_meter?.value,
+    });
     render();
   }
   else if (type === "save-water-bill") {
