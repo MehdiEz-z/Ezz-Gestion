@@ -615,6 +615,7 @@ body.read-only-mode #app [data-form] { display: none !important; }
 
 .dot-cnss { background: var(--month); }
 .dot-ass { background: var(--week); }
+.dot-paid { background: var(--danger); }
 
 .reimb-grid {
   display: grid;
