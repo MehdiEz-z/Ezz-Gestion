@@ -13,7 +13,7 @@ import {
 
 export function render() {
   document.getElementById("header-title").textContent =
-    ui.subTab === "budget" ? "Gestion achats maison"
+    ui.subTab === "budget" ? "Gestion course"
       : ui.subTab === "categories" ? "Catégories & lieux"
         : "Enregistrer un achat";
   document.getElementById("month-btn-label").textContent = monthChipLabel(ui.viewedMonthKey);
