@@ -293,13 +293,15 @@ function renderRecapCard(monthKey) {
     const badge = recapBadge(r);
     return `
       <li class="list-item utility-recap-row">
-        <div style="flex:1;min-width:0">
-          <div class="list-item-name">${esc(personName(p))}</div>
+        <div class="utility-recap-inner">
+          <div class="utility-recap-head">
+            <div class="list-item-name">${esc(personName(p))}</div>
+            <span class="badge ${badge.cls}">${badge.label}</span>
+          </div>
           ${renderUtilityKvRow("Électricité", `${money(r.elec)} DH`)}
           ${renderUtilityKvRow("Eau", `${money(r.water)} DH`)}
           ${renderUtilityKvRow("Total", `${money(r.total)} DH`, true)}
         </div>
-        <span class="badge ${badge.cls}">${badge.label}</span>
       </li>`;
   }).join("");
 
