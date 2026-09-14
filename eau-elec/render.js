@@ -115,11 +115,19 @@ function meterPeriodLabels(monthKey) {
   return { prev: monthLabel(prevKey), curr: monthLabel(monthKey) };
 }
 
+function renderUtilityKvRow(label, value, bold = false) {
+  return `
+    <div class="utility-kv-row${bold ? " utility-kv-row-bold" : ""}">
+      <span>${label}</span>
+      <span>${value}</span>
+    </div>`;
+}
+
 function renderElecMeterLines(monthKey, prev, curr, labels) {
   if (prev == null && curr == null) return "";
   const lines = [];
-  if (prev != null) lines.push(`<div class="small-label">${labels.prev} ${prev} kWh</div>`);
-  if (curr != null) lines.push(`<div class="small-label">${labels.curr} ${curr} kWh</div>`);
+  if (prev != null) lines.push(renderUtilityKvRow(`${labels.prev} :`, `${prev} kWh`));
+  if (curr != null) lines.push(renderUtilityKvRow(`${labels.curr} :`, `${curr} kWh`));
   return lines.join("");
 }
 
@@ -134,12 +142,11 @@ function renderElecPersonBlock(monthKey, p, bill) {
   const canEdit = isAdmin && !isPaid;
   const showPrevInput = isFirstEauMonth(monthKey);
   const prevReady = isFirstEauMonth(monthKey) || prev != null;
-  const hasBill = bill?.elec_bill_total != null;
   const sharesReady = hasElecSharesCalculated(monthKey);
 
   const meterLines = hasMeters
     ? renderElecMeterLines(monthKey, prev, curr, labels)
-    : (!showPrevInput && prev != null ? `<div class="small-label">${labels.prev} ${prev} kWh</div>` : "");
+    : (!showPrevInput && prev != null ? renderUtilityKvRow(`${labels.prev} :`, `${prev} kWh`) : "");
 
   const meterForm = !hasMeters && canEdit && prevReady ? `
     <form class="form-col utility-meter-col" data-form="save-elec-meters" data-month-key="${monthKey}" data-person-id="${p.id}">
@@ -149,7 +156,7 @@ function renderElecPersonBlock(monthKey, p, bill) {
     </form>` : "";
 
   const partLine = sharesReady && share > 0
-    ? `<div class="small-label"><strong>Part : ${money(share)} DH</strong></div>`
+    ? renderUtilityKvRow("Part :", `${money(share)} DH`, true)
     : "";
 
   const payBtn = hasMeters && sharesReady && share > 0 && canEdit
@@ -175,7 +182,7 @@ function renderWaterPersonBlock(monthKey, p, bill) {
   const share = hasBill && shareRow && shareRow.share_amount != null ? Number(shareRow.share_amount) : 0;
   const canEdit = isAdmin && !isPaid;
 
-  const partLine = `<div class="small-label"><strong>Part : ${money(share)} DH</strong></div>`;
+  const partLine = renderUtilityKvRow("Part :", `${money(share)} DH`, true);
 
   const payBtn = hasBill && shareRow && canEdit
     ? `<button type="button" class="btn-small" style="background:var(--week);margin-top:6px;width:100%" data-action="pay-water" data-month-key="${monthKey}" data-person-id="${p.id}">Payer</button>`
@@ -201,7 +208,10 @@ function renderUtilityCardHead(title, colorVar, monthKey, stats, open, canToggle
         ${isCurrentMonth ? `<span class="badge badge-current">Mois en cours</span>` : ""}
       </div>
       <div style="display:flex;align-items:center;gap:10px">
-        <div class="card-preview">À payer : ${money(stats.toPay)} DH</div>
+        <div class="card-preview">
+          À payer : ${money(stats.total)} DH
+          <br><span class="small-label success">Payé : ${money(stats.paid)} DH</span>
+        </div>
         ${canToggle ? `<span class="chevron">${open.isOpen ? "▲" : "▼"}</span>` : ""}
       </div>
     </div>`;
