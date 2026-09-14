@@ -1,9 +1,8 @@
 import { getActiveModule } from "../shared/router.js";
 import {
   ui,
-  state,
   addPerson, updatePerson,
-  saveElecMonth, saveWaterMonth,
+  saveElecBillTotal, saveElecMeters, saveWaterMonth,
   markElecPaid, markWaterPaid,
 } from "./data.js";
 import { render } from "./render.js";
@@ -73,19 +72,25 @@ async function onSubmit(e) {
     if (ok) ui.modal = null;
     render();
   }
-  else if (type === "save-elec") {
-    const monthKey = form.dataset.monthKey;
-    const personInputs = {};
-    for (const p of state.persons) {
-      personInputs[p.id] = {
-        prevMeter: form.elements[`prev_${p.id}`]?.value,
-        currMeter: form.elements[`curr_${p.id}`]?.value,
-      };
-    }
-    await saveElecMonth(monthKey, form.bill_total.value, personInputs);
+  else if (type === "save-elec-bill") {
+    await saveElecBillTotal(form.dataset.monthKey, form.bill_total.value);
     render();
   }
-  else if (type === "save-water") {
+  else if (type === "save-elec-meters") {
+    const monthKey = form.dataset.monthKey;
+    const card = form.closest(".card");
+    const allForms = card ? card.querySelectorAll('[data-form="save-elec-meters"]') : [form];
+    const inputs = {};
+    for (const f of allForms) {
+      inputs[f.dataset.personId] = {
+        prevMeter: f.prev_meter?.value,
+        currMeter: f.curr_meter?.value,
+      };
+    }
+    await saveElecMeters(monthKey, inputs);
+    render();
+  }
+  else if (type === "save-water-bill") {
     await saveWaterMonth(form.dataset.monthKey, form.bill_total.value);
     render();
   }
