@@ -635,8 +635,8 @@ body.read-only-mode #app [data-form] { display: none !important; }
   margin-bottom: 8px;
 }
 
-body.module-eau.read-only-mode [data-action="pay-elec"],
-body.module-eau.read-only-mode [data-action="pay-water"] { display: none !important; }
+body.module-eau-elec.read-only-mode [data-action="pay-elec"],
+body.module-eau-elec.read-only-mode [data-action="pay-water"] { display: none !important; }
 
 body.module-maladie.read-only-mode [data-form="save-cnss-deposit-date"],
 body.module-maladie.read-only-mode [data-form="save-assurance-sent-date"],
