@@ -1,9 +1,9 @@
 import { flash } from "./utils.js";
 
 const MODULE_META = {
-  maison: { title: "Gestion achats maison", maisonControls: true },
+  maison: { title: "Gestion course", maisonControls: true },
   maladie: { title: "Dossier maladie", maisonControls: false },
-  eau: { title: "Eau & Électricité", maisonControls: false },
+  eau: { title: "Eau & Électricité", maisonControls: true },
 };
 
 const LOADERS = {
