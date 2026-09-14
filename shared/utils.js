@@ -82,6 +82,11 @@ export function moneyRound(n) {
   return v.toLocaleString("fr-FR", { maximumFractionDigits: 0 });
 }
 
+/** Arrondi entier pour parts utility (505,86 → 506) */
+export function roundShare(n) {
+  return Math.round(Number(n) || 0);
+}
+
 export function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
