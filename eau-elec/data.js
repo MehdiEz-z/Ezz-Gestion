@@ -69,6 +69,19 @@ export function isFirstEauMonth(monthKey) {
   return monthKey === EAU_START_MONTH;
 }
 
+export function isPrevMonthElecComplete(monthKey) {
+  if (isFirstEauMonth(monthKey)) return true;
+  const prevKey = previousMonthKey(monthKey);
+  if (prevKey < EAU_START_MONTH) return true;
+  if (state.persons.length === 0) return true;
+  const prevBill = getBill(prevKey);
+  if (!prevBill) return false;
+  return state.persons.every(p => {
+    const r = elecReading(prevBill.id, p.id);
+    return r && r.curr_meter != null;
+  });
+}
+
 /** Relevé précédent affiché : saisi (août) ou fin de mois N-1 */
 export function getPrevMeter(monthKey, personId) {
   const bill = getBill(monthKey);
