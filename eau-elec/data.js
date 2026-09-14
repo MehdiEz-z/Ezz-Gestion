@@ -127,16 +127,37 @@ export function monthElecStats(monthKey) {
   if (!bill || bill.elec_bill_total == null) {
     return { toPay: 0, paid: 0, total: 0, hasData: false };
   }
+
+  const billTotal = Number(bill.elec_bill_total);
+
+  if (!hasElecSharesCalculated(bill)) {
+    let paid = 0;
+    for (const p of state.persons) {
+      const r = elecReading(bill.id, p.id);
+      if (r?.paid_at && Number(r.share_amount) > 0) paid += Number(r.share_amount);
+    }
+    const toPay = Math.max(0, billTotal - paid);
+    return { toPay, paid, total: billTotal, hasData: true };
+  }
+
   let toPay = 0;
   let paid = 0;
   for (const p of state.persons) {
     const r = elecReading(bill.id, p.id);
-    if (!r || r.share_amount == null) continue;
+    if (!r) continue;
     const share = Number(r.share_amount);
     if (r.paid_at) paid += share;
     else toPay += share;
   }
   return { toPay, paid, total: toPay + paid, hasData: true };
+}
+
+export function hasElecSharesCalculated(monthKeyOrBill) {
+  const bill = typeof monthKeyOrBill === "string" ? getBill(monthKeyOrBill) : monthKeyOrBill;
+  if (!bill?.elec_bill_total) return false;
+  const entries = collectElecEntriesFromSaved(bill);
+  if (!entries) return false;
+  return calcElecShares(bill.elec_bill_total, entries) != null;
 }
 
 export function monthWaterStats(monthKey) {
@@ -161,7 +182,7 @@ export function personRecap(monthKey, personId) {
   if (!bill) return { elec: 0, water: 0, total: 0, elecPaid: false, waterPaid: false };
   const er = elecReading(bill.id, personId);
   const ws = waterShare(bill.id, personId);
-  const elec = er ? Number(er.share_amount) : 0;
+  const elec = er && hasElecSharesCalculated(bill) ? Number(er.share_amount) : 0;
   const water = ws ? Number(ws.share_amount) : 0;
   return {
     elec, water, total: elec + water,
@@ -181,7 +202,7 @@ export function personGlobalSummary(personId) {
 
   for (const bill of state.bills) {
     const er = elecReading(bill.id, personId);
-    if (er) {
+    if (er && hasElecSharesCalculated(bill)) {
       const amt = Number(er.share_amount);
       totalElec += amt;
       if (er.paid_at) paidElec += amt;
@@ -389,7 +410,7 @@ export async function saveElecMeters(monthKey, personId, inp, silent = false) {
   const entry = buildSingleElecEntry(monthKey, bill, personId, inp);
   if (!entry) return false;
 
-  const ok = await upsertElecReading(bill, personId, entry.prev, entry.curr, null);
+  const ok = await upsertElecReading(bill, personId, entry.prev, entry.curr, 0);
   if (!ok) return false;
 
   if (bill.elec_bill_total != null) {
