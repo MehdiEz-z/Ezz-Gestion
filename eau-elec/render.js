@@ -1,7 +1,7 @@
 import {
   state, ui,
   personName, getBill, elecReading, waterShare,
-  getPrevMeter, isFirstEauMonth, isPrevMonthElecComplete,
+  getPrevMeter, isFirstEauMonth, isPrevMonthElecComplete, hasElecSharesCalculated,
   monthElecStats, monthWaterStats, personRecap, personGlobalSummary,
   recapBadge,
 } from "./data.js";
@@ -130,11 +130,12 @@ function renderElecPersonBlock(monthKey, p, bill) {
   const labels = meterPeriodLabels(monthKey);
   const prev = hasMeters ? Number(reading.prev_meter) : getPrevMeter(monthKey, p.id);
   const curr = hasMeters ? Number(reading.curr_meter) : null;
-  const share = reading && reading.share_amount != null ? Number(reading.share_amount) : null;
+  const share = reading ? Number(reading.share_amount) : 0;
   const canEdit = isAdmin && !isPaid;
   const showPrevInput = isFirstEauMonth(monthKey);
   const prevReady = isFirstEauMonth(monthKey) || prev != null;
   const hasBill = bill?.elec_bill_total != null;
+  const sharesReady = hasElecSharesCalculated(monthKey);
 
   const meterLines = hasMeters
     ? renderElecMeterLines(monthKey, prev, curr, labels)
@@ -147,11 +148,11 @@ function renderElecPersonBlock(monthKey, p, bill) {
       <button type="submit" class="btn-small" style="background:var(--month)">Enregistrer</button>
     </form>` : "";
 
-  const partLine = hasBill && share != null
+  const partLine = sharesReady && share > 0
     ? `<div class="small-label"><strong>Part : ${money(share)} DH</strong></div>`
     : "";
 
-  const payBtn = hasMeters && hasBill && share != null && canEdit
+  const payBtn = hasMeters && sharesReady && share > 0 && canEdit
     ? `<button type="button" class="btn-small" style="background:var(--month);margin-top:6px;width:100%" data-action="pay-elec" data-month-key="${monthKey}" data-person-id="${p.id}">Payer</button>`
     : "";
 
