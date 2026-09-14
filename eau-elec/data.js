@@ -1,7 +1,7 @@
 import { supabaseClient } from "../shared/supabase.js";
 import { isAdmin, currentUser } from "../shared/auth.js";
 import {
-  flash, getErrorMessage, normalizeName, EAU_START_MONTH, previousMonthKey, activeMonthKey, monthLabel,
+  flash, getErrorMessage, normalizeName, EAU_START_MONTH, previousMonthKey, activeMonthKey, monthLabel, roundShare,
 } from "../shared/utils.js";
 
 export let state = {
@@ -155,6 +155,14 @@ export function monthElecStats(monthKey) {
 export function hasElecSharesCalculated(monthKeyOrBill) {
   const bill = typeof monthKeyOrBill === "string" ? getBill(monthKeyOrBill) : monthKeyOrBill;
   if (!bill?.elec_bill_total) return false;
+  if (state.persons.length === 0) return false;
+
+  const allHaveShare = state.persons.every(p => {
+    const r = elecReading(bill.id, p.id);
+    return r && r.curr_meter != null && Number(r.share_amount) > 0;
+  });
+  if (allHaveShare) return true;
+
   const entries = collectElecEntriesFromSaved(bill);
   if (!entries) return false;
   return calcElecShares(bill.elec_bill_total, entries) != null;
@@ -174,7 +182,8 @@ export function monthWaterStats(monthKey) {
     if (s.paid_at) paid += share;
     else toPay += share;
   }
-  return { toPay, paid, total: toPay + paid, hasData: true };
+  const total = toPay + paid || Number(bill.water_bill_total);
+  return { toPay, paid, total, hasData: true };
 }
 
 export function personRecap(monthKey, personId) {
@@ -182,7 +191,7 @@ export function personRecap(monthKey, personId) {
   if (!bill) return { elec: 0, water: 0, total: 0, elecPaid: false, waterPaid: false };
   const er = elecReading(bill.id, personId);
   const ws = waterShare(bill.id, personId);
-  const elec = er && hasElecSharesCalculated(bill) ? Number(er.share_amount) : 0;
+  const elec = er && Number(er.share_amount) > 0 ? Number(er.share_amount) : 0;
   const water = ws ? Number(ws.share_amount) : 0;
   return {
     elec, water, total: elec + water,
@@ -202,7 +211,7 @@ export function personGlobalSummary(personId) {
 
   for (const bill of state.bills) {
     const er = elecReading(bill.id, personId);
-    if (er && hasElecSharesCalculated(bill)) {
+    if (er && er.curr_meter != null && Number(er.share_amount) > 0) {
       const amt = Number(er.share_amount);
       totalElec += amt;
       if (er.paid_at) paidElec += amt;
@@ -393,7 +402,7 @@ async function recalcElecShares(monthKey, silent = false) {
     const entry = entries.find(e => e.personId === sh.personId);
     const ok = await upsertElecReading(
       bill, sh.personId, entry.prev, entry.curr,
-      Math.round(sh.share * 100) / 100,
+      roundShare(sh.share),
     );
     if (!ok) return false;
   }
@@ -455,7 +464,7 @@ export async function saveWaterMonth(monthKey, billTotal) {
   if (billErr) { flash(getErrorMessage(billErr, "Erreur enregistrement facture eau."), true); return false; }
   bill.water_bill_total = total;
 
-  const roundedShare = Math.round(share * 100) / 100;
+  const roundedShare = roundShare(share);
 
   for (const p of state.persons) {
     if (waterShare(bill.id, p.id)?.paid_at) continue;
