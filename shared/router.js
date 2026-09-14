@@ -35,7 +35,9 @@ function updateHeaderUI(id) {
   const meta = MODULE_META[id] || MODULE_META.maison;
   document.getElementById("header-title").textContent = meta.title;
   const controls = document.getElementById("maison-controls");
-  if (controls) controls.style.display = meta.maisonControls ? "flex" : "none";
+  if (controls && id !== "eau-elec") {
+    controls.style.display = meta.maisonControls ? "flex" : "none";
+  }
   document.body.classList.remove("module-maison", "module-maladie", "module-eau-elec");
   document.body.classList.add("module-" + id);
 }
