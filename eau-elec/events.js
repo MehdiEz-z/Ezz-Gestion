@@ -14,7 +14,7 @@ export function setupEvents() {
 }
 
 function onClick(e) {
-  if (getActiveModule() !== "eau") return;
+  if (getActiveModule() !== "eau-elec") return;
 
   if (e.target.classList && e.target.classList.contains("overlay")) {
     const type = e.target.dataset.overlayClose;
@@ -57,7 +57,7 @@ function onClick(e) {
 }
 
 async function onSubmit(e) {
-  if (getActiveModule() !== "eau") return;
+  if (getActiveModule() !== "eau-elec") return;
   const form = e.target.closest("[data-form]");
   if (!form) return;
   e.preventDefault();
