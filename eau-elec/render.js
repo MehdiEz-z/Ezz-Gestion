@@ -150,7 +150,7 @@ function renderElecPersonBlock(monthKey, p, bill) {
     : (!showPrevInput && prev != null ? renderUtilityKvRow(`${labels.prev} :`, `${prev} kWh`) : "");
 
   const consoLine = hasMeters && prev != null && curr != null
-    ? renderUtilityKvRow("Consommation :", `${calcElecConso(prev, curr)} kWh`)
+    ? renderUtilityKvRow("Conso :", `${calcElecConso(prev, curr)} kWh`)
     : "";
 
   const meterForm = !hasMeters && canEdit && prevReady ? `
