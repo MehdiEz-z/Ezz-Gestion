@@ -649,20 +649,23 @@ body.read-only-mode #app [data-form] { display: none !important; }
 .utility-meter-col .btn-small { width: 100%; }
 
 .utility-recap-row {
-  align-items: flex-start;
+  display: block;
+  padding-bottom: 14px;
 }
 
 .utility-recap-row:not(:first-child) {
   padding-top: 14px;
 }
 
-.utility-recap-row > div {
-  flex: 1;
-  min-width: 0;
-  align-self: stretch;
+.utility-recap-inner {
+  width: 100%;
 }
 
-.utility-recap-row .list-item-name {
+.utility-recap-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
@@ -683,7 +686,6 @@ body.read-only-mode #app [data-form] { display: none !important; }
 
 .utility-recap-row .badge {
   flex-shrink: 0;
-  margin-top: 2px;
 }
 
 .reimb-block {
