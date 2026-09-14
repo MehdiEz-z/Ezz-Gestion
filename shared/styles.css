@@ -623,6 +623,21 @@ body.read-only-mode #app [data-form] { display: none !important; }
   margin-bottom: 12px;
 }
 
+.utility-kv-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.utility-kv-row-bold {
+  font-weight: 700;
+  color: var(--ink);
+}
+
 .utility-meter-col { gap: 8px; }
 
 .utility-meter-col .btn-small { width: 100%; }
