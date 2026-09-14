@@ -623,6 +623,25 @@ body.read-only-mode #app [data-form] { display: none !important; }
   margin-bottom: 12px;
 }
 
+.utility-card-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 4px;
+}
+
+.utility-meter-row .field { min-width: 0; }
+
+.utility-recap-row {
+  align-items: flex-start;
+}
+
+.utility-recap-row .badge {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
 .reimb-block {
   border: 1px solid var(--border);
   border-radius: 10px;

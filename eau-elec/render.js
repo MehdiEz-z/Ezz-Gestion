@@ -3,19 +3,16 @@ import {
   personName, getBill, elecReading, waterShare,
   getPrevMeter, isFirstEauMonth, calcElecConso,
   monthElecStats, monthWaterStats, personRecap, personGlobalSummary,
-  recapBadge,
+  monthElecStatus, monthWaterStatus, recapBadge,
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
 import {
   activeMonthKey, esc, EAU_START_MONTH, monthChipLabel, monthLabel,
-  monthsRangeFrom, money,
+  monthsRangeFrom, moneyRound, previousMonthKey,
 } from "../shared/utils.js";
 
-function renderDualProgress(paid, total, colorElec, colorWater, paidElec, paidWater) {
-  if (total <= 0) {
-    return `<div class="progress-row"><div class="progress-track"><div class="progress-fill" style="width:0"></div></div></div>`;
-  }
-  const pct = Math.min(100, (paid / total) * 100);
+function renderDualProgress(paid, total, paidElec, paidWater) {
+  const pct = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
   const elecPct = total > 0 ? Math.min(100, (paidElec / total) * 100) : 0;
   const waterPct = total > 0 ? Math.min(100 - elecPct, (paidWater / total) * 100) : 0;
   return `
@@ -26,10 +23,9 @@ function renderDualProgress(paid, total, colorElec, colorWater, paidElec, paidWa
       </div>
     </div>
     <div class="progress-legend">
-      <span><i class="dot dot-cnss"></i> Électricité ${money(paidElec)} DH</span>
-      <span><i class="dot dot-ass"></i> Eau ${money(paidWater)} DH</span>
-    </div>
-    <div class="small-label" style="margin-top:4px">Payé ${money(paid)} / ${money(total)} DH (${Math.round(pct)}%)</div>`;
+      <span><i class="dot dot-cnss"></i> Électricité ${moneyRound(paidElec)} DH</span>
+      <span><i class="dot dot-ass"></i> Eau ${moneyRound(paidWater)} DH</span>
+    </div>`;
 }
 
 function renderExpandableAddCard(key, title, bodyHtml) {
@@ -46,7 +42,6 @@ function renderExpandableAddCard(key, title, bodyHtml) {
 
 function renderPersonSummaryCard(p) {
   const s = personGlobalSummary(p.id);
-  const grand = s.grandTotal || s.chargeTotal + s.paidTotal;
   return `
     <div class="card" style="border-color:var(--month)">
       <div class="card-head">
@@ -55,12 +50,12 @@ function renderPersonSummaryCard(p) {
           <span class="badge badge-current">${esc(personName(p))}</span>
         </div>
         <div class="card-preview" style="text-align:right">
-          <div>${money(s.chargeElec)} DH <span class="small-label">Électricité</span></div>
-          <div>${money(s.chargeWater)} DH <span class="small-label">Eau</span></div>
+          <div><span class="small-label">Électricité</span> ${moneyRound(s.totalElec)} DH</div>
+          <div><span class="small-label">Eau</span> ${moneyRound(s.totalWater)} DH</div>
         </div>
       </div>
       <div class="card-body open">
-        ${renderDualProgress(s.paidTotal, grand, "var(--month)", "var(--week)", s.paidElec, s.paidWater)}
+        ${renderDualProgress(s.paidTotal, s.grandTotal, s.paidElec, s.paidWater)}
       </div>
     </div>`;
 }
@@ -115,6 +110,14 @@ function renderReferentielTab() {
     </div>`;
 }
 
+function meterPeriodLabels(monthKey) {
+  const prevKey = isFirstEauMonth(monthKey) ? previousMonthKey(monthKey) : previousMonthKey(monthKey);
+  return {
+    prev: monthLabel(prevKey),
+    curr: monthLabel(monthKey),
+  };
+}
+
 function renderElecPersonBlock(monthKey, p, bill) {
   const reading = bill ? elecReading(bill.id, p.id) : null;
   const isPaid = !!(reading && reading.paid_at);
@@ -123,29 +126,44 @@ function renderElecPersonBlock(monthKey, p, bill) {
   const conso = prev != null && curr != null ? calcElecConso(prev, curr) : null;
   const share = reading ? Number(reading.share_amount) : null;
   const canEdit = isAdmin && !isPaid;
-  const showPrevInput = isFirstEauMonth(monthKey) && canEdit;
+  const labels = meterPeriodLabels(monthKey);
+  const periodLine = conso != null
+    ? `${labels.prev} — ${labels.curr} — Conso ${conso} kWh`
+    : `${labels.prev} — ${labels.curr} — Conso —`;
 
-  if (isPaid || !canEdit) {
+  if (isPaid) {
     return `
       <div class="reimb-block" style="border-color:var(--month)">
         <div class="reimb-title" style="color:var(--month)">${esc(personName(p))}</div>
-        <div class="small-label">Relevé préc. : ${prev != null ? prev + " kWh" : "—"}</div>
-        <div class="small-label">Relevé actuel : ${curr != null ? curr + " kWh" : "—"}</div>
-        <div class="small-label">Consommation : ${conso != null ? conso + " kWh" : "—"}</div>
-        <div class="small-label"><strong>Part : ${share != null ? money(share) + " DH" : "—"}</strong></div>
-        ${isPaid ? `<span class="badge badge-current" style="margin-top:6px">Payé</span>` : ""}
+        <div class="small-label">${periodLine}</div>
+        <div class="small-label"><strong>Part : ${share != null ? moneyRound(share) + " DH" : "—"}</strong></div>
+        <span class="badge badge-current" style="margin-top:6px">Payé</span>
       </div>`;
   }
+
+  if (!canEdit) {
+    return `
+      <div class="reimb-block" style="border-color:var(--month)">
+        <div class="reimb-title" style="color:var(--month)">${esc(personName(p))}</div>
+        <div class="small-label">${periodLine}</div>
+        <div class="small-label"><strong>Part : ${share != null ? moneyRound(share) + " DH" : "—"}</strong></div>
+      </div>`;
+  }
+
+  const showPrevInput = isFirstEauMonth(monthKey);
+  const meterForm = `
+    <form class="inline-form utility-meter-row" data-form="save-elec-meters" data-month-key="${monthKey}" data-person-id="${p.id}">
+      ${showPrevInput ? `<input class="field" name="prev_meter" type="number" min="0" step="1" placeholder="${esc(labels.prev)}" value="${prev != null ? prev : ""}" required />` : ""}
+      <input class="field" name="curr_meter" type="number" min="0" step="1" placeholder="${esc(labels.curr)}" value="${curr != null ? curr : ""}" required />
+      <button type="submit" class="btn-small" style="background:var(--month);white-space:nowrap">Enregistrer</button>
+    </form>`;
 
   return `
     <div class="reimb-block" style="border-color:var(--month)">
       <div class="reimb-title" style="color:var(--month)">${esc(personName(p))}</div>
-      ${showPrevInput ? `
-        <input class="field" form="form-elec-${monthKey}" name="prev_${p.id}" type="number" min="0" step="1" placeholder="Relevé précédent" value="${prev != null ? prev : ""}" required />` : `
-        <div class="small-label">Relevé préc. : ${prev != null ? prev + " kWh" : "—"}</div>`}
-      <input class="field" form="form-elec-${monthKey}" name="curr_${p.id}" type="number" min="0" step="1" placeholder="Relevé actuel" value="${curr != null ? curr : ""}" required />
-      ${conso != null ? `<div class="small-label">Consommation : ${conso} kWh</div>` : ""}
-      ${share != null ? `<div class="small-label"><strong>Part : ${money(share)} DH</strong></div>` : ""}
+      ${!showPrevInput && prev != null ? `<div class="small-label">${labels.prev} : ${prev} kWh</div>` : ""}
+      ${meterForm}
+      ${share != null ? `<div class="small-label" style="margin-top:6px">${periodLine}</div><div class="small-label"><strong>Part : ${moneyRound(share)} DH</strong></div>` : ""}
       ${reading && share != null ? `
         <button type="button" class="btn-small" style="background:var(--month);margin-top:6px;width:100%" data-action="pay-elec" data-month-key="${monthKey}" data-person-id="${p.id}">Payer</button>` : ""}
     </div>`;
@@ -157,21 +175,47 @@ function renderWaterPersonBlock(monthKey, p, bill) {
   const share = shareRow ? Number(shareRow.share_amount) : null;
   const canEdit = isAdmin && !isPaid;
 
-  if (isPaid || !canEdit) {
+  if (isPaid) {
     return `
       <div class="reimb-block" style="border-color:var(--week)">
         <div class="reimb-title" style="color:var(--week)">${esc(personName(p))}</div>
-        <div class="small-label"><strong>Part : ${share != null ? money(share) + " DH" : "—"}</strong></div>
-        ${isPaid ? `<span class="badge badge-current" style="margin-top:6px">Payé</span>` : ""}
+        <div class="small-label"><strong>Part : ${share != null ? moneyRound(share) + " DH" : "—"}</strong></div>
+        <span class="badge badge-current" style="margin-top:6px">Payé</span>
+      </div>`;
+  }
+
+  if (!canEdit) {
+    return `
+      <div class="reimb-block" style="border-color:var(--week)">
+        <div class="reimb-title" style="color:var(--week)">${esc(personName(p))}</div>
+        <div class="small-label"><strong>Part : ${share != null ? moneyRound(share) + " DH" : "—"}</strong></div>
       </div>`;
   }
 
   return `
     <div class="reimb-block" style="border-color:var(--week)">
       <div class="reimb-title" style="color:var(--week)">${esc(personName(p))}</div>
-      ${share != null ? `<div class="small-label"><strong>Part : ${money(share)} DH</strong></div>` : `<div class="small-label">Part : —</div>`}
+      ${share != null ? `<div class="small-label"><strong>Part : ${moneyRound(share)} DH</strong></div>` : `<div class="small-label">Part : —</div>`}
       ${shareRow && share != null ? `
         <button type="button" class="btn-small" style="background:var(--week);margin-top:6px;width:100%" data-action="pay-water" data-month-key="${monthKey}" data-person-id="${p.id}">Payer</button>` : ""}
+    </div>`;
+}
+
+function renderUtilityCardHead(title, colorVar, monthKey, stats, status, open) {
+  const payLine = stats.hasData ? `À payer : ${moneyRound(stats.toPay)} DH` : "—";
+  return `
+    <div class="card-head" data-action="toggle-card" data-key="${open.key}">
+      <div style="flex:1;min-width:0">
+        <div class="card-title" style="color:${colorVar}">${title}</div>
+        <div class="utility-card-row">
+          <span class="card-range">${payLine}</span>
+          <span class="card-range">${monthLabel(monthKey)}</span>
+          <span class="badge ${status.cls}">${status.label}</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+        <span class="chevron">${open.isOpen ? "▲" : "▼"}</span>
+      </div>
     </div>`;
 }
 
@@ -180,15 +224,15 @@ function renderElecCard(monthKey) {
   const open = ui.expanded.has(key);
   const bill = getBill(monthKey);
   const stats = monthElecStats(monthKey);
-  const isActive = monthKey === activeMonthKey();
+  const status = monthElecStatus(monthKey);
   const editable = isAdmin;
 
   const openBody = state.persons.length === 0
     ? `<div class="small-label">Ajoutez des personnes dans le Référentiel.</div>`
     : `
-      <form id="form-elec-${monthKey}" class="form-col" data-form="save-elec" data-month-key="${monthKey}" style="margin-bottom:10px">
-        <input class="field" name="bill_total" type="number" min="0" step="0.01" placeholder="Facture totale (DH)" value="${bill?.elec_bill_total != null ? bill.elec_bill_total : ""}" ${editable ? "" : "disabled"} required />
-        ${editable ? `<button type="submit" class="btn-small" style="background:var(--month);align-self:flex-start">Enregistrer</button>` : ""}
+      <form class="inline-form" data-form="save-elec-bill" data-month-key="${monthKey}" style="margin-bottom:12px">
+        <input class="field" name="bill_total" type="number" min="0" step="0.01" placeholder="Facture" value="${bill?.elec_bill_total != null ? bill.elec_bill_total : ""}" ${editable ? "" : "disabled"} required />
+        ${editable ? `<button type="submit" class="btn-small" style="background:var(--month);white-space:nowrap">Enregistrer</button>` : ""}
       </form>
       <div class="reimb-grid">
         ${state.persons.map(p => renderElecPersonBlock(monthKey, p, bill)).join("")}
@@ -196,15 +240,7 @@ function renderElecCard(monthKey) {
 
   return `
     <div class="card" style="border-color:var(--month)">
-      <div class="card-head" data-action="toggle-card" data-key="${key}">
-        <div>
-          <div class="card-title" style="color:var(--month)">Électricité</div>
-          <div class="card-range">${monthLabel(monthKey)}</div>
-          <div class="card-range">${stats.hasData ? money(stats.toPay) + " DH à payer" : "—"}</div>
-          ${isActive ? `<div class="card-range">Mois en cours · Payé : ${money(stats.paid)} DH</div>` : ""}
-        </div>
-        <span class="chevron">${open ? "▲" : "▼"}</span>
-      </div>
+      ${renderUtilityCardHead("Électricité", "var(--month)", monthKey, stats, status, { key, isOpen: open })}
       <div class="card-body ${open ? "open" : ""}">${openBody}</div>
     </div>`;
 }
@@ -214,15 +250,15 @@ function renderWaterCard(monthKey) {
   const open = ui.expanded.has(key);
   const bill = getBill(monthKey);
   const stats = monthWaterStats(monthKey);
-  const isActive = monthKey === activeMonthKey();
+  const status = monthWaterStatus(monthKey);
   const editable = isAdmin;
 
   const openBody = state.persons.length === 0
     ? `<div class="small-label">Ajoutez des personnes dans le Référentiel.</div>`
     : `
-      <form class="form-col" data-form="save-water" data-month-key="${monthKey}" style="margin-bottom:10px">
-        <input class="field" name="bill_total" type="number" min="0" step="0.01" placeholder="Facture totale (DH)" value="${bill?.water_bill_total != null ? bill.water_bill_total : ""}" ${editable ? "" : "disabled"} required />
-        ${editable ? `<button type="submit" class="btn-small" style="background:var(--week);align-self:flex-start">Enregistrer</button>` : ""}
+      <form class="inline-form" data-form="save-water-bill" data-month-key="${monthKey}" style="margin-bottom:12px">
+        <input class="field" name="bill_total" type="number" min="0" step="0.01" placeholder="Facture" value="${bill?.water_bill_total != null ? bill.water_bill_total : ""}" ${editable ? "" : "disabled"} required />
+        ${editable ? `<button type="submit" class="btn-small" style="background:var(--week);white-space:nowrap">Enregistrer</button>` : ""}
       </form>
       <div class="reimb-grid">
         ${state.persons.map(p => renderWaterPersonBlock(monthKey, p, bill)).join("")}
@@ -230,15 +266,7 @@ function renderWaterCard(monthKey) {
 
   return `
     <div class="card" style="border-color:var(--week)">
-      <div class="card-head" data-action="toggle-card" data-key="${key}">
-        <div>
-          <div class="card-title" style="color:var(--week)">Eau</div>
-          <div class="card-range">${monthLabel(monthKey)}</div>
-          <div class="card-range">${stats.hasData ? money(stats.toPay) + " DH à payer" : "—"}</div>
-          ${isActive ? `<div class="card-range">Mois en cours · Payé : ${money(stats.paid)} DH</div>` : ""}
-        </div>
-        <span class="chevron">${open ? "▲" : "▼"}</span>
-      </div>
+      ${renderUtilityCardHead("Eau", "var(--week)", monthKey, stats, status, { key, isOpen: open })}
       <div class="card-body ${open ? "open" : ""}">${openBody}</div>
     </div>`;
 }
@@ -251,10 +279,12 @@ function renderRecapCard(monthKey) {
     const r = personRecap(monthKey, p.id);
     const badge = recapBadge(r);
     return `
-      <li class="list-item">
+      <li class="list-item utility-recap-row">
         <div>
           <div class="list-item-name">${esc(personName(p))}</div>
-          <div class="small-label">Élec ${money(r.elec)} DH · Eau ${money(r.water)} DH · Total ${money(r.total)} DH</div>
+          <div class="small-label">Électricité ${moneyRound(r.elec)} DH</div>
+          <div class="small-label">Eau ${moneyRound(r.water)} DH</div>
+          <div class="small-label"><strong>Total ${moneyRound(r.total)} DH</strong></div>
         </div>
         <span class="badge ${badge.cls}">${badge.label}</span>
       </li>`;

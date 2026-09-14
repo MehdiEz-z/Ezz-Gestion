@@ -77,6 +77,11 @@ export function money(n) {
   return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+export function moneyRound(n) {
+  const v = Math.round(Number(n) || 0);
+  return v.toLocaleString("fr-FR", { maximumFractionDigits: 0 });
+}
+
 export function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
