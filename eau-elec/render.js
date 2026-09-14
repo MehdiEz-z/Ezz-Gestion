@@ -1,7 +1,7 @@
 import {
   state, ui,
   personName, getBill, elecReading, waterShare,
-  getPrevMeter, isFirstEauMonth, isPrevMonthElecComplete, hasElecSharesCalculated,
+  getPrevMeter, isFirstEauMonth, isPrevMonthElecComplete, hasElecSharesCalculated, calcElecConso,
   monthElecStats, monthWaterStats, personRecap, personGlobalSummary,
   recapBadge,
 } from "./data.js";
@@ -25,6 +25,7 @@ function renderDualProgress(paid, total, paidElec, paidWater) {
     <div class="progress-legend">
       <span><i class="dot dot-cnss"></i> Électricité ${money(paidElec)} DH</span>
       <span><i class="dot dot-ass"></i> Eau ${money(paidWater)} DH</span>
+      <span><i class="dot dot-paid"></i> ${money(paid)} DH</span>
     </div>`;
 }
 
@@ -148,6 +149,10 @@ function renderElecPersonBlock(monthKey, p, bill) {
     ? renderElecMeterLines(monthKey, prev, curr, labels)
     : (!showPrevInput && prev != null ? renderUtilityKvRow(`${labels.prev} :`, `${prev} kWh`) : "");
 
+  const consoLine = hasMeters && prev != null && curr != null
+    ? renderUtilityKvRow("Consommation :", `${calcElecConso(prev, curr)} kWh`)
+    : "";
+
   const meterForm = !hasMeters && canEdit && prevReady ? `
     <form class="form-col utility-meter-col" data-form="save-elec-meters" data-month-key="${monthKey}" data-person-id="${p.id}">
       ${showPrevInput ? `<input class="field" name="prev_meter" type="number" min="0" step="1" placeholder="${esc(labels.prev)}" value="" required />` : ""}
@@ -169,6 +174,7 @@ function renderElecPersonBlock(monthKey, p, bill) {
     <div class="reimb-block" style="border-color:var(--month)">
       <div class="reimb-title" style="color:var(--month)">${esc(personName(p))}</div>
       ${meterLines}
+      ${consoLine}
       ${meterForm}
       ${partLine}
       ${isPaid ? paidBadge : payBtn}
@@ -287,11 +293,11 @@ function renderRecapCard(monthKey) {
     const badge = recapBadge(r);
     return `
       <li class="list-item utility-recap-row">
-        <div>
+        <div style="flex:1;min-width:0">
           <div class="list-item-name">${esc(personName(p))}</div>
-          <div class="small-label">Électricité ${money(r.elec)} DH</div>
-          <div class="small-label">Eau ${money(r.water)} DH</div>
-          <div class="small-label"><strong>Total ${money(r.total)} DH</strong></div>
+          ${renderUtilityKvRow("Électricité", `${money(r.elec)} DH`)}
+          ${renderUtilityKvRow("Eau", `${money(r.water)} DH`)}
+          ${renderUtilityKvRow("Total", `${money(r.total)} DH`, true)}
         </div>
         <span class="badge ${badge.cls}">${badge.label}</span>
       </li>`;
