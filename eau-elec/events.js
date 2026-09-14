@@ -36,6 +36,12 @@ function onClick(e) {
     ui.subTab = "factures";
     render();
   }
+  else if (action === "go-prev-month") {
+    ui.viewedMonthKey = target.dataset.month;
+    ui.subTab = "factures";
+    ui.expanded.add("elec:" + target.dataset.month);
+    render();
+  }
   else if (action === "toggle-card") {
     const key = target.dataset.key;
     if (ui.expanded.has(key)) ui.expanded.delete(key);
