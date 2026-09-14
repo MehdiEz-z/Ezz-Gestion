@@ -15,10 +15,7 @@ export const ui = {
   subTab: "synthese",
   viewedMonthKey: null,
   monthPanelOpen: false,
-  expanded: new Set([
-    "elec:" + EAU_START_MONTH, "water:" + EAU_START_MONTH, "recap:" + EAU_START_MONTH,
-    "ref:persons", "ref:add-person",
-  ]),
+  expanded: new Set(),
   modal: null,
 };
 

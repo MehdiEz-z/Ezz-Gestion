@@ -623,15 +623,9 @@ body.read-only-mode #app [data-form] { display: none !important; }
   margin-bottom: 12px;
 }
 
-.utility-card-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  margin-top: 4px;
-}
+.utility-meter-col { gap: 8px; }
 
-.utility-meter-row .field { min-width: 0; }
+.utility-meter-col .btn-small { width: 100%; }
 
 .utility-recap-row {
   align-items: flex-start;
