@@ -1,9 +1,32 @@
-export function deactivate() {}
+import { activeMonthKey, EAU_START_MONTH } from "../shared/utils.js";
+import { ui, fetchStateFromSupabase } from "./data.js";
+import { render } from "./render.js";
+import { setupEvents } from "./events.js";
 
-export async function activate() {
-  document.getElementById("subtabs").innerHTML = "";
-  document.getElementById("main").innerHTML = "";
-  document.getElementById("modal-root").innerHTML = "";
+let eventsReady = false;
+let dataLoaded = false;
+
+export function deactivate() {
+  ui.modal = null;
+  ui.monthPanelOpen = false;
 }
 
-export function render() {}
+export function resetModule() {
+  dataLoaded = false;
+}
+
+export async function activate() {
+  if (!ui.viewedMonthKey) ui.viewedMonthKey = activeMonthKey();
+  if (ui.viewedMonthKey < EAU_START_MONTH) ui.viewedMonthKey = EAU_START_MONTH;
+  if (!eventsReady) {
+    setupEvents();
+    eventsReady = true;
+  }
+  if (!dataLoaded) {
+    await fetchStateFromSupabase();
+    dataLoaded = true;
+  }
+  render();
+}
+
+export { render };
