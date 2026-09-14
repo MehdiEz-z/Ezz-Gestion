@@ -3,13 +3,13 @@ import { flash } from "./utils.js";
 const MODULE_META = {
   maison: { title: "Gestion course", maisonControls: true },
   maladie: { title: "Dossier maladie", maisonControls: false },
-  eau: { title: "Eau & Électricité", maisonControls: true },
+  "eau-elec": { title: "Eau & Électricité", maisonControls: true },
 };
 
 const LOADERS = {
   maison: () => import("../maison/boot.js"),
   maladie: () => import("../maladie/boot.js"),
-  eau: () => import("../eau/boot.js"),
+  "eau-elec": () => import("../eau-elec/boot.js"),
 };
 
 let activeModule = null;
@@ -20,7 +20,9 @@ export function getActiveModule() {
 }
 
 export function getStoredModule() {
-  return sessionStorage.getItem("ezz-module") || "maison";
+  const stored = sessionStorage.getItem("ezz-module") || "maison";
+  if (stored === "eau") return "eau-elec";
+  return stored;
 }
 
 function updateNavUI(id) {
@@ -34,7 +36,7 @@ function updateHeaderUI(id) {
   document.getElementById("header-title").textContent = meta.title;
   const controls = document.getElementById("maison-controls");
   if (controls) controls.style.display = meta.maisonControls ? "flex" : "none";
-  document.body.classList.remove("module-maison", "module-maladie", "module-eau");
+  document.body.classList.remove("module-maison", "module-maladie", "module-eau-elec");
   document.body.classList.add("module-" + id);
 }
 
