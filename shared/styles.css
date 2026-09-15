@@ -688,6 +688,28 @@ body.read-only-mode #app [data-form] { display: none !important; }
   flex-shrink: 0;
 }
 
+.utility-recap-block {
+  padding: 4px 0;
+}
+
+.utility-recap-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.utility-recap-sep {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 12px 0;
+}
+
+.utility-recap-block .utility-kv-row span:last-child {
+  text-align: right;
+  white-space: nowrap;
+}
+
 .reimb-block {
   border: 1px solid var(--border);
   border-radius: 10px;
