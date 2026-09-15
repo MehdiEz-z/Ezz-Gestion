@@ -1,6 +1,6 @@
 import {
   state, ui,
-  monthSpentTotal, weekSpentTotal, isPurchaseEditable,
+  monthSpentTotal, weekSpentTotal, achatsRecap, isPurchaseEditable,
   getPeriodDisplayRows, getAvailableCategoriesForPeriod,
   isPeriodCategoryAssigned, totalForPeriodRow, purchasesForPeriodRow,
 } from "./data.js";
@@ -292,8 +292,44 @@ function renderCategoriesTab() {
     </div>`;
 }
 
+function renderUtilityKvRow(label, value, bold = false) {
+  return `
+    <div class="utility-kv-row${bold ? " utility-kv-row-bold" : ""}">
+      <span>${label}</span>
+      <span>${value}</span>
+    </div>`;
+}
+
+function renderAchatsRecapCard(monthKey) {
+  const key = "achat-recap:" + monthKey;
+  const open = ui.expanded.has(key);
+  const r = achatsRecap(monthKey);
+
+  return `
+    <div class="card">
+      <div class="card-head" data-action="toggle-card" data-key="${key}">
+        <div class="card-title">Récapitulatif</div>
+        <span class="chevron">${open ? "▲" : "▼"}</span>
+      </div>
+      <div class="card-body ${open ? "open" : ""}">
+        <div class="utility-recap-block">
+          <div class="utility-recap-section-title">Gain Mensuel</div>
+          ${renderUtilityKvRow("Consommation", `${money(r.monthConso)} DH`)}
+          ${renderUtilityKvRow("Gain", `${money(r.monthGain)} DH`)}
+          <hr class="utility-recap-sep" />
+          <div class="utility-recap-section-title">Gain Semaines</div>
+          ${renderUtilityKvRow("Consommation", `${money(r.weekConso)} DH`)}
+          ${renderUtilityKvRow("Gain", `${money(r.weekGain)} DH`)}
+          <hr class="utility-recap-sep" />
+          ${renderUtilityKvRow("Total Gain", `${money(r.totalGain)} DH`, true)}
+        </div>
+      </div>
+    </div>`;
+}
+
 function renderAchatsTab() {
-  const monthKey = activeMonthKey();
+  const monthKey = ui.viewedMonthKey;
+  const isActiveMonth = monthKey === activeMonthKey();
   const monthBudget = state.monthlyBudgets[monthKey];
   const monthTotal = monthSpentTotal(monthKey);
   const monthKeyStr = "achat-month:" + monthKey;
@@ -309,7 +345,7 @@ function renderAchatsTab() {
         <div>
           <div class="card-title" style="color:var(--month)">Achat Mensuel</div>
           <div class="card-range">${monthLabel(monthKey)}</div>
-          <span class="badge badge-current">Mois en cours</span>
+          <span class="badge ${isActiveMonth ? "badge-current" : "badge-past"}">${isActiveMonth ? "Mois en cours" : "Consultation"}</span>
           ${monthOver ? `<span class="badge badge-danger">Dépassé</span>` : ""}
         </div>
         <div style="display:flex;align-items:center;gap:10px">
@@ -324,7 +360,7 @@ function renderAchatsTab() {
           ${monthOver ? `<div class="alert-banner">Budget mensuel dépassé !</div>` : ""}
           ${renderPeriodCategoryPicker("mensuel", monthKey)}
           ${state.categories.filter(c => c.type === "mensuel").length === 0 && monthRows.length === 0 ? `<div class="small-label">Aucune catégorie mensuelle créée.</div>` : monthRows.length === 0 ? `<div class="small-label">Sélectionne une catégorie ci-dessus.</div>` : `
-            <ul class="list">${monthRows.map(r => renderPeriodRow(r, "mensuel", true, { monthKey })).join("")}</ul>`}
+            <ul class="list">${monthRows.map(r => renderPeriodRow(r, "mensuel", isActiveMonth, { monthKey })).join("")}</ul>`}
         </div>
       `}
     </div>`;
@@ -335,7 +371,8 @@ function renderAchatsTab() {
     const isoWs = toISO(wStart), isoWe = toISO(addDays(wStart, 6));
     const n = getWeekNumberInMonth(wStart);
     let status;
-    if (isoWs === todayWeekISO) status = "current";
+    if (!isActiveMonth) status = "past";
+    else if (isoWs === todayWeekISO) status = "current";
     else if (isoWs < todayWeekISO) status = "past";
     else status = "future";
 
@@ -389,7 +426,7 @@ function renderAchatsTab() {
       </div>`;
   }).join("");
 
-  return `<div class="stack">${monthCard}${weekCards}</div>`;
+  return `<div class="stack">${monthCard}${weekCards}${renderAchatsRecapCard(monthKey)}</div>`;
 }
 
 function renderMonthPanel() {
