@@ -192,7 +192,7 @@ export function weekSpentTotal(isoWs, isoWe) {
     .reduce((s, p) => s + Number(p.price), 0);
 }
 
-/** @returns {{ monthConso: number, monthGain: number, weekConso: number, weekGain: number, totalGain: number }} */
+/** @returns {{ monthConso: number, monthGain: number, weekConso: number, weekGain: number, totalConso: number, totalGain: number }} */
 export function achatsRecap(monthKey) {
   const monthBudget = state.monthlyBudgets[monthKey];
   const monthConso = monthSpentTotal(monthKey);
@@ -224,6 +224,7 @@ export function achatsRecap(monthKey) {
     monthGain,
     weekConso,
     weekGain,
+    totalConso: monthConso + weekConso,
     totalGain: monthGain + weekGain,
   };
 }
