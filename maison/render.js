@@ -12,6 +12,9 @@ import {
 } from "../shared/utils.js";
 
 export function render() {
+  const controls = document.getElementById("maison-controls");
+  if (controls) controls.style.display = ui.subTab === "categories" ? "none" : "flex";
+
   document.getElementById("header-title").textContent =
     ui.subTab === "budget" ? "Gestion course"
       : ui.subTab === "categories" ? "Catégories & lieux"
@@ -91,7 +94,7 @@ function renderMonthAccordion(monthKey) {
           ${monthBudget !== undefined && monthTotal > Number(monthBudget) ? `<span class="badge badge-danger">Dépassé</span>` : ""}
         </div>
         <div style="display:flex;align-items:center;gap:10px">
-          <div class="card-preview">${monthBudget !== undefined ? money(monthBudget) + " DH<br>" + money(monthTotal) + " DH consommé" : "budget non défini"}</div>
+          <div class="card-preview">${monthBudget !== undefined ? money(monthBudget) + " DH<br><span class=\"small-label\">Consommé : " + money(monthTotal) + " DH</span>" : "budget non défini"}</div>
           ${monthBudget === undefined ? `<span class="chevron">${monthOpen ? "▲" : "▼"}</span>` : ""}
         </div>
       </div>
@@ -137,7 +140,7 @@ function renderMonthAccordion(monthKey) {
             ${budget !== undefined && total > Number(budget) ? `<span class="badge badge-danger">Dépassé</span>` : ""}
           </div>
           <div style="display:flex;align-items:center;gap:10px">
-            <div class="card-preview">${budget !== undefined ? money(budget) + " DH<br>" + money(total) + " DH consommé" : "budget non défini"}</div>
+            <div class="card-preview">${budget !== undefined ? money(budget) + " DH<br><span class=\"small-label\">Consommé : " + money(total) + " DH</span>" : "budget non défini"}</div>
             ${canToggle ? `<span class="chevron">${open ? "▲" : "▼"}</span>` : ""}
           </div>
         </div>
@@ -321,6 +324,7 @@ function renderAchatsRecapCard(monthKey) {
           ${renderUtilityKvRow("Consommation", `${money(r.weekConso)} DH`)}
           ${renderUtilityKvRow("Gain", `${money(r.weekGain)} DH`)}
           <hr class="utility-recap-sep" />
+          ${renderUtilityKvRow("Consommation Total", `${money(r.totalConso)} DH`)}
           ${renderUtilityKvRow("Total Gain", `${money(r.totalGain)} DH`, true)}
         </div>
       </div>
@@ -349,7 +353,7 @@ function renderAchatsTab() {
           ${monthOver ? `<span class="badge badge-danger">Dépassé</span>` : ""}
         </div>
         <div style="display:flex;align-items:center;gap:10px">
-          <div class="card-preview">${monthBudget !== undefined ? money(monthTotal) + " DH consommé" : "Budget non défini"}${monthBudget !== undefined ? `<br><span class="small-label ${monthRemCls}">Reste : ${money(monthRemaining)} DH</span>` : ""}</div>
+          <div class="card-preview">${monthBudget !== undefined ? `<span class="small-label">Consommé : ${money(monthTotal)} DH</span>` : "Budget non défini"}${monthBudget !== undefined ? `<br><span class="small-label ${monthRemCls}">Reste : ${money(monthRemaining)} DH</span>` : ""}</div>
           ${monthBudget !== undefined ? `<span class="chevron">${monthOpen ? "▲" : "▼"}</span>` : ""}
         </div>
       </div>
@@ -402,7 +406,7 @@ function renderAchatsTab() {
             ${weekOver ? `<span class="badge badge-danger">Dépassé</span>` : ""}
           </div>
           <div style="display:flex;align-items:center;gap:10px">
-            <div class="card-preview">${status === "future" ? "" : budget !== undefined ? money(total) + " DH consommé" + (budget !== undefined ? `<br><span class="small-label ${remCls}">Reste : ${money(remaining)} DH</span>` : "") : "Budget non défini"}</div>
+            <div class="card-preview">${status === "future" ? "" : budget !== undefined ? `<span class="small-label">Consommé : ${money(total)} DH</span><br><span class="small-label ${remCls}">Reste : ${money(remaining)} DH</span>` : "Budget non défini"}</div>
             ${canShowWeekBody ? `<span class="chevron">${open ? "▲" : "▼"}</span>` : ""}
           </div>
         </div>
