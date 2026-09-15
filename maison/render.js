@@ -324,7 +324,7 @@ function renderAchatsRecapCard(monthKey) {
           ${renderUtilityKvRow("Consommation", `${money(r.weekConso)} DH`)}
           ${renderUtilityKvRow("Gain", `${money(r.weekGain)} DH`)}
           <hr class="utility-recap-sep" />
-          ${renderUtilityKvRow("Consommation Total", `${money(r.totalConso)} DH`)}
+          ${renderUtilityKvRow("Total Consommation", `${money(r.totalConso)} DH`, true)}
           ${renderUtilityKvRow("Total Gain", `${money(r.totalGain)} DH`, true)}
         </div>
       </div>
