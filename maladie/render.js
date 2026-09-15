@@ -114,7 +114,7 @@ function renderSyntheseTab() {
             <div class="card-title" style="color:var(--danger)">Total dépensé</div>
             <span class="badge badge-danger">Charge globale : ${money(s.globalCharge)} DH</span>
           </div>
-          <div class="card-preview">${money(s.totalSpent)} DH dépensé<br>${money(totalReimb)} DH remboursé</div>
+          <div class="card-preview"><span class="small-label">Dépensé : ${money(s.totalSpent)} DH</span><br><span class="small-label success">Remboursé : ${money(totalReimb)} DH</span></div>
         </div>
         <div class="card-body open">
           ${renderDualProgress(s.totalSpent, s.totalCnss, s.totalAss)}
@@ -128,8 +128,8 @@ function renderSyntheseTab() {
             <span class="badge badge-current">${s.totalDossiers} dossier${s.totalDossiers > 1 ? "s" : ""}</span>
           </div>
           <div class="card-preview" style="text-align:right">
-            <div>${s.pendingCount} en attente</div>
-            <div style="font-size:11px;color:var(--muted)">${s.rembourseCount} remboursé${s.rembourseCount > 1 ? "s" : ""}</div>
+            <div class="small-label">En attente : ${s.pendingCount}</div>
+            <div class="small-label success">Remboursé : ${s.rembourseCount}</div>
           </div>
         </div>
         <div class="card-body open">

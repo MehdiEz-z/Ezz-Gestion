@@ -51,8 +51,8 @@ function renderPersonSummaryCard(p) {
           <span class="badge badge-current">${esc(personName(p))}</span>
         </div>
         <div class="card-preview" style="text-align:right">
-          <div><span class="small-label">Électricité</span> ${money(s.totalElec)} DH</div>
-          <div><span class="small-label">Eau</span> ${money(s.totalWater)} DH</div>
+          <div><span class="small-label">Électricité :</span> ${money(s.totalElec)} DH</div>
+          <div><span class="small-label">Eau :</span> ${money(s.totalWater)} DH</div>
         </div>
       </div>
       <div class="card-body open">
@@ -298,9 +298,9 @@ function renderRecapCard(monthKey) {
             <div class="list-item-name">${esc(personName(p))}</div>
             <span class="badge ${badge.cls}">${badge.label}</span>
           </div>
-          ${renderUtilityKvRow("Électricité", `${money(r.elec)} DH`)}
-          ${renderUtilityKvRow("Eau", `${money(r.water)} DH`)}
-          ${renderUtilityKvRow("Total", `${money(r.total)} DH`, true)}
+          ${renderUtilityKvRow("Électricité :", `${money(r.elec)} DH`)}
+          ${renderUtilityKvRow("Eau :", `${money(r.water)} DH`)}
+          ${renderUtilityKvRow("Total :", `${money(r.total)} DH`, true)}
         </div>
       </li>`;
   }).join("");
