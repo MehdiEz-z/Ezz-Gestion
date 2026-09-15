@@ -1,6 +1,6 @@
 import { supabaseClient } from "../shared/supabase.js";
 import { isAdmin, currentUser } from "../shared/auth.js";
-import { flash, getErrorMessage, normalizeName, toISO, getWeekStart, activeMonthKey, money, addDays, parseISODate } from "../shared/utils.js";
+import { flash, getErrorMessage, normalizeName, toISO, getWeekStart, getWeeksOfMonth, activeMonthKey, money, addDays, parseISODate } from "../shared/utils.js";
 
 export let state = {
   categories: [],
@@ -190,6 +190,42 @@ export function weekSpentTotal(isoWs, isoWe) {
   return state.purchases
     .filter(p => p.type === "hebdo" && p.date >= isoWs && p.date <= isoWe)
     .reduce((s, p) => s + Number(p.price), 0);
+}
+
+/** @returns {{ monthConso: number, monthGain: number, weekConso: number, weekGain: number, totalGain: number }} */
+export function achatsRecap(monthKey) {
+  const monthBudget = state.monthlyBudgets[monthKey];
+  const monthConso = monthSpentTotal(monthKey);
+  const monthGain = monthBudget != null ? Number(monthBudget) - monthConso : 0;
+
+  const isActiveMonth = monthKey === activeMonthKey();
+  const todayWeekISO = toISO(getWeekStart(new Date()));
+  let weekConso = 0;
+  let weekGain = 0;
+
+  for (const wStart of getWeeksOfMonth(monthKey)) {
+    const isoWs = toISO(wStart);
+    const isoWe = toISO(addDays(wStart, 6));
+    let status;
+    if (!isActiveMonth) status = "past";
+    else if (isoWs === todayWeekISO) status = "current";
+    else if (isoWs < todayWeekISO) status = "past";
+    else status = "future";
+    if (status === "future") continue;
+
+    const conso = weekSpentTotal(isoWs, isoWe);
+    weekConso += conso;
+    const budget = state.weeklyBudgets[isoWs];
+    if (budget != null) weekGain += Number(budget) - conso;
+  }
+
+  return {
+    monthConso,
+    monthGain,
+    weekConso,
+    weekGain,
+    totalGain: monthGain + weekGain,
+  };
 }
 
 export function placeHasPurchases(placeId) {
