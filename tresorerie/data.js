@@ -157,7 +157,6 @@ export {
   movementsForSystemType, manualMovementsForCategory,
   saisieDepenseTotal, saisieRevenueTotal, isManualMovementEditable,
   SOURCE_LABELS,
-  systemMovementDetailLabel, getSystemDetailTitle,
 };
 
 export { TRESORERIE_START_MONTH };
