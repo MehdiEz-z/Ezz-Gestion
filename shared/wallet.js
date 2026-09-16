@@ -407,7 +407,6 @@ export function monthSummary(monthKey) {
 
   return {
     isFirst,
-    prevKey,
     salary,
     soldePrev,
     totalResources,
