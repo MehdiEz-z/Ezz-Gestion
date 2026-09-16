@@ -1,5 +1,6 @@
 import { supabaseClient } from "../shared/supabase.js";
 import { isAdmin, currentUser } from "../shared/auth.js";
+import { loadWalletData, syncUtilityPayment, setAppOwner } from "../shared/wallet.js";
 import {
   flash, getErrorMessage, normalizeName, EAU_START_MONTH, previousMonthKey, activeMonthKey, monthLabel, roundShare,
 } from "../shared/utils.js";
@@ -298,6 +299,14 @@ export async function updatePerson(personId, firstName, lastName, phone) {
   return true;
 }
 
+export async function setPersonAppOwner(personId) {
+  if (!isAdmin) return false;
+  const ok = await setAppOwner(personId);
+  if (!ok) return false;
+  state.persons.forEach(p => { p.is_app_owner = p.id === personId; });
+  return true;
+}
+
 export async function saveElecBillTotal(monthKey, billTotal) {
   if (!isAdmin) return false;
   const total = Number(billTotal);
@@ -499,6 +508,19 @@ export async function markElecPaid(monthKey, personId) {
   if (!r) { flash("Aucune part électricité à payer.", true); return false; }
   if (r.paid_at) return true;
 
+  const p = state.persons.find(x => x.id === personId);
+  if (p?.is_app_owner) {
+    await loadWalletData();
+    const walletOk = await syncUtilityPayment({
+      monthKey,
+      personName: personName(p),
+      amount: Number(r.share_amount),
+      sourceType: "elec_pay",
+      refKey: `elec:${r.id}`,
+    });
+    if (!walletOk) return false;
+  }
+
   const { data, error } = await supabaseClient.from("utility_elec_readings")
     .update({ paid_at: new Date().toISOString() }).eq("id", r.id).select().single();
   if (error) { flash(getErrorMessage(error, "Erreur paiement électricité."), true); return false; }
@@ -513,6 +535,19 @@ export async function markWaterPaid(monthKey, personId) {
   const s = bill ? waterShare(bill.id, personId) : null;
   if (!s) { flash("Aucune part eau à payer.", true); return false; }
   if (s.paid_at) return true;
+
+  const p = state.persons.find(x => x.id === personId);
+  if (p?.is_app_owner) {
+    await loadWalletData();
+    const walletOk = await syncUtilityPayment({
+      monthKey,
+      personName: personName(p),
+      amount: Number(s.share_amount),
+      sourceType: "water_pay",
+      refKey: `water:${s.id}`,
+    });
+    if (!walletOk) return false;
+  }
 
   const { data, error } = await supabaseClient.from("utility_water_shares")
     .update({ paid_at: new Date().toISOString() }).eq("id", s.id).select().single();
