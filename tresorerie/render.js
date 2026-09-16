@@ -1,12 +1,17 @@
 import {
   ui, monthSummary,
   getWalletCategoriesByDirection, TRESORERIE_START_MONTH,
+  getSaisieDisplayRows, getAvailableSaisieCategories,
+  saisieDepenseTotal, saisieRevenueTotal,
+  movementsForSystemType, manualMovementsForCategory,
+  isManualMovementEditable, isSaisieCategoryPinned,
+  SOURCE_LABELS,
 } from "./data.js";
-import { getWalletCategories } from "../shared/wallet.js";
+import { getWalletCategories, getMovements } from "../shared/wallet.js";
 import { isAdmin } from "../shared/auth.js";
 import {
-  activeMonthKey, esc, monthChipLabel, monthLabel, monthsRangeFrom,
-  money, previousMonthKey,
+  activeMonthKey, esc, formatDateFull, monthChipLabel, monthLabel, monthsRangeFrom,
+  money, parseISODate, previousMonthKey,
 } from "../shared/utils.js";
 
 export function render() {
@@ -56,7 +61,17 @@ function renderWalletCategoryRow(c) {
 
 function renderModal() {
   const m = ui.modal;
-  if (m.type !== "edit-wallet-category") return "";
+  if (!m) return "";
+  if (m.type === "edit-wallet-category") return renderEditWalletCategoryModal(m);
+  if (m.type === "add-manual-movement") return renderAddManualMovementModal(m);
+  if (m.type === "wallet-system-details") return renderWalletSystemDetailsModal(m);
+  if (m.type === "wallet-manual-details") return renderWalletManualDetailsModal(m);
+  if (m.type === "edit-manual-movement") return renderEditManualMovementModal(m);
+  if (m.type === "confirm-delete") return renderConfirmDeleteModal(m);
+  return "";
+}
+
+function renderEditWalletCategoryModal(m) {
   const cat = getWalletCategories().find(c => c.id === m.categoryId);
   if (!cat || cat.is_system) return "";
   const dir = cat.direction || "depense";
@@ -73,6 +88,188 @@ function renderModal() {
           <input type="hidden" name="direction" value="${dir}" />
           <button type="submit" class="btn-primary">Enregistrer</button>
         </form>
+      </div>
+    </div>`;
+}
+
+function renderSaisieCategoryPicker(monthKey, direction) {
+  if (!isAdmin) return "";
+  const available = getAvailableSaisieCategories(monthKey, direction);
+  if (available.length === 0) return "";
+  const chipClass = direction === "depense" ? "chip-pick-month" : "chip-pick-week";
+  return `
+    <div class="period-cat-picker">
+      <div class="chip-row period-cat-scroll">
+        ${available.map(c => `
+          <button type="button" class="chip chip-pick ${chipClass}" data-action="assign-saisie-category" data-category-id="${c.id}" data-month-key="${monthKey}" data-direction="${direction}">${esc(c.name)}</button>
+        `).join("")}
+      </div>
+    </div>`;
+}
+
+function renderSaisieRow(row, editable, monthKey, direction) {
+  const isSystem = row.kind === "system";
+  const detailAction = isSystem ? "open-wallet-system-details" : "open-wallet-manual-details";
+  const detailAttrs = isSystem
+    ? `data-source-type="${row.sourceType}"`
+    : `data-category-id="${row.categoryId}"`;
+  const canUnassign = !isSystem && editable && row.total === 0
+    && isSaisieCategoryPinned(monthKey, direction, row.categoryId);
+  return `
+    <li class="item-row">
+      <div class="item-name">${esc(row.name)}</div>
+      <div class="item-amount">${money(row.total)} DH</div>
+      <div class="item-actions">
+        <button type="button" class="icon-btn" data-action="${detailAction}" ${detailAttrs} data-month-key="${monthKey}" data-direction="${direction}" title="Détails">🧾</button>
+        ${!isSystem && editable && isAdmin ? `<button type="button" class="icon-btn add" data-action="open-add-manual-movement" data-category-id="${row.categoryId}" data-month-key="${monthKey}" data-direction="${direction}" title="Ajouter">＋</button>` : ""}
+        ${canUnassign ? `<button type="button" class="btn-delete" data-action="unassign-saisie-category" data-category-id="${row.categoryId}" data-month-key="${monthKey}" data-direction="${direction}" title="Retirer">✕</button>` : ""}
+      </div>
+    </li>`;
+}
+
+function renderSaisieDirectionCard(direction, monthKey, isActiveMonth, isFuture) {
+  const isDepense = direction === "depense";
+  const title = isDepense ? "Dépense" : "Revenu";
+  const previewLabel = isDepense ? "Dépensé" : "Reçu";
+  const total = isDepense ? saisieDepenseTotal(monthKey) : saisieRevenueTotal(monthKey);
+  const borderColor = isDepense ? "var(--danger)" : "var(--week)";
+  const titleColor = isDepense ? "var(--danger)" : "var(--week)";
+  const key = `saisie:${direction}:${monthKey}`;
+  const open = ui.expanded.has(key);
+  const editable = isActiveMonth;
+  const rows = getSaisieDisplayRows(monthKey, direction);
+  const canExpand = !isFuture;
+
+  const body = canExpand ? `
+    <div class="card-body ${open ? "open" : ""}">
+      ${editable && isAdmin ? renderSaisieCategoryPicker(monthKey, direction) : ""}
+      ${rows.length === 0
+    ? `<div class="small-label">${isDepense ? "Aucune dépense enregistrée." : "Aucun revenu enregistré."}</div>`
+    : `<ul class="list">${rows.map(r => renderSaisieRow(r, editable, monthKey, direction)).join("")}</ul>`}
+    </div>` : "";
+
+  return `
+    <div class="card ${isFuture ? "disabled" : ""}" style="border-color:${borderColor}">
+      <div class="card-head" data-action="${canExpand ? "toggle-card" : ""}" data-key="${key}">
+        <div>
+          <div class="card-title" style="color:${titleColor}">${title}</div>
+          <div class="card-range">${monthLabel(monthKey)}</div>
+          ${isActiveMonth ? `<span class="badge badge-current">Mois en cours</span>` : `<span class="badge badge-past">Consultation</span>`}
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="card-preview"><span class="small-label">${previewLabel} : ${money(total)} DH</span></div>
+          ${canExpand ? `<span class="chevron">${open ? "▲" : "▼"}</span>` : ""}
+        </div>
+      </div>
+      ${body}
+    </div>`;
+}
+
+function renderAddManualMovementModal(m) {
+  const cat = getWalletCategories().find(c => c.id === m.categoryId);
+  if (!cat || cat.is_system) return "";
+  const isDepense = m.direction === "depense";
+  return `
+    <div class="overlay" data-overlay-close="modal">
+      <div class="sheet">
+        <div class="sheet-title">${esc(cat.name)} <button class="close-btn" data-action="close-modal">✕</button></div>
+        <form class="form-col" data-form="add-manual-movement" data-month-key="${m.monthKey}" data-category-id="${cat.id}" data-direction="${m.direction}">
+          <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant en DH" required />
+          <input class="field" name="label" placeholder="Libellé (optionnel)" />
+          <div class="small-label">Date : aujourd'hui (${formatDateFull(new Date())})</div>
+          <button type="submit" class="btn-primary">${isDepense ? "Enregistrer la dépense" : "Enregistrer le revenu"}</button>
+        </form>
+      </div>
+    </div>`;
+}
+
+function renderMovementDetailLine(mov, editable) {
+  const amt = Math.abs(Number(mov.amount));
+  return `
+    <li class="list-item" style="flex-direction:column;align-items:stretch;gap:4px">
+      <div class="purchase-detail-row">
+        <div>
+          <div class="list-item-name">${money(amt)} DH — ${esc(mov.label)}</div>
+          <div class="small-label">${formatDateFull(parseISODate(mov.movement_date))}</div>
+        </div>
+        ${editable ? `
+        <div class="purchase-detail-actions">
+          <button class="icon-btn edit" data-action="open-edit-manual-movement" data-movement-id="${mov.id}" title="Modifier">✏️</button>
+          <button class="btn-delete" data-action="open-delete-confirm" data-entity="manual-movement" data-id="${mov.id}" data-label="${money(amt)} DH" title="Supprimer">🗑️</button>
+        </div>` : ""}
+      </div>
+    </li>`;
+}
+
+function renderWalletSystemDetailsModal(m) {
+  const list = movementsForSystemType(m.monthKey, m.sourceType);
+  const total = list.reduce((s, x) => s + Math.abs(Number(x.amount)), 0);
+  const title = SOURCE_LABELS[m.sourceType] || m.sourceType;
+  return `
+    <div class="overlay" data-overlay-close="modal">
+      <div class="sheet">
+        <div class="sheet-title">${esc(title)} — ${money(total)} DH <button class="close-btn" data-action="close-modal">✕</button></div>
+        <ul class="list">
+          ${list.map(x => `
+            <li class="list-item" style="flex-direction:column;align-items:stretch;gap:4px">
+              <div class="purchase-detail-row">
+                <div>
+                  <div class="list-item-name">${money(Math.abs(Number(x.amount)))} DH — ${esc(x.label)}</div>
+                  <div class="small-label">${formatDateFull(parseISODate(x.movement_date))}</div>
+                </div>
+              </div>
+            </li>`).join("")}
+        </ul>
+      </div>
+    </div>`;
+}
+
+function renderWalletManualDetailsModal(m) {
+  const cat = getWalletCategories().find(c => c.id === m.categoryId);
+  if (!cat) return "";
+  const list = manualMovementsForCategory(m.monthKey, m.categoryId);
+  const total = list.reduce((s, x) => s + Math.abs(Number(x.amount)), 0);
+  return `
+    <div class="overlay" data-overlay-close="modal">
+      <div class="sheet">
+        <div class="sheet-title">${esc(cat.name)} — ${money(total)} DH <button class="close-btn" data-action="close-modal">✕</button></div>
+        <ul class="list">
+          ${list.length === 0
+    ? `<li class="list-item"><div class="small-label">Aucun mouvement.</div></li>`
+    : list.map(x => renderMovementDetailLine(x, m.editable && isManualMovementEditable(x))).join("")}
+        </ul>
+      </div>
+    </div>`;
+}
+
+function renderEditManualMovementModal(m) {
+  const mov = getMovements().find(x => x.id === m.movementId);
+  if (!mov) return "";
+  return `
+    <div class="overlay" data-overlay-close="modal">
+      <div class="sheet">
+        <div class="sheet-title">Modifier mouvement <button class="close-btn" data-action="close-modal">✕</button></div>
+        <form class="form-col" data-form="edit-manual-movement" data-movement-id="${mov.id}">
+          <input class="field" name="amount" type="number" min="0" step="0.01" value="${Math.abs(Number(mov.amount))}" required />
+          <input class="field" name="label" value="${esc(mov.label)}" placeholder="Libellé" />
+          <div class="small-label">Date : ${formatDateFull(parseISODate(mov.movement_date))}</div>
+          <button type="submit" class="btn-primary">Enregistrer</button>
+        </form>
+      </div>
+    </div>`;
+}
+
+function renderConfirmDeleteModal(m) {
+  const labels = { "manual-movement": "ce mouvement" };
+  return `
+    <div class="overlay" data-overlay-close="modal">
+      <div class="sheet">
+        <div class="sheet-title">Confirmer la suppression</div>
+        <p class="confirm-text">Voulez-vous vraiment supprimer ${labels[m.entity] || "cet élément"} <strong>${esc(m.label)}</strong> ? Cette action est irréversible.</p>
+        <div class="btn-row">
+          <button type="button" class="btn-danger" data-action="confirm-delete" data-entity="${m.entity}" data-id="${m.id}">Supprimer</button>
+          <button type="button" class="btn-secondary" data-action="close-modal">Annuler</button>
+        </div>
       </div>
     </div>`;
 }
@@ -218,14 +415,27 @@ function renderCategoriesTab() {
 }
 
 function renderSaisieTab() {
+  const mk = ui.viewedMonthKey;
+  const s = monthSummary(mk);
+  const isActiveMonth = mk === activeMonthKey();
+  const isFuture = mk > activeMonthKey();
+  const canShow = !s.needsOpeningSetup && !s.needsSalarySetup;
+
+  if (!canShow) {
+    return `
+      <div class="stack">
+        <div class="card">
+          <div class="card-body open">
+            <div class="small-label">Complète d'abord la configuration du mois dans l'onglet <strong>Synthèse</strong>.</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
   return `
     <div class="stack">
-      <div class="card">
-        <div class="card-body open">
-          <div class="small-label">Phase 2 : saisie des charges manuelles et autres sources de revenu.</div>
-          <div class="small-label" style="margin-top:8px">Pour l'instant, configure le mois depuis l'onglet <strong>Synthèse</strong>.</div>
-        </div>
-      </div>
+      ${renderSaisieDirectionCard("depense", mk, isActiveMonth, isFuture)}
+      ${renderSaisieDirectionCard("revenue", mk, isActiveMonth, isFuture)}
     </div>`;
 }
 
