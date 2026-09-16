@@ -1,5 +1,9 @@
 import { supabaseClient } from "../shared/supabase.js";
 import { isAdmin, currentUser } from "../shared/auth.js";
+import {
+  loadWalletData, canAfford, availableBalance,
+  syncCareAction, removeCareAction, syncDossierReimbursements,
+} from "../shared/wallet.js";
 import { flash, getErrorMessage, normalizeName, money } from "../shared/utils.js";
 
 export let state = {
@@ -447,6 +451,8 @@ export async function updateReimbursements(dossierId, { cnssExpected, cnssReceiv
     .update(payload).eq("id", dossierId).select().single();
   if (error) { flash(getErrorMessage(error, "Erreur remboursements."), true); return false; }
   Object.assign(d, data);
+  await loadWalletData();
+  await syncDossierReimbursements(d);
   if (status === "rembourse") flash("Dossier remboursé et verrouillé.");
   else flash("Remboursements enregistrés.");
   return true;
@@ -460,11 +466,19 @@ export async function addCareAction(dossierId, categoryId, amount, place, action
   if (!ad || isNaN(amount) || amount < 0 || !place.trim()) {
     flash("Prix, lieu et date obligatoires.", true); return false;
   }
+  const monthKey = ad.slice(0, 7);
+  await loadWalletData();
+  if (!canAfford(monthKey, amount)) {
+    flash(`Solde insuffisant : reste ${money(availableBalance(monthKey))} DH, besoin ${money(amount)} DH.`, true);
+    return false;
+  }
   const { data, error } = await supabaseClient.from("care_actions")
     .insert({ dossier_id: dossierId, category_id: categoryId, amount, place: place.trim(), action_date: ad })
     .select().single();
   if (error) { flash(getErrorMessage(error, "Erreur ajout action."), true); return false; }
   state.careActions.unshift(data);
+  const dossierLabel = d.dossier_number || "Sans N°";
+  await syncCareAction(data, dossierLabel);
   if (d.dossier_number && d.status === "depose_cnss") {
     await supabaseClient.from("medical_dossiers").update({ status: "en_cours" }).eq("id", dossierId);
     d.status = "en_cours";
@@ -481,11 +495,21 @@ export async function updateCareAction(id, amount, place, actionDate) {
   if (!d || !canEditCareActions(d)) { flash("Soins non modifiables.", true); return false; }
   const ad = parseDateInput(actionDate);
   if (!ad || isNaN(amount) || amount < 0 || !place.trim()) return false;
+  const monthKey = ad.slice(0, 7);
+  const oldAmt = Number(action.amount);
+  const newAmt = Number(amount);
+  await loadWalletData();
+  if (newAmt > oldAmt && !canAfford(monthKey, newAmt - oldAmt, `care:${id}`)) {
+    flash(`Solde insuffisant : reste ${money(availableBalance(monthKey))} DH, besoin ${money(newAmt - oldAmt)} DH.`, true);
+    return false;
+  }
   const { data, error } = await supabaseClient.from("care_actions")
     .update({ amount, place: place.trim(), action_date: ad }).eq("id", id).select().single();
   if (error) { flash(getErrorMessage(error, "Erreur modification action."), true); return false; }
   const idx = state.careActions.findIndex(a => a.id === id);
   if (idx >= 0) state.careActions[idx] = data;
+  const dossierLabel = d.dossier_number || "Sans N°";
+  await syncCareAction(data, dossierLabel);
   flash("Action modifiée.");
   return true;
 }
@@ -496,6 +520,7 @@ export async function deleteCareAction(id) {
   if (!action) return false;
   const d = state.dossiers.find(x => x.id === action.dossier_id);
   if (!d || !canEditCareActions(d)) { flash("Soins non modifiables.", true); return false; }
+  await removeCareAction(id);
   const { error } = await supabaseClient.from("care_actions").delete().eq("id", id);
   if (error) { flash(getErrorMessage(error, "Erreur suppression action."), true); return false; }
   state.careActions = state.careActions.filter(a => a.id !== id);
