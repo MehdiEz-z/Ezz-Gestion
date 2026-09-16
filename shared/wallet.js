@@ -1,5 +1,8 @@
 import { supabaseClient } from "./supabase.js";
-import { flash, getErrorMessage, money, previousMonthKey, TRESORERIE_START_MONTH, toISO } from "./utils.js";
+import {
+  activeMonthKey, flash, getErrorMessage, money, previousMonthKey,
+  TRESORERIE_START_MONTH, toISO,
+} from "./utils.js";
 
 /** @type {object[]|null} */
 let movementsCache = null;
@@ -18,6 +21,14 @@ export const SOURCE_LABELS = {
   water_pay: "Paiement eau",
   manual: "Charge manuelle",
 };
+
+export const SYSTEM_EXPENSE_TYPES = [
+  "budget_month", "budget_week", "care", "elec_pay", "water_pay",
+];
+
+export const SYSTEM_REVENUE_TYPES = [
+  "salary", "cnss", "assurance",
+];
 
 export function invalidateWalletCache() {
   movementsCache = null;
@@ -342,10 +353,14 @@ export async function syncUtilityPayment({ monthKey, personName, amount, sourceT
 export async function addManualExpense(monthKey, categoryId, amount, label) {
   const amt = Number(amount);
   if (!Number.isFinite(amt) || amt <= 0) { flash("Montant invalide.", true); return false; }
-  const msg = affordMessage(monthKey, amt);
-  if (msg) { flash(msg, true); return false; }
   const cat = getWalletCategories().find(c => c.id === categoryId);
   if (!cat || cat.is_system) { flash("Catégorie invalide.", true); return false; }
+  if ((cat.direction || "depense") !== "depense") {
+    flash("Cette catégorie n'est pas une dépense.", true);
+    return false;
+  }
+  const msg = affordMessage(monthKey, amt);
+  if (msg) { flash(msg, true); return false; }
   const { data, error } = await supabaseClient.from("wallet_movements")
     .insert({
       month_key: monthKey,
@@ -354,13 +369,89 @@ export async function addManualExpense(monthKey, categoryId, amount, label) {
       source_module: "tresorerie",
       source_type: "manual",
       category_id: categoryId,
-      label: label || cat.name,
+      label: label?.trim() || cat.name,
     })
     .select()
     .single();
   if (error) { flash(getErrorMessage(error, "Erreur saisie charge."), true); return false; }
   movementsCache.push(data);
-  flash("Charge enregistrée.");
+  flash("Dépense enregistrée.");
+  return true;
+}
+
+export async function addManualRevenue(monthKey, categoryId, amount, label) {
+  const amt = Number(amount);
+  if (!Number.isFinite(amt) || amt <= 0) { flash("Montant invalide.", true); return false; }
+  const cat = getWalletCategories().find(c => c.id === categoryId);
+  if (!cat || cat.is_system) { flash("Catégorie invalide.", true); return false; }
+  if ((cat.direction || "depense") !== "revenue") {
+    flash("Cette catégorie n'est pas un revenu.", true);
+    return false;
+  }
+  const { data, error } = await supabaseClient.from("wallet_movements")
+    .insert({
+      month_key: monthKey,
+      movement_date: toISO(new Date()),
+      amount: amt,
+      source_module: "tresorerie",
+      source_type: "manual",
+      category_id: categoryId,
+      label: label?.trim() || cat.name,
+    })
+    .select()
+    .single();
+  if (error) { flash(getErrorMessage(error, "Erreur saisie revenu."), true); return false; }
+  movementsCache.push(data);
+  flash("Revenu enregistré.");
+  return true;
+}
+
+export async function updateManualMovement(id, amount, label) {
+  const mov = getMovements().find(m => m.id === id);
+  if (!mov || mov.source_type !== "manual") return false;
+  if (!isManualMovementEditable(mov)) {
+    flash("Ce mouvement ne peut pas être modifié (mois passé).", true);
+    return false;
+  }
+  const cat = manualCategoryForMovement(mov);
+  const amt = Number(amount);
+  if (!Number.isFinite(amt) || amt <= 0) { flash("Montant invalide.", true); return false; }
+  const direction = cat?.direction || (Number(mov.amount) < 0 ? "depense" : "revenue");
+  const oldAbs = Math.abs(Number(mov.amount));
+  if (direction === "depense") {
+    const delta = amt - oldAbs;
+    if (delta > 0) {
+      const msg = affordMessage(mov.month_key, delta);
+      if (msg) { flash(msg, true); return false; }
+    }
+  }
+  const nextAmount = direction === "depense" ? -amt : amt;
+  const { data, error } = await supabaseClient.from("wallet_movements")
+    .update({
+      amount: nextAmount,
+      label: label?.trim() || cat?.name || mov.label,
+    })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) { flash(getErrorMessage(error, "Erreur modification."), true); return false; }
+  const idx = movementsCache.findIndex(m => m.id === id);
+  if (idx >= 0) movementsCache[idx] = data;
+  flash("Mouvement modifié.");
+  return true;
+}
+
+export async function deleteManualMovement(id) {
+  const mov = getMovements().find(m => m.id === id);
+  if (!mov || mov.source_type !== "manual") return false;
+  if (!isManualMovementEditable(mov)) {
+    flash("Ce mouvement ne peut pas être supprimé (mois passé).", true);
+    return false;
+  }
+  const { error } = await supabaseClient.from("wallet_movements").delete().eq("id", id);
+  if (error) { flash(getErrorMessage(error, "Erreur suppression."), true); return false; }
+  movementsCache = movementsCache.filter(m => m.id !== id);
+  flash("Mouvement supprimé.");
   return true;
 }
 
@@ -417,6 +508,59 @@ export async function deleteWalletCategory(id) {
   return true;
 }
 
+function sumManualByDirection(monthKey, direction) {
+  return movementsForMonth(monthKey)
+    .filter(m => {
+      if (m.source_type !== "manual") return false;
+      const cat = getWalletCategories().find(c => c.id === m.category_id);
+      return cat && (cat.direction || "depense") === direction;
+    })
+    .reduce((s, m) => s + Math.abs(Number(m.amount)), 0);
+}
+
+export function movementsForSystemType(monthKey, sourceType) {
+  return movementsForMonth(monthKey)
+    .filter(m => m.source_type === sourceType)
+    .sort((a, b) => (a.movement_date < b.movement_date ? 1 : -1));
+}
+
+export function totalForSystemType(monthKey, sourceType) {
+  return movementsForSystemType(monthKey, sourceType)
+    .reduce((s, m) => s + Math.abs(Number(m.amount)), 0);
+}
+
+export function manualMovementsForCategory(monthKey, categoryId) {
+  return movementsForMonth(monthKey)
+    .filter(m => m.source_type === "manual" && m.category_id === categoryId)
+    .sort((a, b) => (a.movement_date < b.movement_date ? 1 : -1));
+}
+
+export function totalForManualCategory(monthKey, categoryId) {
+  return manualMovementsForCategory(monthKey, categoryId)
+    .reduce((s, m) => s + Math.abs(Number(m.amount)), 0);
+}
+
+export function saisieDepenseTotal(monthKey) {
+  return SYSTEM_EXPENSE_TYPES.reduce(
+    (s, t) => s + totalForSystemType(monthKey, t), 0,
+  ) + sumManualByDirection(monthKey, "depense");
+}
+
+export function saisieRevenueTotal(monthKey) {
+  return SYSTEM_REVENUE_TYPES.reduce(
+    (s, t) => s + totalForSystemType(monthKey, t), 0,
+  ) + sumManualByDirection(monthKey, "revenue");
+}
+
+export function isManualMovementEditable(movement) {
+  return movement?.source_type === "manual"
+    && movement.month_key === activeMonthKey();
+}
+
+function manualCategoryForMovement(movement) {
+  return getWalletCategories().find(c => c.id === movement.category_id) || null;
+}
+
 function sumByTypes(monthKey, types, positiveOnly = false) {
   return movementsForMonth(monthKey)
     .filter(m => types.includes(m.source_type) && (!positiveOnly || Number(m.amount) > 0))
@@ -433,9 +577,9 @@ export function monthSummary(monthKey) {
   const budget = sumByTypes(monthKey, ["budget_month", "budget_week"]);
   const maladie = sumByTypes(monthKey, ["care"]);
   const utilities = sumByTypes(monthKey, ["elec_pay", "water_pay"]);
-  const autres = sumByTypes(monthKey, ["manual"]);
+  const autres = sumManualByDirection(monthKey, "depense");
   const reimbursements = sumByTypes(monthKey, ["cnss", "assurance"], true);
-  const otherIncome = 0;
+  const otherIncome = sumManualByDirection(monthKey, "revenue");
 
   const totalResources = salary + soldePrev;
   const totalExpenses = budget + maladie + utilities + autres;
