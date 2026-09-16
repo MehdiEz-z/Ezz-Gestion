@@ -1,6 +1,6 @@
 import { activeMonthKey } from "../shared/utils.js";
 import { loadWalletData } from "../shared/wallet.js";
-import { ui, fetchStateFromSupabase } from "./data.js";
+import { ui, fetchStateFromSupabase, loadMaladieLookup } from "./data.js";
 import { render } from "./render.js";
 import { setupEvents } from "./events.js";
 
@@ -26,7 +26,7 @@ export async function activate() {
     await fetchStateFromSupabase();
     dataLoaded = true;
   } else {
-    await loadWalletData();
+    await Promise.all([loadWalletData(), loadMaladieLookup()]);
   }
   render();
 }

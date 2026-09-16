@@ -16,7 +16,7 @@ export const SOURCE_LABELS = {
   assurance: "Remboursement assurance",
   budget_month: "Budget mensuel",
   budget_week: "Budget hebdo",
-  care: "Soin dossier",
+  care: "Soin médical",
   elec_pay: "Paiement électricité",
   water_pay: "Paiement eau",
   manual: "Charge manuelle",
@@ -269,7 +269,7 @@ export async function syncWeekBudget(isoWeekStart, monthKey, newAmount, oldAmoun
   }));
 }
 
-export async function syncCareAction(action, dossierLabel) {
+export async function syncCareAction(action, categoryName) {
   const monthKey = action.action_date.slice(0, 7);
   const refKey = `care:${action.id}`;
   const amt = Number(action.amount);
@@ -281,7 +281,7 @@ export async function syncCareAction(action, dossierLabel) {
     sourceModule: "maladie",
     sourceType: "care",
     refKey,
-    label: `Soin — ${dossierLabel}`,
+    label: categoryName || "Soin",
     movementDate: action.action_date,
   }));
 }
@@ -292,7 +292,7 @@ export async function removeCareAction(actionId) {
 
 export async function syncDossierReimbursements(dossier) {
   const monthKey = toISO(new Date()).slice(0, 7);
-  const num = dossier.dossier_number || "Sans N°";
+  const numLabel = dossier.dossier_number ? `N°${dossier.dossier_number}` : "Sans N°";
   let ok = true;
 
   if (dossier.cnss_received != null && dossier.cnss_received !== "") {
@@ -304,7 +304,7 @@ export async function syncDossierReimbursements(dossier) {
         sourceModule: "maladie",
         sourceType: "cnss",
         refKey: `cnss:${dossier.id}`,
-        label: `Remboursement CNSS — ${num}`,
+        label: numLabel,
       });
       if (!r) ok = false;
     }
@@ -321,7 +321,7 @@ export async function syncDossierReimbursements(dossier) {
         sourceModule: "maladie",
         sourceType: "assurance",
         refKey: `assurance:${dossier.id}`,
-        label: `Remboursement assurance — ${num}`,
+        label: numLabel,
       });
       if (!r) ok = false;
     }
@@ -359,6 +359,8 @@ export async function addManualExpense(monthKey, categoryId, amount, label) {
     flash("Cette catégorie n'est pas une dépense.", true);
     return false;
   }
+  const lbl = label?.trim();
+  if (!lbl) { flash("Le libellé est obligatoire.", true); return false; }
   const msg = affordMessage(monthKey, amt);
   if (msg) { flash(msg, true); return false; }
   const { data, error } = await supabaseClient.from("wallet_movements")
@@ -369,7 +371,7 @@ export async function addManualExpense(monthKey, categoryId, amount, label) {
       source_module: "tresorerie",
       source_type: "manual",
       category_id: categoryId,
-      label: label?.trim() || cat.name,
+      label: lbl,
     })
     .select()
     .single();
@@ -388,6 +390,8 @@ export async function addManualRevenue(monthKey, categoryId, amount, label) {
     flash("Cette catégorie n'est pas un revenu.", true);
     return false;
   }
+  const lbl = label?.trim();
+  if (!lbl) { flash("Le libellé est obligatoire.", true); return false; }
   const { data, error } = await supabaseClient.from("wallet_movements")
     .insert({
       month_key: monthKey,
@@ -396,7 +400,7 @@ export async function addManualRevenue(monthKey, categoryId, amount, label) {
       source_module: "tresorerie",
       source_type: "manual",
       category_id: categoryId,
-      label: label?.trim() || cat.name,
+      label: lbl,
     })
     .select()
     .single();
@@ -425,11 +429,13 @@ export async function updateManualMovement(id, amount, label) {
       if (msg) { flash(msg, true); return false; }
     }
   }
+  const lbl = label?.trim();
+  if (!lbl) { flash("Le libellé est obligatoire.", true); return false; }
   const nextAmount = direction === "depense" ? -amt : amt;
   const { data, error } = await supabaseClient.from("wallet_movements")
     .update({
       amount: nextAmount,
-      label: label?.trim() || cat?.name || mov.label,
+      label: lbl,
     })
     .eq("id", id)
     .select()

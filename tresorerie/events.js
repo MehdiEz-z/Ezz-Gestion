@@ -5,7 +5,7 @@ import {
   ui, setOpeningBalance, setSalary,
   addManualExpense, addManualRevenue, updateManualMovement, deleteManualMovement,
   addWalletCategory, updateWalletCategory,
-  pinSaisieCategory, unpinSaisieCategory,
+  pinSaisieCategory, unpinSaisieCategory, loadMaladieLookup,
 } from "./data.js";
 import { render } from "./render.js";
 
@@ -124,7 +124,7 @@ async function handleConfirmDelete(entity, id) {
   } else {
     ui.modal = null;
   }
-  await loadWalletData();
+  await Promise.all([loadWalletData(), loadMaladieLookup()]);
   render();
 }
 
@@ -136,11 +136,11 @@ async function onSubmit(e) {
 
   if (form.dataset.form === "set-opening") {
     const ok = await setOpeningBalance(ui.viewedMonthKey, form.amount.value);
-    if (ok) { await loadWalletData(); render(); }
+    if (ok) { await Promise.all([loadWalletData(), loadMaladieLookup()]); render(); }
   }
   else if (form.dataset.form === "set-salary") {
     const ok = await setSalary(form.dataset.monthKey, form.amount.value);
-    if (ok) { await loadWalletData(); render(); }
+    if (ok) { await Promise.all([loadWalletData(), loadMaladieLookup()]); render(); }
   }
   else if (form.dataset.form === "add-wallet-category") {
     const ok = await addWalletCategory(form.name.value, form.direction.value);
@@ -161,7 +161,7 @@ async function onSubmit(e) {
       : await addManualExpense(monthKey, categoryId, form.amount.value, form.label.value);
     if (ok) {
       ui.modal = null;
-      await loadWalletData();
+      await Promise.all([loadWalletData(), loadMaladieLookup()]);
       render();
     }
   }
@@ -174,7 +174,7 @@ async function onSubmit(e) {
     if (ok) {
       const returnTo = ui.modal && ui.modal.returnTo;
       ui.modal = returnTo || null;
-      await loadWalletData();
+      await Promise.all([loadWalletData(), loadMaladieLookup()]);
       render();
     }
   }

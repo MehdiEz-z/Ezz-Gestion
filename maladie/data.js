@@ -435,6 +435,14 @@ export async function updateReimbursements(dossierId, { cnssExpected, cnssReceiv
   if (!isAdmin) return false;
   const d = state.dossiers.find(x => x.id === dossierId);
   if (!d || isDossierLocked(d)) { flash("Dossier verrouillé.", true); return false; }
+  if (cnssReceived !== undefined && d.cnss_received != null) {
+    flash("Le montant CNSS est déjà enregistré.", true);
+    return false;
+  }
+  if (assuranceReceived !== undefined && d.assurance_received != null) {
+    flash("Le montant assurance est déjà enregistré.", true);
+    return false;
+  }
 
   const payload = {};
   if (cnssExpected !== undefined) payload.cnss_expected = cnssExpected === "" ? null : Number(cnssExpected);
@@ -477,8 +485,8 @@ export async function addCareAction(dossierId, categoryId, amount, place, action
     .select().single();
   if (error) { flash(getErrorMessage(error, "Erreur ajout action."), true); return false; }
   state.careActions.unshift(data);
-  const dossierLabel = d.dossier_number || "Sans N°";
-  await syncCareAction(data, dossierLabel);
+  const cat = state.careCategories.find(c => c.id === categoryId);
+  await syncCareAction(data, cat?.name || "Soin");
   if (d.dossier_number && d.status === "depose_cnss") {
     await supabaseClient.from("medical_dossiers").update({ status: "en_cours" }).eq("id", dossierId);
     d.status = "en_cours";
@@ -508,8 +516,8 @@ export async function updateCareAction(id, amount, place, actionDate) {
   if (error) { flash(getErrorMessage(error, "Erreur modification action."), true); return false; }
   const idx = state.careActions.findIndex(a => a.id === id);
   if (idx >= 0) state.careActions[idx] = data;
-  const dossierLabel = d.dossier_number || "Sans N°";
-  await syncCareAction(data, dossierLabel);
+  const cat = state.careCategories.find(c => c.id === data.category_id);
+  await syncCareAction(data, cat?.name || "Soin");
   flash("Action modifiée.");
   return true;
 }
