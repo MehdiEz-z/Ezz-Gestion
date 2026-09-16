@@ -162,7 +162,11 @@ export async function deleteMovementByRef(refKey) {
 
 export async function setOpeningBalance(monthKey, amount) {
   if (monthKey !== TRESORERIE_START_MONTH) {
-    flash("Le solde banque ne se saisit que pour le premier mois.", true);
+    flash("Le solde actuel ne se saisit que pour le premier mois.", true);
+    return false;
+  }
+  if (hasOpeningBalance()) {
+    flash("Le solde actuel est déjà fixé et ne peut plus être modifié.", true);
     return false;
   }
   const n = Number(amount);
@@ -173,13 +177,21 @@ export async function setOpeningBalance(monthKey, amount) {
     sourceModule: "tresorerie",
     sourceType: "opening",
     refKey: `opening:${monthKey}`,
-    label: "Solde banque",
+    label: "Solde actuel",
   });
-  if (ok) flash("Solde banque enregistré.");
+  if (ok) flash("Solde actuel enregistré.");
   return !!ok;
 }
 
 export async function setSalary(monthKey, amount) {
+  if (monthKey === TRESORERIE_START_MONTH) {
+    flash("Le salaire se saisit à partir du mois suivant.", true);
+    return false;
+  }
+  if (hasSalary(monthKey)) {
+    flash("Le salaire de ce mois est déjà fixé et ne peut plus être modifié.", true);
+    return false;
+  }
   const n = Number(amount);
   if (!Number.isFinite(n) || n <= 0) { flash("Salaire invalide.", true); return false; }
   const refKey = `salary:${monthKey}`;
@@ -368,43 +380,48 @@ export async function deleteWalletCategory(id) {
   return true;
 }
 
-/** @returns {{ carry: number, salary: number, totalIn: number, totalOut: number, balance: number, lines: object[] }} */
+function sumByTypes(monthKey, types, positiveOnly = false) {
+  return movementsForMonth(monthKey)
+    .filter(m => types.includes(m.source_type) && (!positiveOnly || Number(m.amount) > 0))
+    .reduce((s, m) => s + Math.abs(Number(m.amount)), 0);
+}
+
+/** Synthèse structurée en 3 blocs + solde disponible. */
 export function monthSummary(monthKey) {
-  const movs = movementsForMonth(monthKey);
-  const lines = [];
   const isFirst = monthKey === TRESORERIE_START_MONTH;
+  const salaryMov = movementByRef(`salary:${monthKey}`);
+  const salary = salaryMov ? Number(salaryMov.amount) : 0;
+  const soldePrev = isFirst ? carryIn(monthKey) : carryIn(monthKey);
 
-  if (!isFirst) {
-    const c = carryIn(monthKey);
-    lines.push({ label: "Report mois précédent", amount: c, kind: "carry" });
-  }
+  const budget = sumByTypes(monthKey, ["budget_month", "budget_week"]);
+  const maladie = sumByTypes(monthKey, ["care"]);
+  const utilities = sumByTypes(monthKey, ["elec_pay", "water_pay"]);
+  const autres = sumByTypes(monthKey, ["manual"]);
+  const reimbursements = sumByTypes(monthKey, ["cnss", "assurance"], true);
+  const otherIncome = 0;
 
-  for (const m of movs) {
-    lines.push({
-      label: m.label,
-      amount: Number(m.amount),
-      kind: Number(m.amount) >= 0 ? "in" : "out",
-      sourceType: m.source_type,
-    });
-  }
-
-  let salary = 0;
-  let totalIn = isFirst ? 0 : carryIn(monthKey);
-  let totalOut = 0;
-  for (const m of movs) {
-    const amt = Number(m.amount);
-    if (m.source_type === "salary") salary = amt;
-    if (amt > 0) totalIn += amt;
-    else totalOut += Math.abs(amt);
-  }
+  const totalResources = salary + soldePrev;
+  const totalExpenses = budget + maladie + utilities + autres;
+  const totalIncomes = reimbursements + otherIncome;
+  const soldeDisponible = totalResources - totalExpenses + totalIncomes;
 
   return {
-    carry: isFirst ? carryIn(monthKey) : carryIn(monthKey),
+    isFirst,
+    prevKey,
     salary,
-    totalIn,
-    totalOut,
-    balance: availableBalance(monthKey),
-    lines,
+    soldePrev,
+    totalResources,
+    budget,
+    maladie,
+    utilities,
+    autres,
+    totalExpenses,
+    reimbursements,
+    otherIncome,
+    totalIncomes,
+    soldeDisponible,
+    needsOpeningSetup: isFirst && !hasOpeningBalance(),
+    needsSalarySetup: !isFirst && !hasSalary(monthKey),
   };
 }
 
