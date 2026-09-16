@@ -1,11 +1,11 @@
 import {
-  ui, monthSummary, hasOpeningBalance, hasSalary,
+  ui, monthSummary,
   getUserWalletCategories, TRESORERIE_START_MONTH,
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
 import {
   activeMonthKey, esc, monthChipLabel, monthLabel, monthsRangeFrom,
-  money,
+  money, previousMonthKey,
 } from "../shared/utils.js";
 
 export function render() {
@@ -31,44 +31,95 @@ export function render() {
     ui.monthPanelOpen ? renderMonthPanel() : "";
 }
 
-function renderKvRow(label, value, bold = false, success = false) {
-  const cls = bold ? " utility-kv-row-bold" : success ? " success" : "";
+function renderKvRow(label, value, bold = false) {
   return `
     <div class="utility-kv-row${bold ? " utility-kv-row-bold" : ""}">
       <span>${label}</span>
-      <span class="${success ? "small-label success" : ""}">${value}</span>
+      <span>${value}</span>
     </div>`;
+}
+
+function renderSetupBlock(s, mk) {
+  if (!isAdmin) return "";
+  if (s.needsOpeningSetup) {
+    return `
+      <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+        <div class="small-label" style="margin-bottom:8px">Première utilisation : indique le solde réel de ta banque aujourd'hui.</div>
+        <form class="inline-form" data-form="set-opening">
+          <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Solde actuel en DH" required />
+          <button type="submit" class="btn-small" style="background:var(--danger)">Fixer</button>
+        </form>
+      </div>`;
+  }
+  if (s.needsSalarySetup) {
+    return `
+      <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+        <div class="small-label" style="margin-bottom:8px">Saisis le salaire de ${monthLabel(mk)} (non modifiable après validation).</div>
+        <form class="inline-form" data-form="set-salary" data-month-key="${mk}">
+          <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Salaire en DH" required />
+          <button type="submit" class="btn-small" style="background:var(--month)">Fixer</button>
+        </form>
+      </div>`;
+  }
+  return "";
 }
 
 function renderSyntheseTab() {
   const mk = ui.viewedMonthKey;
   const s = monthSummary(mk);
+  const prevKey = previousMonthKey(mk);
+  const open = ui.expanded.has("treasury-synth:" + mk);
+  const canExpand = !s.needsOpeningSetup && !s.needsSalarySetup;
 
-  const movementLines = s.lines.map(l => {
-    const sign = l.amount >= 0 ? "+" : "−";
-    const abs = money(Math.abs(l.amount));
-    const success = l.amount > 0;
-    return renderKvRow(l.label, `${sign} ${abs} DH`, false, success);
-  }).join("");
+  const soldePrevLabel = s.isFirst
+    ? "Solde actuel"
+    : `Solde ${monthLabel(prevKey)}`;
+
+  const recap = canExpand ? `
+    <div class="utility-recap-block">
+      ${renderSetupBlock(s, mk)}
+      <div class="utility-recap-section-title">Ressources</div>
+      ${renderKvRow(`Salaire ${monthLabel(mk)}`, `${money(s.salary)} DH`)}
+      ${renderKvRow(soldePrevLabel, `${money(s.soldePrev)} DH`)}
+      ${renderKvRow("Total", `${money(s.totalResources)} DH`, true)}
+      <hr class="utility-recap-sep" />
+      <div class="utility-recap-section-title">Dépenses</div>
+      ${renderKvRow("Budget (mensuel + hebdos)", `${money(s.budget)} DH`)}
+      ${renderKvRow("Dépense Maladie", `${money(s.maladie)} DH`)}
+      ${renderKvRow("Eau et électricité", `${money(s.utilities)} DH`)}
+      ${renderKvRow("Autres charges", `${money(s.autres)} DH`)}
+      ${renderKvRow("Total Dépense", `${money(s.totalExpenses)} DH`, true)}
+      <hr class="utility-recap-sep" />
+      <div class="utility-recap-section-title">Entrées complémentaires</div>
+      ${renderKvRow("Remboursement (CNSS + assurance)", `${money(s.reimbursements)} DH`)}
+      ${renderKvRow("Autre source de revenu", `${money(s.otherIncome)} DH`)}
+      ${renderKvRow("Total", `${money(s.totalIncomes)} DH`, true)}
+      <hr class="utility-recap-sep" />
+      ${renderKvRow("Solde disponible", `${money(s.soldeDisponible)} DH`, true)}
+    </div>` : `
+    <div class="card-body-inner">
+      ${renderSetupBlock(s, mk)}
+      ${!s.needsOpeningSetup && !s.needsSalarySetup ? "" : `<div class="small-label">Complète la saisie ci-dessus pour afficher le récapitulatif.</div>`}
+    </div>`;
 
   return `
     <div class="stack">
       <div class="card" style="border-color:var(--month)">
-        <div class="card-head">
+        <div class="card-head" data-action="${canExpand ? "toggle-card" : ""}" data-key="treasury-synth:${mk}">
           <div>
             <div class="card-title" style="color:var(--month)">Trésorerie</div>
             <div class="card-range">${monthLabel(mk)}</div>
             ${mk === activeMonthKey() ? `<span class="badge badge-current">Mois en cours</span>` : `<span class="badge badge-past">Consultation</span>`}
           </div>
-          <div class="card-preview"><span class="small-label success">Solde : ${money(s.balance)} DH</span></div>
-        </div>
-        <div class="card-body open">
-          <div class="utility-recap-block">
-            ${movementLines || `<div class="small-label">Aucun mouvement ce mois.</div>`}
-            <hr class="utility-recap-sep" />
-            ${renderKvRow("Solde disponible", `${money(s.balance)} DH`, true)}
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="card-preview">
+              <span class="small-label">Salaire : ${money(s.salary)} DH</span><br>
+              <span class="small-label success">Solde : ${money(s.soldeDisponible)} DH</span>
+            </div>
+            ${canExpand ? `<span class="chevron">${open ? "▲" : "▼"}</span>` : ""}
           </div>
         </div>
+        <div class="card-body ${canExpand && open ? "open" : canExpand ? "" : "open"}">${recap}</div>
       </div>
     </div>`;
 }
@@ -107,58 +158,21 @@ function renderCategoriesTab() {
                 <div class="list-item-name">${esc(c.name)}</div>
                 ${isAdmin ? `<button class="btn-delete" data-action="delete-wallet-category" data-id="${c.id}" title="Supprimer">🗑️</button>` : ""}
               </li>`).join("")}</ul>`}
-          <div class="small-label" style="margin-top:10px">Les entrées système (salaire, budgets, soins, remboursements…) sont créées automatiquement.</div>
         </div>
       </div>
     </div>`;
 }
 
 function renderSaisieTab() {
-  const mk = ui.viewedMonthKey;
-  const isFirst = mk === TRESORERIE_START_MONTH;
-  const cats = getUserWalletCategories();
-
-  const openingBlock = isFirst && isAdmin && !hasOpeningBalance() ? `
-    <div class="card" style="border-color:var(--danger)">
-      <div class="card-head"><div class="card-title" style="color:var(--danger)">Solde banque actuel</div></div>
-      <div class="card-body open">
-        <div class="small-label" style="margin-bottom:10px">Première utilisation : saisis le solde réel de ta banque aujourd'hui.</div>
-        <form class="inline-form" data-form="set-opening">
-          <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Solde en DH" required />
-          <button type="submit" class="btn-small" style="background:var(--danger)">Enregistrer</button>
-        </form>
+  return `
+    <div class="stack">
+      <div class="card">
+        <div class="card-body open">
+          <div class="small-label">Phase 2 : saisie des charges manuelles et autres sources de revenu.</div>
+          <div class="small-label" style="margin-top:8px">Pour l'instant, configure le mois depuis l'onglet <strong>Synthèse</strong>.</div>
+        </div>
       </div>
-    </div>` : "";
-
-  const salaryBlock = isAdmin ? `
-    <div class="card" style="border-color:var(--month)">
-      <div class="card-head"><div class="card-title" style="color:var(--month)">Salaire du mois</div></div>
-      <div class="card-body open">
-        ${hasSalary(mk) ? `<div class="small-label success" style="margin-bottom:10px">Salaire déjà enregistré pour ce mois.</div>` : ""}
-        <form class="inline-form" data-form="set-salary" data-month-key="${mk}">
-          <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Salaire en DH" required />
-          <button type="submit" class="btn-small" style="background:var(--month)">${hasSalary(mk) ? "Modifier" : "Enregistrer"}</button>
-        </form>
-      </div>
-    </div>` : "";
-
-  const manualBlock = isAdmin && cats.length > 0 ? `
-    <div class="card">
-      <div class="card-head"><div class="card-title">Charge manuelle</div></div>
-      <div class="card-body open">
-        <form class="form-col" data-form="add-manual-expense" data-month-key="${mk}">
-          <select class="field" name="category_id" required>
-            <option value="" disabled selected hidden>Choisir une catégorie…</option>
-            ${cats.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}
-          </select>
-          <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant en DH" required />
-          <input class="field" name="label" placeholder="Libellé (optionnel)" />
-          <button type="submit" class="btn-primary">Enregistrer la charge</button>
-        </form>
-      </div>
-    </div>` : isAdmin ? `<div class="small-label">Crée des catégories (Gasoil, Café…) dans l'onglet Catégories.</div>` : "";
-
-  return `<div class="stack">${openingBlock}${salaryBlock}${manualBlock}</div>`;
+    </div>`;
 }
 
 function renderMonthPanel() {
