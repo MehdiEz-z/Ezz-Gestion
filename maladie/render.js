@@ -315,12 +315,13 @@ function renderReimbBlock(d, block, editable) {
   const color = isCnss ? "var(--month)" : "var(--week)";
   const label = isCnss ? "CNSS" : "Assurance";
   const received = isCnss ? d.cnss_received : d.assurance_received;
+  const blockEditable = editable && received == null;
   return `
     <div class="reimb-block" style="border-color:${color}">
       <div class="reimb-title" style="color:${color}">${label}</div>
-      ${editable ? `
+      ${blockEditable ? `
         <form class="form-col" data-form="update-reimb" data-dossier-id="${d.id}" data-block="${block}">
-          <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant" value="${received != null ? received : ""}" />
+          <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant" required />
           <button type="submit" class="btn-small" style="background:${color}">Enregistrer</button>
         </form>` : `
         <div class="small-label">Montant : ${received != null ? money(received) + " DH" : "—"}</div>`}
