@@ -1,5 +1,6 @@
 export const APP_START_MONTH = "2026-09";
 export const EAU_START_MONTH = "2026-08";
+export const TRESORERIE_START_MONTH = APP_START_MONTH;
 
 export function pad(n) { return n < 10 ? "0" + n : "" + n; }
 export function toISO(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
