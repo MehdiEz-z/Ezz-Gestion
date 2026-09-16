@@ -1,7 +1,7 @@
 import { getActiveModule } from "../shared/router.js";
 import {
   ui,
-  addPerson, updatePerson,
+  addPerson, updatePerson, setPersonAppOwner,
   saveElecBillTotal, saveElecMeters, saveWaterMonth,
   markElecPaid, markWaterPaid,
 } from "./data.js";
@@ -45,6 +45,9 @@ function onClick(e) {
   else if (action === "open-edit-person") {
     ui.modal = { type: "edit-person", personId: target.dataset.personId };
     render();
+  }
+  else if (action === "set-app-owner") {
+    setPersonAppOwner(target.dataset.personId).then(() => render());
   }
   else if (action === "pay-elec") {
     markElecPaid(target.dataset.monthKey, target.dataset.personId).then(() => render());

@@ -1,5 +1,6 @@
 import { supabaseClient } from "../shared/supabase.js";
 import { isAdmin, currentUser } from "../shared/auth.js";
+import { loadWalletData, syncMonthBudget, syncWeekBudget } from "../shared/wallet.js";
 import { flash, getErrorMessage, normalizeName, toISO, getWeekStart, getWeeksOfMonth, activeMonthKey, money, addDays, parseISODate } from "../shared/utils.js";
 
 export let state = {
@@ -298,6 +299,10 @@ export async function setMonthBudget(monthKey, amount) {
     flash(`Impossible : le budget (${money(amount)} DH) est inférieur au total déjà consommé (${money(consumed)} DH).`, true);
     return false;
   }
+  const oldAmount = state.monthlyBudgets[monthKey] || 0;
+  await loadWalletData();
+  const walletOk = await syncMonthBudget(monthKey, amount, oldAmount);
+  if (!walletOk) return false;
   const { error } = await supabaseClient.from("monthly_budgets").upsert({ month_key: monthKey, amount });
   if (error) { flash(getErrorMessage(error, "Erreur lors de la mise à jour du budget mensuel."), true); return false; }
   state.monthlyBudgets[monthKey] = amount;
@@ -313,6 +318,11 @@ export async function setWeekBudget(isoWeekStart, amount) {
     flash(`Impossible : le budget (${money(amount)} DH) est inférieur au total déjà consommé (${money(consumed)} DH).`, true);
     return false;
   }
+  const oldAmount = state.weeklyBudgets[isoWeekStart] || 0;
+  const monthKey = isoWeekStart.slice(0, 7);
+  await loadWalletData();
+  const walletOk = await syncWeekBudget(isoWeekStart, monthKey, amount, oldAmount);
+  if (!walletOk) return false;
   const { error } = await supabaseClient.from("weekly_budgets").upsert({ week_start: isoWeekStart, amount });
   if (error) { flash(getErrorMessage(error, "Erreur lors de la mise à jour du budget hebdo."), true); return false; }
   state.weeklyBudgets[isoWeekStart] = amount;

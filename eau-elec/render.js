@@ -72,10 +72,11 @@ function renderPersonRow(p) {
   return `
     <li class="list-item">
       <div>
-        <div class="list-item-name">${esc(personName(p))}</div>
+        <div class="list-item-name">${esc(personName(p))}${p.is_app_owner ? ` <span class="badge badge-current">Propriétaire</span>` : ""}</div>
         <div class="small-label">${esc(p.phone || "—")}</div>
       </div>
       <div class="list-item-right">
+        ${isAdmin && !p.is_app_owner ? `<button class="icon-btn" data-action="set-app-owner" data-person-id="${p.id}" title="Définir propriétaire app">👤</button>` : ""}
         ${isAdmin ? `<button class="icon-btn edit" data-action="open-edit-person" data-person-id="${p.id}" title="Modifier">✏️</button>` : ""}
       </div>
     </li>`;
