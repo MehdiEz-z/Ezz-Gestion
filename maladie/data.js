@@ -435,6 +435,14 @@ export async function updateReimbursements(dossierId, { cnssExpected, cnssReceiv
   if (!isAdmin) return false;
   const d = state.dossiers.find(x => x.id === dossierId);
   if (!d || isDossierLocked(d)) { flash("Dossier verrouillé.", true); return false; }
+  if (cnssReceived !== undefined && d.cnss_received != null) {
+    flash("Le montant CNSS est déjà enregistré.", true);
+    return false;
+  }
+  if (assuranceReceived !== undefined && d.assurance_received != null) {
+    flash("Le montant assurance est déjà enregistré.", true);
+    return false;
+  }
 
   const payload = {};
   if (cnssExpected !== undefined) payload.cnss_expected = cnssExpected === "" ? null : Number(cnssExpected);
