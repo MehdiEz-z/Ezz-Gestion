@@ -5,7 +5,7 @@ import {
   saisieDepenseTotal, saisieRevenueTotal,
   movementsForSystemType, manualMovementsForCategory,
   isManualMovementEditable, isSaisieCategoryPinned,
-  SOURCE_LABELS,
+  SOURCE_LABELS, systemMovementDetailLabel, getSystemDetailTitle,
 } from "./data.js";
 import { getWalletCategories, getMovements } from "../shared/wallet.js";
 import { isAdmin } from "../shared/auth.js";
@@ -132,8 +132,8 @@ function renderSaisieDirectionCard(direction, monthKey, isActiveMonth, isFuture)
   const title = isDepense ? "Dépense" : "Revenu";
   const previewLabel = isDepense ? "Dépensé" : "Reçu";
   const total = isDepense ? saisieDepenseTotal(monthKey) : saisieRevenueTotal(monthKey);
-  const borderColor = isDepense ? "var(--danger)" : "var(--week)";
-  const titleColor = isDepense ? "var(--danger)" : "var(--week)";
+  const borderColor = isDepense ? "var(--month)" : "var(--week)";
+  const titleColor = isDepense ? "var(--month)" : "var(--week)";
   const key = `saisie:${direction}:${monthKey}`;
   const open = ui.expanded.has(key);
   const editable = isActiveMonth;
@@ -175,7 +175,7 @@ function renderAddManualMovementModal(m) {
         <div class="sheet-title">${esc(cat.name)} <button class="close-btn" data-action="close-modal">✕</button></div>
         <form class="form-col" data-form="add-manual-movement" data-month-key="${m.monthKey}" data-category-id="${cat.id}" data-direction="${m.direction}">
           <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant en DH" required />
-          <input class="field" name="label" placeholder="Libellé (optionnel)" />
+          <input class="field" name="label" placeholder="Libellé" required />
           <div class="small-label">Date : aujourd'hui (${formatDateFull(new Date())})</div>
           <button type="submit" class="btn-primary">${isDepense ? "Enregistrer la dépense" : "Enregistrer le revenu"}</button>
         </form>
@@ -204,7 +204,7 @@ function renderMovementDetailLine(mov, editable) {
 function renderWalletSystemDetailsModal(m) {
   const list = movementsForSystemType(m.monthKey, m.sourceType);
   const total = list.reduce((s, x) => s + Math.abs(Number(x.amount)), 0);
-  const title = SOURCE_LABELS[m.sourceType] || m.sourceType;
+  const title = getSystemDetailTitle(m.sourceType);
   return `
     <div class="overlay" data-overlay-close="modal">
       <div class="sheet">
@@ -214,7 +214,7 @@ function renderWalletSystemDetailsModal(m) {
             <li class="list-item" style="flex-direction:column;align-items:stretch;gap:4px">
               <div class="purchase-detail-row">
                 <div>
-                  <div class="list-item-name">${money(Math.abs(Number(x.amount)))} DH — ${esc(x.label)}</div>
+                  <div class="list-item-name">${money(Math.abs(Number(x.amount)))} DH — ${esc(systemMovementDetailLabel(x))}</div>
                   <div class="small-label">${formatDateFull(parseISODate(x.movement_date))}</div>
                 </div>
               </div>
@@ -251,7 +251,7 @@ function renderEditManualMovementModal(m) {
         <div class="sheet-title">Modifier mouvement <button class="close-btn" data-action="close-modal">✕</button></div>
         <form class="form-col" data-form="edit-manual-movement" data-movement-id="${mov.id}">
           <input class="field" name="amount" type="number" min="0" step="0.01" value="${Math.abs(Number(mov.amount))}" required />
-          <input class="field" name="label" value="${esc(mov.label)}" placeholder="Libellé" />
+          <input class="field" name="label" value="${esc(mov.label)}" placeholder="Libellé" required />
           <div class="small-label">Date : ${formatDateFull(parseISODate(mov.movement_date))}</div>
           <button type="submit" class="btn-primary">Enregistrer</button>
         </form>
@@ -387,9 +387,9 @@ function renderCategoriesTab() {
   return `
     <div class="stack">
       ${isAdmin ? renderExpandableAddCard("wallet-cats:add", "Ajouter une catégorie", addCatForm) : ""}
-      <div class="card" style="border-color:var(--danger)">
+      <div class="card" style="border-color:var(--month)">
         <div class="card-head" data-action="toggle-card" data-key="wallet-cats:depense">
-          <div class="card-title" style="color:var(--danger)">Catégories dépense</div>
+          <div class="card-title" style="color:var(--month)">Catégories dépense</div>
           <div style="display:flex;align-items:center;gap:10px">
             <div class="card-preview">${depense.length} catégorie${depense.length > 1 ? "s" : ""}</div>
             <span class="chevron">${depenseOpen ? "▲" : "▼"}</span>
