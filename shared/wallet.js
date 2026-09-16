@@ -55,6 +55,17 @@ export function getUserWalletCategories() {
   return getWalletCategories().filter(c => !c.is_system);
 }
 
+export function getWalletCategoriesByDirection(direction) {
+  return getUserWalletCategories().filter(c => (c.direction || "depense") === direction);
+}
+
+function walletCategoryNameTaken(name, excludeId = null) {
+  const key = name.trim().toLowerCase();
+  return getUserWalletCategories().some(
+    c => c.id !== excludeId && c.name.toLowerCase() === key,
+  );
+}
+
 function movementsForMonth(monthKey) {
   return getMovements().filter(m => m.month_key === monthKey);
 }
@@ -353,18 +364,44 @@ export async function addManualExpense(monthKey, categoryId, amount, label) {
   return true;
 }
 
-export async function addWalletCategory(name) {
+export async function addWalletCategory(name, direction) {
   const n = name.trim();
-  if (!n) { flash("Nom obligatoire.", true); return false; }
-  if (getWalletCategories().some(c => c.name.toLowerCase() === n.toLowerCase())) {
+  if (!n) { flash("Le nom de la catégorie est obligatoire.", true); return false; }
+  if (!["depense", "revenue"].includes(direction)) {
+    flash("Type de catégorie invalide.", true);
+    return false;
+  }
+  if (walletCategoryNameTaken(n)) {
     flash("Cette catégorie existe déjà.", true);
     return false;
   }
   const { data, error } = await supabaseClient.from("wallet_categories")
-    .insert({ name: n, is_system: false }).select().single();
+    .insert({ name: n, is_system: false, direction }).select().single();
   if (error) { flash(getErrorMessage(error, "Erreur ajout catégorie."), true); return false; }
   categoriesCache.push(data);
   flash("Catégorie ajoutée.");
+  return true;
+}
+
+export async function updateWalletCategory(id, name, direction) {
+  const cat = getUserWalletCategories().find(c => c.id === id);
+  if (!cat) return false;
+  const n = name.trim();
+  if (!n) { flash("Le nom de la catégorie est obligatoire.", true); return false; }
+  if (!["depense", "revenue"].includes(direction)) {
+    flash("Type de catégorie invalide.", true);
+    return false;
+  }
+  if (walletCategoryNameTaken(n, id)) {
+    flash("Cette catégorie existe déjà.", true);
+    return false;
+  }
+  const { data, error } = await supabaseClient.from("wallet_categories")
+    .update({ name: n, direction }).eq("id", id).select().single();
+  if (error) { flash(getErrorMessage(error, "Erreur modification catégorie."), true); return false; }
+  const idx = categoriesCache.findIndex(c => c.id === id);
+  if (idx >= 0) categoriesCache[idx] = data;
+  flash("Catégorie modifiée.");
   return true;
 }
 

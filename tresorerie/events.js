@@ -2,7 +2,7 @@ import { getActiveModule } from "../shared/router.js";
 import { loadWalletData } from "../shared/wallet.js";
 import {
   ui, setOpeningBalance, setSalary, addManualExpense,
-  addWalletCategory, deleteWalletCategory,
+  addWalletCategory, updateWalletCategory,
 } from "./data.js";
 import { render } from "./render.js";
 
@@ -15,10 +15,10 @@ async function onClick(e) {
   if (getActiveModule() !== "tresorerie") return;
 
   if (e.target.classList && e.target.classList.contains("overlay")) {
-    if (e.target.dataset.overlayClose === "month") {
-      ui.monthPanelOpen = false;
-      render();
-    }
+    const type = e.target.dataset.overlayClose;
+    if (type === "month") ui.monthPanelOpen = false;
+    else if (type === "modal") ui.modal = null;
+    render();
     return;
   }
 
@@ -40,10 +40,20 @@ async function onClick(e) {
     else ui.expanded.add(key);
     render();
   }
-  else if (action === "delete-wallet-category") {
-    const ok = await deleteWalletCategory(target.dataset.id);
-    if (ok) render();
+  else if (action === "pick-wallet-direction") {
+    const form = target.closest("form");
+    if (!form) return;
+    form.querySelectorAll("[data-action='pick-wallet-direction']").forEach(b => {
+      b.classList.remove("active-month", "active-week");
+    });
+    target.classList.add(target.dataset.value === "revenue" ? "active-week" : "active-month");
+    form.querySelector("[name='direction']").value = target.dataset.value;
   }
+  else if (action === "open-edit-wallet-category") {
+    ui.modal = { type: "edit-wallet-category", categoryId: target.dataset.categoryId };
+    render();
+  }
+  else if (action === "close-modal") { ui.modal = null; render(); }
 }
 
 async function onSubmit(e) {
@@ -70,7 +80,15 @@ async function onSubmit(e) {
     if (ok) { await loadWalletData(); render(); }
   }
   else if (form.dataset.form === "add-wallet-category") {
-    const ok = await addWalletCategory(form.name.value);
+    const ok = await addWalletCategory(form.name.value, form.direction.value);
     if (ok) render();
+  }
+  else if (form.dataset.form === "edit-wallet-category") {
+    const ok = await updateWalletCategory(
+      form.dataset.categoryId,
+      form.name.value,
+      form.direction.value,
+    );
+    if (ok) { ui.modal = null; render(); }
   }
 }

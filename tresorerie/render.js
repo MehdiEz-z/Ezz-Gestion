@@ -1,7 +1,8 @@
 import {
   ui, monthSummary,
-  getUserWalletCategories, TRESORERIE_START_MONTH,
+  getWalletCategoriesByDirection, TRESORERIE_START_MONTH,
 } from "./data.js";
+import { getWalletCategories } from "../shared/wallet.js";
 import { isAdmin } from "../shared/auth.js";
 import {
   activeMonthKey, esc, monthChipLabel, monthLabel, monthsRangeFrom,
@@ -10,11 +11,11 @@ import {
 
 export function render() {
   const controls = document.getElementById("maison-controls");
-  if (controls) controls.style.display = "flex";
+  if (controls) controls.style.display = ui.subTab === "categories" ? "none" : "flex";
   document.getElementById("month-btn-label").textContent = monthChipLabel(ui.viewedMonthKey);
   document.getElementById("header-title").textContent =
     ui.subTab === "synthese" ? "Trésorerie"
-      : ui.subTab === "categories" ? "Catégories charges"
+      : ui.subTab === "categories" ? "Catégories"
         : "Saisie trésorerie";
 
   document.getElementById("subtabs").innerHTML = `
@@ -28,7 +29,52 @@ export function render() {
   else main.innerHTML = renderSaisieTab();
 
   document.getElementById("modal-root").innerHTML =
-    ui.monthPanelOpen ? renderMonthPanel() : "";
+    ui.monthPanelOpen ? renderMonthPanel() : (ui.modal ? renderModal() : "");
+}
+
+function renderExpandableAddCard(key, title, bodyHtml) {
+  const open = ui.expanded.has(key);
+  return `
+    <div class="card card-add">
+      <div class="card-head" data-action="toggle-card" data-key="${key}">
+        <div class="card-title">${title}</div>
+        <span class="chevron">${open ? "▲" : "▼"}</span>
+      </div>
+      <div class="card-body ${open ? "open" : ""}">${bodyHtml}</div>
+    </div>`;
+}
+
+function renderWalletCategoryRow(c) {
+  return `
+    <li class="list-item">
+      <div class="list-item-name">${esc(c.name)}</div>
+      <div class="list-item-right">
+        ${isAdmin ? `<button class="icon-btn edit" data-action="open-edit-wallet-category" data-category-id="${c.id}" title="Modifier">✏️</button>` : ""}
+      </div>
+    </li>`;
+}
+
+function renderModal() {
+  const m = ui.modal;
+  if (m.type !== "edit-wallet-category") return "";
+  const cat = getWalletCategories().find(c => c.id === m.categoryId);
+  if (!cat || cat.is_system) return "";
+  const dir = cat.direction || "depense";
+  return `
+    <div class="overlay" data-overlay-close="modal">
+      <div class="sheet">
+        <div class="sheet-title">Modifier catégorie <button class="close-btn" data-action="close-modal">✕</button></div>
+        <form class="form-col" data-form="edit-wallet-category" data-category-id="${cat.id}">
+          <input class="field" name="name" value="${esc(cat.name)}" required />
+          <div class="segment-row">
+            <button type="button" class="segment ${dir === "depense" ? "active-month" : ""}" data-action="pick-wallet-direction" data-value="depense">Dépense</button>
+            <button type="button" class="segment ${dir === "revenue" ? "active-week" : ""}" data-action="pick-wallet-direction" data-value="revenue">Revenu</button>
+          </div>
+          <input type="hidden" name="direction" value="${dir}" />
+          <button type="submit" class="btn-primary">Enregistrer</button>
+        </form>
+      </div>
+    </div>`;
 }
 
 function renderKvRow(label, value, bold = false) {
@@ -125,39 +171,47 @@ function renderSyntheseTab() {
 }
 
 function renderCategoriesTab() {
-  const cats = getUserWalletCategories();
-  const open = ui.expanded.has("wallet-cats");
-  const addForm = isAdmin ? `
-    <form class="inline-form" data-form="add-wallet-category">
-      <input class="field" name="name" placeholder="Nom (ex. Gasoil, Café…)" required />
-      <button type="submit" class="btn-small" style="background:var(--month)">Ajouter</button>
+  const depense = getWalletCategoriesByDirection("depense");
+  const revenue = getWalletCategoriesByDirection("revenue");
+  const depenseOpen = ui.expanded.has("wallet-cats:depense");
+  const revenueOpen = ui.expanded.has("wallet-cats:revenue");
+
+  const addCatForm = isAdmin ? `
+    <form class="form-col" data-form="add-wallet-category">
+      <input class="field" name="name" placeholder="Nom de la catégorie" required />
+      <div class="segment-row">
+        <button type="button" class="segment active-month" data-action="pick-wallet-direction" data-value="depense">Dépense</button>
+        <button type="button" class="segment" data-action="pick-wallet-direction" data-value="revenue">Revenu</button>
+      </div>
+      <input type="hidden" name="direction" value="depense" />
+      <button type="submit" class="btn-primary">Ajouter la catégorie</button>
     </form>` : "";
 
   return `
     <div class="stack">
-      ${isAdmin ? `
-        <div class="card card-add">
-          <div class="card-head" data-action="toggle-card" data-key="wallet-cats-add">
-            <div class="card-title">Ajouter une catégorie</div>
-            <span class="chevron">${ui.expanded.has("wallet-cats-add") ? "▲" : "▼"}</span>
-          </div>
-          <div class="card-body ${ui.expanded.has("wallet-cats-add") ? "open" : ""}">${addForm}</div>
-        </div>` : ""}
-      <div class="card">
-        <div class="card-head" data-action="toggle-card" data-key="wallet-cats">
-          <div class="card-title">Charges hors Course</div>
+      ${isAdmin ? renderExpandableAddCard("wallet-cats:add", "Ajouter une catégorie", addCatForm) : ""}
+      <div class="card" style="border-color:var(--danger)">
+        <div class="card-head" data-action="toggle-card" data-key="wallet-cats:depense">
+          <div class="card-title" style="color:var(--danger)">Catégories dépense</div>
           <div style="display:flex;align-items:center;gap:10px">
-            <div class="card-preview">${cats.length} catégorie${cats.length > 1 ? "s" : ""}</div>
-            <span class="chevron">${open ? "▲" : "▼"}</span>
+            <div class="card-preview">${depense.length} catégorie${depense.length > 1 ? "s" : ""}</div>
+            <span class="chevron">${depenseOpen ? "▲" : "▼"}</span>
           </div>
         </div>
-        <div class="card-body ${open ? "open" : ""}">
-          ${cats.length === 0 ? `<div class="small-label">Aucune catégorie. Ajoute Gasoil, Café, etc.</div>` : `
-            <ul class="list">${cats.map(c => `
-              <li class="list-item">
-                <div class="list-item-name">${esc(c.name)}</div>
-                ${isAdmin ? `<button class="btn-delete" data-action="delete-wallet-category" data-id="${c.id}" title="Supprimer">🗑️</button>` : ""}
-              </li>`).join("")}</ul>`}
+        <div class="card-body ${depenseOpen ? "open" : ""}">
+          ${depense.length === 0 ? `<div class="small-label">Aucune catégorie dépense.</div>` : `<ul class="list">${depense.map(renderWalletCategoryRow).join("")}</ul>`}
+        </div>
+      </div>
+      <div class="card" style="border-color:var(--week)">
+        <div class="card-head" data-action="toggle-card" data-key="wallet-cats:revenue">
+          <div class="card-title" style="color:var(--week)">Catégories revenu</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="card-preview">${revenue.length} catégorie${revenue.length > 1 ? "s" : ""}</div>
+            <span class="chevron">${revenueOpen ? "▲" : "▼"}</span>
+          </div>
+        </div>
+        <div class="card-body ${revenueOpen ? "open" : ""}">
+          ${revenue.length === 0 ? `<div class="small-label">Aucune catégorie revenu.</div>` : `<ul class="list">${revenue.map(renderWalletCategoryRow).join("")}</ul>`}
         </div>
       </div>
     </div>`;

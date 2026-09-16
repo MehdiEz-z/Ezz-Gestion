@@ -1,7 +1,8 @@
 import {
-  loadWalletData, getUserWalletCategories, monthSummary, hasOpeningBalance, hasSalary,
+  loadWalletData, getUserWalletCategories, getWalletCategoriesByDirection,
+  monthSummary, hasOpeningBalance, hasSalary,
   setOpeningBalance, setSalary, addManualExpense,
-  addWalletCategory, deleteWalletCategory,
+  addWalletCategory, updateWalletCategory,
 } from "../shared/wallet.js";
 import { TRESORERIE_START_MONTH } from "../shared/utils.js";
 import { isAdmin } from "../shared/auth.js";
@@ -27,9 +28,9 @@ export async function fetchStateFromSupabase() {
 
 export {
   setOpeningBalance, setSalary, addManualExpense,
-  addWalletCategory, deleteWalletCategory,
+  addWalletCategory, updateWalletCategory,
   monthSummary, hasOpeningBalance, hasSalary,
-  getUserWalletCategories,
+  getUserWalletCategories, getWalletCategoriesByDirection,
 };
 
 export { TRESORERIE_START_MONTH };
