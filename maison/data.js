@@ -193,6 +193,95 @@ export function weekSpentTotal(isoWs, isoWe) {
     .reduce((s, p) => s + Number(p.price), 0);
 }
 
+/** Stock report en début de semaine (cumul des semaines passées du mois). */
+export function weekReportStockAtStart(monthKey, periodKey) {
+  let reportStock = 0;
+  for (const seg of getMonthWeekSegments(monthKey)) {
+    if (seg.periodKey === periodKey) break;
+    const budget = state.weeklyBudgets[seg.periodKey];
+    if (budget == null) continue;
+    const consumed = weekSpentTotal(seg.periodKey, toISO(seg.end));
+    const b = Number(budget);
+    const reste = Math.max(0, b - consumed);
+    const reportConsumed = Math.max(0, consumed - b);
+    reportStock = reste + reportStock - reportConsumed;
+  }
+  return reportStock;
+}
+
+/**
+ * @returns {{
+ *   consumed: number, budgetAmount: number|null, budgetPart: number, reportPart: number,
+ *   reste: number, reportRemaining: number, reportStockStart: number, plafond: number,
+ *   showReportLine: boolean, canAddPurchase: boolean,
+ * }}
+ */
+export function weekSpendingStats(monthKey, periodKey, { isActiveWeek, weekNumber }) {
+  const budgetRaw = state.weeklyBudgets[periodKey];
+  const budgetAmount = budgetRaw != null ? Number(budgetRaw) : null;
+  const isoWe = weekEndISO(periodKey, monthKey);
+  const consumed = weekSpentTotal(periodKey, isoWe);
+
+  if (budgetAmount == null) {
+    return {
+      consumed, budgetAmount: null, budgetPart: consumed, reportPart: 0, reste: 0,
+      reportRemaining: 0, reportStockStart: 0, plafond: 0, showReportLine: false, canAddPurchase: false,
+    };
+  }
+
+  const reportStockStart = weekNumber >= 2 ? weekReportStockAtStart(monthKey, periodKey) : 0;
+  const budgetPart = Math.min(consumed, budgetAmount);
+  const reportPart = Math.max(0, consumed - budgetAmount);
+  const reste = Math.max(0, budgetAmount - consumed);
+  const reportRemaining = Math.max(0, reportStockStart - reportPart);
+  const plafond = budgetAmount + reportStockStart;
+  const showReportLine = isActiveWeek && weekNumber >= 2 && reportRemaining > 0;
+  const canAddPurchase = isActiveWeek && consumed < plafond;
+
+  return {
+    consumed, budgetAmount, budgetPart, reportPart, reste, reportRemaining, reportStockStart,
+    plafond, showReportLine, canAddPurchase,
+  };
+}
+
+export function canAddWeeklyPurchase(additionalPrice = 0) {
+  const todaySeg = findWeekSegmentForToday();
+  if (!todaySeg) return false;
+  const monthKey = todaySeg.periodKey.slice(0, 7);
+  const stats = weekSpendingStats(monthKey, todaySeg.periodKey, {
+    isActiveWeek: true,
+    weekNumber: todaySeg.number,
+  });
+  if (stats.budgetAmount == null) return false;
+  return stats.consumed + additionalPrice <= stats.plafond;
+}
+
+export function weeklyRecapGain(monthKey) {
+  let cumulReste = 0;
+  let cumulReportConsumed = 0;
+  const isActiveMonth = monthKey === activeMonthKey();
+  const todaySeg = findWeekSegmentForToday();
+  const todayKey = todaySeg?.periodKey;
+
+  for (const seg of getMonthWeekSegments(monthKey)) {
+    let status;
+    if (!isActiveMonth) status = "past";
+    else if (todayKey && seg.periodKey === todayKey) status = "current";
+    else if (todayKey && seg.periodKey < todayKey) status = "past";
+    else if (todayKey && seg.periodKey > todayKey) status = "future";
+    else status = "past";
+    if (status === "future") continue;
+
+    const budget = state.weeklyBudgets[seg.periodKey];
+    if (budget == null) continue;
+    const c = weekSpentTotal(seg.periodKey, toISO(seg.end));
+    const b = Number(budget);
+    cumulReste += Math.max(0, b - c);
+    cumulReportConsumed += Math.max(0, c - b);
+  }
+  return cumulReste - cumulReportConsumed;
+}
+
 /** @returns {{ monthConso: number, monthGain: number, weekConso: number, weekGain: number, totalConso: number, totalGain: number }} */
 export function achatsRecap(monthKey) {
   const monthBudget = state.monthlyBudgets[monthKey];
@@ -203,8 +292,6 @@ export function achatsRecap(monthKey) {
   const todaySeg = findWeekSegmentForToday();
   const todayPeriodKey = todaySeg ? todaySeg.periodKey : null;
   let weekConso = 0;
-  let weekGain = 0;
-
   for (const seg of getMonthWeekSegments(monthKey)) {
     const isoWs = seg.periodKey;
     const isoWe = toISO(seg.end);
@@ -215,12 +302,9 @@ export function achatsRecap(monthKey) {
     else if (todayPeriodKey && isoWs > todayPeriodKey) status = "future";
     else status = "past";
     if (status === "future") continue;
-
-    const conso = weekSpentTotal(isoWs, isoWe);
-    weekConso += conso;
-    const budget = state.weeklyBudgets[isoWs];
-    if (budget != null) weekGain += Number(budget) - conso;
+    weekConso += weekSpentTotal(isoWs, isoWe);
   }
+  const weekGain = weeklyRecapGain(monthKey);
 
   return {
     monthConso,
@@ -315,14 +399,22 @@ export async function setMonthBudget(monthKey, amount) {
 
 export async function setWeekBudget(isoWeekStart, amount) {
   if (!isAdmin) return false;
-  const isoWe = weekEndISO(isoWeekStart);
+  const monthKey = isoWeekStart.slice(0, 7);
+  const seg = getMonthWeekSegments(monthKey).find(s => s.periodKey === isoWeekStart);
+  const isoWe = weekEndISO(isoWeekStart, monthKey);
   const consumed = weekSpentTotal(isoWeekStart, isoWe);
-  if (amount < consumed) {
-    flash(`Impossible : le budget (${money(amount)} DH) est inférieur au total déjà consommé (${money(consumed)} DH).`, true);
+  const reportPart = seg
+    ? weekSpendingStats(monthKey, isoWeekStart, {
+      isActiveWeek: seg.periodKey === findWeekSegmentForToday()?.periodKey,
+      weekNumber: seg.number,
+    }).reportPart
+    : Math.max(0, consumed - amount);
+  const budgetPartNeeded = consumed - reportPart;
+  if (amount < budgetPartNeeded) {
+    flash(`Impossible : le budget (${money(amount)} DH) est inférieur à la part déjà consommée sur le budget semaine (${money(budgetPartNeeded)} DH).`, true);
     return false;
   }
   const oldAmount = state.weeklyBudgets[isoWeekStart] || 0;
-  const monthKey = isoWeekStart.slice(0, 7);
   await loadWalletData();
   const walletOk = await syncWeekBudget(isoWeekStart, monthKey, amount, oldAmount);
   if (!walletOk) return false;
@@ -431,6 +523,10 @@ export async function addPurchase({ categoryId, type, place_id, price }) {
   if (!isAdmin) return false;
   const cat = state.categories.find(c => c.id === categoryId);
   if (!cat) return false;
+  if (type === "hebdo" && !canAddWeeklyPurchase(Number(price))) {
+    flash("Plafond hebdo atteint (budget semaine + report épuisés).", true);
+    return false;
+  }
   const date = toISO(new Date());
   const { data, error } = await supabaseClient.from("purchases")
     .insert({
@@ -457,6 +553,13 @@ export async function updatePurchase(id, { price, place_id }) {
   if (!isPurchaseEditable(purchase)) {
     flash("Cet achat ne peut pas être modifié (période passée).", true);
     return false;
+  }
+  if (purchase.type === "hebdo") {
+    const delta = Number(price) - Number(purchase.price);
+    if (delta > 0 && !canAddWeeklyPurchase(delta)) {
+      flash("Plafond hebdo atteint (budget semaine + report épuisés).", true);
+      return false;
+    }
   }
   const { data, error } = await supabaseClient.from("purchases")
     .update({ price, place_id }).eq("id", id).select().single();
@@ -492,10 +595,12 @@ function checkBudgetAlert(type, date) {
   } else {
     const seg = findWeekSegmentForDate(parseISODate(date));
     if (!seg) return;
-    const ws = seg.periodKey;
-    const budget = Number(state.weeklyBudgets[ws]);
-    if (!budget) return;
-    const we = weekEndISO(ws);
-    if (weekSpentTotal(ws, we) > budget) flash("Alerte : budget hebdo dépassé !", true);
+    const monthKey = seg.periodKey.slice(0, 7);
+    const stats = weekSpendingStats(monthKey, seg.periodKey, {
+      isActiveWeek: seg.periodKey === findWeekSegmentForToday()?.periodKey,
+      weekNumber: seg.number,
+    });
+    if (stats.budgetAmount == null) return;
+    if (stats.consumed > stats.plafond) flash("Alerte : plafond hebdo dépassé !", true);
   }
 }
