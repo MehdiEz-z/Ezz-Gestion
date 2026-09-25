@@ -1,7 +1,7 @@
 import { supabaseClient } from "../shared/supabase.js";
 import { isAdmin, currentUser } from "../shared/auth.js";
 import { loadWalletData, syncMonthBudget, syncWeekBudget } from "../shared/wallet.js";
-import { flash, getErrorMessage, normalizeName, toISO, getWeekStart, getWeeksOfMonth, activeMonthKey, money, addDays, parseISODate } from "../shared/utils.js";
+import { flash, getErrorMessage, normalizeName, toISO, activeMonthKey, money, parseISODate, getMonthWeekSegments, weekEndForPeriodKey, findWeekSegmentForDate, findWeekSegmentForToday } from "../shared/utils.js";
 
 export let state = {
   categories: [],
@@ -57,8 +57,8 @@ export async function fetchStateFromSupabase() {
   if (wBudgets.data) wBudgets.data.forEach(b => { state.weeklyBudgets[b.week_start] = b.amount; });
 }
 
-function weekEndISO(isoWs) {
-  return toISO(addDays(parseISODate(isoWs), 6));
+function weekEndISO(isoWs, monthKey = isoWs.slice(0, 7)) {
+  return weekEndForPeriodKey(isoWs, monthKey);
 }
 
 function purchasesInPeriod(type, periodKey) {
@@ -200,18 +200,20 @@ export function achatsRecap(monthKey) {
   const monthGain = monthBudget != null ? Number(monthBudget) - monthConso : 0;
 
   const isActiveMonth = monthKey === activeMonthKey();
-  const todayWeekISO = toISO(getWeekStart(new Date()));
+  const todaySeg = findWeekSegmentForToday();
+  const todayPeriodKey = todaySeg ? todaySeg.periodKey : null;
   let weekConso = 0;
   let weekGain = 0;
 
-  for (const wStart of getWeeksOfMonth(monthKey)) {
-    const isoWs = toISO(wStart);
-    const isoWe = toISO(addDays(wStart, 6));
+  for (const seg of getMonthWeekSegments(monthKey)) {
+    const isoWs = seg.periodKey;
+    const isoWe = toISO(seg.end);
     let status;
     if (!isActiveMonth) status = "past";
-    else if (isoWs === todayWeekISO) status = "current";
-    else if (isoWs < todayWeekISO) status = "past";
-    else status = "future";
+    else if (todayPeriodKey && isoWs === todayPeriodKey) status = "current";
+    else if (todayPeriodKey && isoWs < todayPeriodKey) status = "past";
+    else if (todayPeriodKey && isoWs > todayPeriodKey) status = "future";
+    else status = "past";
     if (status === "future") continue;
 
     const conso = weekSpentTotal(isoWs, isoWe);
@@ -255,9 +257,10 @@ export function placeNameTaken(name, excludeId = null) {
 
 export function isPurchaseEditable(purchase) {
   if (purchase.type === "mensuel") return purchase.date.slice(0, 7) === activeMonthKey();
-  const ws = toISO(getWeekStart(new Date()));
-  const we = toISO(new Date(getWeekStart(new Date()).getTime() + 6 * 86400000));
-  return purchase.date >= ws && purchase.date <= we;
+  const seg = findWeekSegmentForDate(parseISODate(purchase.date));
+  const todaySeg = findWeekSegmentForToday();
+  if (!seg || !todaySeg) return false;
+  return seg.periodKey === todaySeg.periodKey;
 }
 
 export async function assignPeriodCategory(type, periodKey, categoryId) {
@@ -487,7 +490,9 @@ function checkBudgetAlert(type, date) {
     if (!budget) return;
     if (monthSpentTotal(mk) > budget) flash("Alerte : budget mensuel dépassé !", true);
   } else {
-    const ws = toISO(getWeekStart(new Date(date)));
+    const seg = findWeekSegmentForDate(parseISODate(date));
+    if (!seg) return;
+    const ws = seg.periodKey;
     const budget = Number(state.weeklyBudgets[ws]);
     if (!budget) return;
     const we = weekEndISO(ws);
