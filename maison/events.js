@@ -9,7 +9,7 @@ import {
   assignPeriodCategory, unassignPeriodCategory,
 } from "./data.js";
 import { render } from "./render.js";
-import { activeMonthKey, getWeekStart, normalizeName, toISO } from "../shared/utils.js";
+import { activeMonthKey, findWeekSegmentForToday, normalizeName } from "../shared/utils.js";
 
 export function setupEvents() {
   document.addEventListener("click", onClick);
@@ -80,7 +80,7 @@ async function onClick(e) {
     const weekStart = target.dataset.weekStart || null;
     const editable = type === "mensuel"
       ? monthKey === activeMonthKey()
-      : weekStart === toISO(getWeekStart(new Date()));
+      : weekStart === (findWeekSegmentForToday()?.periodKey || "");
     const categoryId = target.dataset.categoryId || null;
     const displayName = target.dataset.categoryName
       || state.categories.find(c => c.id === categoryId)?.name
