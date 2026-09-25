@@ -3,6 +3,7 @@ import {
   monthSpentTotal, weekSpentTotal, achatsRecap, isPurchaseEditable,
   getPeriodDisplayRows, getAvailableCategoriesForPeriod,
   isPeriodCategoryAssigned, totalForPeriodRow, purchasesForPeriodRow,
+  weekSpendingStats, canAddWeeklyPurchase,
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
 import {
@@ -18,6 +19,33 @@ function weekSegmentStatus(seg, isActiveMonth) {
   if (seg.periodKey === todaySeg.periodKey) return "current";
   if (seg.periodKey < todaySeg.periodKey) return "past";
   return "future";
+}
+
+/** Consommé : budget semaine + part report en rouge si > 0. */
+function renderWeekConsumedLabel(stats) {
+  if (stats.budgetAmount == null) {
+    return `<span class="small-label">Consommé : ${money(stats.consumed)} DH</span>`;
+  }
+  if (stats.reportPart > 0) {
+    return `<span class="small-label">Consommé : ${money(stats.budgetPart)} DH + <span class="danger">${money(stats.reportPart)} DH</span></span>`;
+  }
+  return `<span class="small-label">Consommé : ${money(stats.consumed)} DH</span>`;
+}
+
+function renderWeekAchatsPreview(monthKey, seg, status) {
+  const isActiveWeek = status === "current";
+  const stats = weekSpendingStats(monthKey, seg.periodKey, {
+    isActiveWeek,
+    weekNumber: seg.number,
+  });
+  if (stats.budgetAmount == null) return "Budget non défini";
+  const remCls = stats.reste > 0 ? "success" : "danger";
+  let html = renderWeekConsumedLabel(stats);
+  html += `<br><span class="small-label ${remCls}">Reste : ${money(stats.reste)} DH</span>`;
+  if (stats.showReportLine) {
+    html += `<br><span class="small-label">Report : ${money(stats.reportRemaining)} DH</span>`;
+  }
+  return html;
 }
 
 export function render() {
@@ -186,13 +214,13 @@ function renderPeriodCategoryPicker(type, periodKey) {
     </div>`;
 }
 
-function renderPeriodRow(row, type, editable, ctx, pastOnly = false) {
+function renderPeriodRow(row, type, editable, ctx, pastOnly = false, hebdoCanAdd = true) {
   const periodKey = type === "mensuel" ? ctx.monthKey : ctx.weekStart;
   const total = totalForPeriodRow(row, type, periodKey);
   if (pastOnly && total === 0) return "";
   const ctxAttr = type === "mensuel" ? `data-month-key="${ctx.monthKey}"` : `data-week-start="${ctx.weekStart}"`;
   const idAttr = row.categoryId ? `data-category-id="${row.categoryId}"` : `data-category-name="${esc(row.name)}"`;
-  const canAdd = editable && !pastOnly && row.categoryId;
+  const canAdd = editable && !pastOnly && row.categoryId && (type !== "hebdo" || hebdoCanAdd);
   const canUnassign = editable && !pastOnly && row.categoryId
     && isPeriodCategoryAssigned(type, periodKey, row.categoryId)
     && total === 0;
@@ -298,10 +326,10 @@ function renderCategoriesTab() {
     </div>`;
 }
 
-function renderUtilityKvRow(label, value, bold = false) {
+function renderUtilityKvRow(label, value, bold = false, hint = "") {
   return `
     <div class="utility-kv-row${bold ? " utility-kv-row-bold" : ""}">
-      <span>${label}</span>
+      <span>${label}${hint ? `<br><span class="small-label">${esc(hint)}</span>` : ""}</span>
       <span>${value}</span>
     </div>`;
 }
@@ -325,7 +353,7 @@ function renderAchatsRecapCard(monthKey) {
           <hr class="utility-recap-sep" />
           <div class="utility-recap-section-title">Gain Semaines</div>
           ${renderUtilityKvRow("Consommation", `${money(r.weekConso)} DH`)}
-          ${renderUtilityKvRow("Gain", `${money(r.weekGain)} DH`)}
+          ${renderUtilityKvRow("Gain", `${money(r.weekGain)} DH`, false, "Cumul restes − report consommé")}
           <hr class="utility-recap-sep" />
           ${renderUtilityKvRow("Total Consommation", `${money(r.totalConso)} DH`, true)}
           ${renderUtilityKvRow("Total Gain", `${money(r.totalGain)} DH`, true)}
@@ -377,21 +405,23 @@ function renderAchatsTab() {
     const isoWe = toISO(seg.end);
     const n = seg.number;
     const status = weekSegmentStatus(seg, isActiveMonth);
+    const isPast = status === "past";
+    const isCurrent = status === "current";
+    const stats = weekSpendingStats(monthKey, isoWs, {
+      isActiveWeek: isCurrent,
+      weekNumber: n,
+    });
 
     const budget = state.weeklyBudgets[isoWs];
-    const total = weekSpentTotal(isoWs, isoWe);
     const key = "achat-week:" + isoWs;
-    const isPast = status === "past";
     const canExpand = status !== "future" && budget !== undefined;
     const open = canExpand && ui.expanded.has(key);
-    const weekOver = budget !== undefined && total > Number(budget);
-    const remaining = budget !== undefined ? Number(budget) - total : 0;
-    const remCls = remaining < 0 ? "danger" : "success";
+    const weekOver = budget !== undefined && stats.consumed > stats.plafond;
     const weekRows = getPeriodDisplayRows("hebdo", isoWs);
-    const catRows = weekRows.map(r => renderPeriodRow(r, "hebdo", status === "current", { weekStart: isoWs }, isPast)).filter(Boolean).join("");
+    const hebdoCanAdd = isCurrent && canAddWeeklyPurchase();
+    const catRows = weekRows.map(r => renderPeriodRow(r, "hebdo", isCurrent, { weekStart: isoWs }, isPast, hebdoCanAdd)).filter(Boolean).join("");
     const hasCatRows = catRows.length > 0;
-    const hasPurchases = total > 0;
-    const isCurrent = status === "current";
+    const hasPurchases = stats.consumed > 0;
     const canShowWeekBody = canExpand && (isCurrent || hasCatRows || hasPurchases);
 
     return `
@@ -404,7 +434,7 @@ function renderAchatsTab() {
             ${weekOver ? `<span class="badge badge-danger">Dépassé</span>` : ""}
           </div>
           <div style="display:flex;align-items:center;gap:10px">
-            <div class="card-preview">${status === "future" ? "" : budget !== undefined ? `<span class="small-label">Consommé : ${money(total)} DH</span><br><span class="small-label ${remCls}">Reste : ${money(remaining)} DH</span>` : "Budget non défini"}</div>
+            <div class="card-preview">${status === "future" ? "" : renderWeekAchatsPreview(monthKey, seg, status)}</div>
             ${canShowWeekBody ? `<span class="chevron">${open ? "▲" : "▼"}</span>` : ""}
           </div>
         </div>
@@ -412,14 +442,15 @@ function renderAchatsTab() {
           <div style="padding:0 16px 16px" class="small-label">Définis d'abord le budget de cette semaine dans l'onglet Budget.</div>
         ` : status !== "future" && isCurrent ? `
           <div class="card-body ${open ? "open" : ""}">
-            ${weekOver ? `<div class="alert-banner">Budget hebdo dépassé !</div>` : ""}
-            ${renderPeriodCategoryPicker("hebdo", isoWs)}
+            ${weekOver ? `<div class="alert-banner">Plafond hebdo dépassé !</div>` : ""}
+            ${!hebdoCanAdd && stats.budgetAmount != null ? `<div class="small-label">Plafond atteint — plus d'achat hebdo possible cette semaine.</div>` : ""}
+            ${hebdoCanAdd ? renderPeriodCategoryPicker("hebdo", isoWs) : ""}
             ${state.categories.filter(c => c.type === "hebdo").length === 0 && weekRows.length === 0 ? `<div class="small-label">Aucune catégorie hebdo créée.</div>` : weekRows.length === 0 ? `<div class="small-label">Sélectionne une catégorie ci-dessus.</div>` : `
               <ul class="list">${catRows}</ul>`}
           </div>
         ` : status !== "future" && isPast && canShowWeekBody ? `
           <div class="card-body ${open ? "open" : ""}">
-            ${weekOver ? `<div class="alert-banner">Budget hebdo dépassé !</div>` : ""}
+            ${weekOver ? `<div class="alert-banner">Plafond hebdo dépassé !</div>` : ""}
             <ul class="list">${catRows}</ul>
           </div>
         ` : status !== "future" && isPast ? `
