@@ -6,10 +6,19 @@ import {
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
 import {
-  activeMonthKey, addDays, esc, formatDateFull, formatDateShort,
-  getWeekNumberInMonth, getWeekStart, getWeeksOfMonth, monthChipLabel,
+  activeMonthKey, esc, formatDateFull, formatDateShort,
+  getMonthWeekSegments, findWeekSegmentForToday, monthChipLabel,
   monthLabel, monthsRange, money, parseISODate, toISO,
 } from "../shared/utils.js";
+
+function weekSegmentStatus(seg, isActiveMonth) {
+  if (!isActiveMonth) return "past";
+  const todaySeg = findWeekSegmentForToday();
+  if (!todaySeg) return "past";
+  if (seg.periodKey === todaySeg.periodKey) return "current";
+  if (seg.periodKey < todaySeg.periodKey) return "past";
+  return "future";
+}
 
 export function render() {
   const controls = document.getElementById("maison-controls");
@@ -111,17 +120,11 @@ function renderMonthAccordion(monthKey) {
       </div>
     </div>`;
 
-  const weeks = getWeeksOfMonth(monthKey);
-  const todayWeekISO = toISO(getWeekStart(new Date()));
-
-  const weekCards = weeks.map(wStart => {
-    const isoWs = toISO(wStart), isoWe = toISO(addDays(wStart, 6));
-    const n = getWeekNumberInMonth(wStart);
-    let status;
-    if (!isActiveMonth) status = "past";
-    else if (isoWs === todayWeekISO) status = "current";
-    else if (isoWs < todayWeekISO) status = "past";
-    else status = "future";
+  const weekCards = getMonthWeekSegments(monthKey).map(seg => {
+    const isoWs = seg.periodKey;
+    const isoWe = toISO(seg.end);
+    const n = seg.number;
+    const status = weekSegmentStatus(seg, isActiveMonth);
 
     const budget = state.weeklyBudgets[isoWs];
     const total = weekSpentTotal(isoWs, isoWe);
@@ -135,7 +138,7 @@ function renderMonthAccordion(monthKey) {
         <div class="card-head" data-action="${canToggle ? "toggle-card" : ""}" data-key="${key}">
           <div>
             <div class="card-title" style="color:var(--week)">Semaine ${n}</div>
-            <div class="card-range">${formatDateShort(wStart)} → ${formatDateShort(addDays(wStart, 6))}</div>
+            <div class="card-range">${formatDateShort(seg.start)} → ${formatDateShort(seg.end)}</div>
             <span class="badge ${status === "current" ? "badge-current" : status === "past" ? "badge-past" : "badge-future"}">${status === "current" ? "Semaine active" : status === "past" ? "Consultation" : "Verrouillée"}</span>
             ${budget !== undefined && total > Number(budget) ? `<span class="badge badge-danger">Dépassé</span>` : ""}
           </div>
@@ -369,16 +372,11 @@ function renderAchatsTab() {
       `}
     </div>`;
 
-  const weeks = getWeeksOfMonth(monthKey);
-  const todayWeekISO = toISO(getWeekStart(new Date()));
-  const weekCards = weeks.map(wStart => {
-    const isoWs = toISO(wStart), isoWe = toISO(addDays(wStart, 6));
-    const n = getWeekNumberInMonth(wStart);
-    let status;
-    if (!isActiveMonth) status = "past";
-    else if (isoWs === todayWeekISO) status = "current";
-    else if (isoWs < todayWeekISO) status = "past";
-    else status = "future";
+  const weekCards = getMonthWeekSegments(monthKey).map(seg => {
+    const isoWs = seg.periodKey;
+    const isoWe = toISO(seg.end);
+    const n = seg.number;
+    const status = weekSegmentStatus(seg, isActiveMonth);
 
     const budget = state.weeklyBudgets[isoWs];
     const total = weekSpentTotal(isoWs, isoWe);
@@ -401,7 +399,7 @@ function renderAchatsTab() {
         <div class="card-head" data-action="${canShowWeekBody ? "toggle-card" : ""}" data-key="${key}">
           <div>
             <div class="card-title" style="color:var(--week)">Achat Semaine ${n}</div>
-            <div class="card-range">${formatDateShort(wStart)} → ${formatDateShort(addDays(wStart, 6))}</div>
+            <div class="card-range">${formatDateShort(seg.start)} → ${formatDateShort(seg.end)}</div>
             <span class="badge ${status === "current" ? "badge-current" : status === "past" ? "badge-past" : "badge-future"}">${status === "current" ? "Semaine active" : status === "past" ? "Consultation" : "Verrouillée"}</span>
             ${weekOver ? `<span class="badge badge-danger">Dépassé</span>` : ""}
           </div>
