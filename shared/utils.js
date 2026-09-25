@@ -33,25 +33,89 @@ export function monthChipLabel(monthKey) {
 export function formatDateShort(d) { return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }); }
 export function formatDateFull(d) { return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }); }
 
-export function getWeekNumberInMonth(weekStart) {
-  const year = weekStart.getFullYear(), month = weekStart.getMonth();
-  let d = new Date(year, month, 1);
-  while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
-  let n = 1;
-  while (d.getTime() < weekStart.getTime()) { d.setDate(d.getDate() + 7); n++; }
-  return n;
-}
-
-export function getWeeksOfMonth(monthKey) {
+/**
+ * Segments hebdo d'un mois civil : samedi→vendredi tronqués en fin de mois ;
+ * début de mois partiel (01 → veille du 1er samedi) sauf pour APP_START_MONTH.
+ * @returns {{ periodKey: string, start: Date, end: Date, number: number }[]}
+ */
+export function getMonthWeekSegments(monthKey) {
   const [y, m] = monthKey.split("-").map(Number);
-  const last = new Date(y, m, 0);
-  const weeks = [];
-  let d = new Date(y, m - 1, 1);
-  while (d <= last) { if (d.getDay() === 6) weeks.push(new Date(d)); d.setDate(d.getDate() + 1); }
-  return weeks;
+  const firstOfMonth = new Date(y, m - 1, 1);
+  firstOfMonth.setHours(0, 0, 0, 0);
+  const lastOfMonth = new Date(y, m, 0);
+  lastOfMonth.setHours(0, 0, 0, 0);
+
+  const firstSaturday = new Date(firstOfMonth);
+  while (firstSaturday.getDay() !== 6) firstSaturday.setDate(firstSaturday.getDate() + 1);
+
+  /** @type {{ periodKey: string, start: Date, end: Date, number: number }[]} */
+  const segments = [];
+
+  const pushSegment = (startDate, endDate) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    if (start.getTime() > end.getTime()) return;
+    segments.push({
+      periodKey: toISO(start),
+      start,
+      end,
+      number: segments.length + 1,
+    });
+  };
+
+  if (monthKey !== APP_START_MONTH && firstOfMonth.getTime() < firstSaturday.getTime()) {
+    const headEnd = addDays(firstSaturday, -1);
+    pushSegment(firstOfMonth, headEnd);
+  }
+
+  let sat = new Date(firstSaturday);
+  while (sat.getTime() <= lastOfMonth.getTime()) {
+    let end = addDays(sat, 6);
+    if (end.getTime() > lastOfMonth.getTime()) end = lastOfMonth;
+    pushSegment(sat, end);
+    sat.setDate(sat.getDate() + 7);
+  }
+
+  segments.forEach((s, i) => { s.number = i + 1; });
+  return segments;
 }
 
-export function activeMonthKey() { return getMonthKey(getWeekStart(new Date())); }
+export function weekEndForPeriodKey(periodKey, monthKey = periodKey.slice(0, 7)) {
+  const seg = getMonthWeekSegments(monthKey).find(s => s.periodKey === periodKey);
+  if (seg) return toISO(seg.end);
+  return toISO(addDays(parseISODate(periodKey), 6));
+}
+
+export function findWeekSegmentForDate(date, monthKey = getMonthKey(date)) {
+  const iso = toISO(date);
+  return getMonthWeekSegments(monthKey).find(s => iso >= s.periodKey && iso <= toISO(s.end)) || null;
+}
+
+export function findWeekSegmentForToday() {
+  return findWeekSegmentForDate(new Date());
+}
+
+export function getWeekNumberInMonth(weekStartOrPeriodKey, monthKey) {
+  const mk = monthKey || (typeof weekStartOrPeriodKey === "string"
+    ? weekStartOrPeriodKey.slice(0, 7)
+    : getMonthKey(weekStartOrPeriodKey));
+  const periodKey = typeof weekStartOrPeriodKey === "string"
+    ? weekStartOrPeriodKey
+    : toISO(weekStartOrPeriodKey);
+  const seg = getMonthWeekSegments(mk).find(s => s.periodKey === periodKey);
+  return seg ? seg.number : 1;
+}
+
+/** @deprecated Préférer getMonthWeekSegments */
+export function getWeeksOfMonth(monthKey) {
+  return getMonthWeekSegments(monthKey).map(s => new Date(s.start));
+}
+
+export function activeMonthKey() {
+  return getMonthKey(new Date());
+}
 
 export function monthsRange(startMonth = APP_START_MONTH) {
   return monthsRangeFrom(startMonth);
