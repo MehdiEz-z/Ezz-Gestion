@@ -702,15 +702,17 @@ export function monthSummary(monthKey) {
   const utilities = sumByTypes(monthKey, ["elec_pay", "water_pay"]);
   const detteRendu = sumByTypes(monthKey, ["debt_repay"]);
   const epargneVerse = sumByTypes(monthKey, ["savings_deposit"]);
-  const autres = sumManualByDirection(monthKey, "depense") + detteRendu + epargneVerse;
+  const manualDepense = sumManualByDirection(monthKey, "depense");
+  const autres = manualDepense;
   const reimbursements = sumByTypes(monthKey, ["cnss", "assurance"], true);
   const dettePrise = sumByTypes(monthKey, ["debt_borrow"], true);
   const epargneRetrait = sumByTypes(monthKey, ["savings_withdraw"], true);
-  const otherIncome = sumManualByDirection(monthKey, "revenue") + dettePrise + epargneRetrait;
+  const manualRevenue = sumManualByDirection(monthKey, "revenue");
+  const otherIncome = manualRevenue;
 
   const totalResources = salary + soldePrev;
-  const totalExpenses = budget + maladie + utilities + autres;
-  const totalIncomes = reimbursements + otherIncome;
+  const totalExpenses = budget + maladie + utilities + manualDepense + detteRendu + epargneVerse;
+  const totalIncomes = reimbursements + manualRevenue + dettePrise + epargneRetrait;
   const soldeBanque = availableBankBalance(monthKey);
   const soldeEspeces = availableCashBalance(monthKey);
 
@@ -723,9 +725,13 @@ export function monthSummary(monthKey) {
     maladie,
     utilities,
     autres,
+    detteRendu,
+    epargneVerse,
     totalExpenses,
     reimbursements,
     otherIncome,
+    dettePrise,
+    epargneRetrait,
     totalIncomes,
     soldeBanque,
     soldeEspeces,
