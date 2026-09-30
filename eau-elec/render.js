@@ -350,8 +350,32 @@ function renderMonthPanel() {
     </div>`;
 }
 
+function renderPaymentMethodPicker(selected = "banque") {
+  const pm = selected === "especes" ? "especes" : "banque";
+  return `
+    <div class="small-label">Paiement</div>
+    <div class="segment-row">
+      <button type="button" class="segment ${pm === "banque" ? "active-month" : ""}" data-action="pick-payment-method" data-value="banque">Carte (banque)</button>
+      <button type="button" class="segment ${pm === "especes" ? "active-week" : ""}" data-action="pick-payment-method" data-value="especes">Espèces</button>
+    </div>
+    <input type="hidden" name="payment_method" value="${pm}" />`;
+}
+
 function renderModal() {
   const m = ui.modal;
+  if (m.type === "utility-pay") {
+    const label = m.utility === "water" ? "eau" : "électricité";
+    return `
+      <div class="overlay" data-overlay-close="modal">
+        <div class="sheet">
+          <div class="sheet-title">Payer ${label} <button class="close-btn" data-action="close-modal">✕</button></div>
+          <form class="form-col" data-form="confirm-utility-pay" data-month-key="${m.monthKey}" data-person-id="${m.personId}" data-utility="${m.utility}">
+            ${renderPaymentMethodPicker("banque")}
+            <button type="submit" class="btn-primary">Confirmer le paiement</button>
+          </form>
+        </div>
+      </div>`;
+  }
   if (m.type === "edit-person") {
     const p = state.persons.find(x => x.id === m.personId);
     if (!p) return "";
