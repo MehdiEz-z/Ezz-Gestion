@@ -7,6 +7,7 @@ import {
   isManualMovementEditable, isSaisieCategoryPinned,
   SOURCE_LABELS, systemMovementDetailLabel, getSystemDetailTitle,
   addCashWithdrawal, stripPaymentMethodFromLabel,
+  totalForSystemType, sumManualByDirection,
 } from "./data.js";
 import { getWalletCategories, getMovements } from "../shared/wallet.js";
 import { isAdmin } from "../shared/auth.js";
@@ -356,6 +357,14 @@ function renderSetupBlock(s, mk) {
 function renderSyntheseTab() {
   const mk = ui.viewedMonthKey;
   const s = monthSummary(mk);
+  const detteRendu = totalForSystemType(mk, "debt_repay");
+  const dettePrise = totalForSystemType(mk, "debt_borrow");
+  const epargneVerse = totalForSystemType(mk, "savings_deposit");
+  const epargneRetrait = totalForSystemType(mk, "savings_withdraw");
+  const autresCharges = sumManualByDirection(mk, "depense");
+  const autresRevenus = sumManualByDirection(mk, "revenue");
+  const totalDepenses = s.budget + s.maladie + s.utilities + autresCharges + detteRendu + epargneVerse;
+  const totalEntrees = s.reimbursements + autresRevenus + dettePrise + epargneRetrait;
   const prevKey = previousMonthKey(mk);
   const open = ui.expanded.has("treasury-synth:" + mk);
   const canExpand = !s.needsOpeningSetup && !s.needsSalarySetup;
@@ -376,17 +385,17 @@ function renderSyntheseTab() {
       ${renderKvRow("Budget (mensuel + hebdos)", `${money(s.budget)} DH`)}
       ${renderKvRow("Dépense Maladie", `${money(s.maladie)} DH`)}
       ${renderKvRow("Eau et électricité", `${money(s.utilities)} DH`)}
-      ${renderKvRow("Remboursement dette", `${money(s.detteRendu)} DH`)}
-      ${renderKvRow("Versement épargne", `${money(s.epargneVerse)} DH`)}
-      ${renderKvRow("Autres charges", `${money(s.autres)} DH`)}
-      ${renderKvRow("Total Dépense", `${money(s.totalExpenses)} DH`, true)}
+      ${renderKvRow(SOURCE_LABELS.debt_repay || "Dette rendu", `${money(detteRendu)} DH`)}
+      ${renderKvRow(SOURCE_LABELS.savings_deposit || "Versement épargne", `${money(epargneVerse)} DH`)}
+      ${renderKvRow("Autres charges", `${money(autresCharges)} DH`)}
+      ${renderKvRow("Total Dépense", `${money(totalDepenses)} DH`, true)}
       <hr class="utility-recap-sep" />
       <div class="utility-recap-section-title">Entrées complémentaires</div>
       ${renderKvRow("Remboursement (CNSS + assurance)", `${money(s.reimbursements)} DH`)}
-      ${renderKvRow("Dette (emprunt)", `${money(s.dettePrise)} DH`)}
-      ${renderKvRow("Retrait épargne", `${money(s.epargneRetrait)} DH`)}
-      ${renderKvRow("Autre source de revenu", `${money(s.otherIncome)} DH`)}
-      ${renderKvRow("Total", `${money(s.totalIncomes)} DH`, true)}
+      ${renderKvRow(SOURCE_LABELS.debt_borrow || "Dette", `${money(dettePrise)} DH`)}
+      ${renderKvRow(SOURCE_LABELS.savings_withdraw || "Retrait épargne", `${money(epargneRetrait)} DH`)}
+      ${renderKvRow("Autre source de revenu", `${money(autresRevenus)} DH`)}
+      ${renderKvRow("Total", `${money(totalEntrees)} DH`, true)}
       <hr class="utility-recap-sep" />
       ${renderKvRow("Solde banque", `${money(s.soldeBanque)} DH`, true)}
       ${renderKvRow("Espèces en poche", `${money(s.soldeEspeces)} DH`, true)}
