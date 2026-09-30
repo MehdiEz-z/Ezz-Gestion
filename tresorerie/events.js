@@ -176,7 +176,7 @@ async function onSubmit(e) {
     const { monthKey, categoryId, direction } = form.dataset;
     const pm = form.payment_method?.value;
     const ok = direction === "revenue"
-      ? await addManualRevenue(monthKey, categoryId, form.amount.value, form.label.value)
+      ? await addManualRevenue(monthKey, categoryId, form.amount.value, form.label.value, pm)
       : await addManualExpense(monthKey, categoryId, form.amount.value, form.label.value, pm);
     if (ok) {
       ui.modal = null;
