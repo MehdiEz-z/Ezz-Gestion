@@ -9,6 +9,7 @@ import {
   movementsForSystemType, totalForSystemType,
   manualMovementsForCategory, totalForManualCategory,
   saisieDepenseTotal, saisieRevenueTotal, isManualMovementEditable,
+  sumManualByDirection,
 } from "../shared/wallet.js";
 import { supabaseClient } from "../shared/supabase.js";
 import { TRESORERIE_START_MONTH } from "../shared/utils.js";
