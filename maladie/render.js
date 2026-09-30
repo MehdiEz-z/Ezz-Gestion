@@ -9,12 +9,19 @@ import {
 import { isAdmin } from "../shared/auth.js";
 import { esc, formatDateFull, money, parseISODate, renderDateField } from "../shared/utils.js";
 
+function renderPaymentMethodBadge(paymentMethod) {
+  const pm = paymentMethod === "especes" ? "especes" : "banque";
+  const cls = pm === "especes" ? "badge badge-pay-especes" : "badge badge-pay-carte";
+  const label = pm === "especes" ? "Espèces" : "Carte";
+  return `<span class="${cls}">${label}</span>`;
+}
+
 function renderPaymentMethodPicker(selected = "banque") {
   const pm = selected === "especes" ? "especes" : "banque";
   return `
     <div class="small-label">Paiement</div>
     <div class="segment-row">
-      <button type="button" class="segment ${pm === "banque" ? "active-month" : ""}" data-action="pick-payment-method" data-value="banque">Carte (banque)</button>
+      <button type="button" class="segment ${pm === "banque" ? "active-month" : ""}" data-action="pick-payment-method" data-value="banque">Carte</button>
       <button type="button" class="segment ${pm === "especes" ? "active-week" : ""}" data-action="pick-payment-method" data-value="especes">Espèces</button>
     </div>
     <input type="hidden" name="payment_method" value="${pm}" />`;
@@ -522,10 +529,13 @@ function renderModal() {
             <div style="font-weight:600">${money(a.amount)} DH</div>
             <div class="small-label">${esc(a.place)} · ${formatDateFull(parseISODate(a.action_date))}</div>
           </div>
-          ${editable ? `<div class="purchase-detail-actions">
+          <div class="purchase-detail-trailing">
+            ${renderPaymentMethodBadge(a.payment_method)}
+            ${editable ? `<div class="purchase-detail-actions">
             <button type="button" class="icon-btn edit" data-action="open-edit-action" data-id="${a.id}" title="Modifier">✏️</button>
             <button type="button" class="btn-delete" data-action="open-delete-action" data-id="${a.id}" title="Supprimer">🗑️</button>
           </div>` : ""}
+          </div>
         </div>`).join("");
     return `
       <div class="overlay" data-overlay-close="modal">

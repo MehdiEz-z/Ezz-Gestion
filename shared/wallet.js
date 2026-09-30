@@ -32,7 +32,7 @@ export function normalizePaymentMethod(value) {
 }
 
 export function paymentMethodLabel(method) {
-  return normalizePaymentMethod(method) === PAYMENT_ESPECES ? "Espèces" : "Carte (banque)";
+  return normalizePaymentMethod(method) === PAYMENT_ESPECES ? "Espèces" : "Carte";
 }
 
 function movementPot(m) {

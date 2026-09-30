@@ -77,7 +77,7 @@ function renderPaymentMethodPicker(selected = "banque") {
   return `
     <div class="small-label">Paiement</div>
     <div class="segment-row">
-      <button type="button" class="segment ${pm === "banque" ? "active-month" : ""}" data-action="pick-payment-method" data-value="banque">Carte (banque)</button>
+      <button type="button" class="segment ${pm === "banque" ? "active-month" : ""}" data-action="pick-payment-method" data-value="banque">Carte</button>
       <button type="button" class="segment ${pm === "especes" ? "active-week" : ""}" data-action="pick-payment-method" data-value="especes">Espèces</button>
     </div>
     <input type="hidden" name="payment_method" value="${pm}" />`;
