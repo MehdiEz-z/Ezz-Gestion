@@ -1,9 +1,10 @@
 import {
   ui, summarySnapshot, getCategoriesByKind, getCategory,
   categoryBalance, movementsForCategory, ACTION_LABELS, KIND_LABELS,
+  getMovement, isDebtMovementEditable, inboundRemainingAmount,
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
-import { esc, formatDateFull, money, parseISODate, renderDateField, toISO } from "../shared/utils.js";
+import { esc, formatDateFull, money, parseISODate } from "../shared/utils.js";
 
 export function render() {
   document.getElementById("maison-controls").style.display = "none";
@@ -91,12 +92,10 @@ function renderSyntheseTab() {
 }
 
 function renderCategoryListItem(c, editable) {
-  const bal = categoryBalance(c.id);
   return `
     <li class="list-item">
       <div class="list-item-name">${esc(c.name)}</div>
       <div class="list-item-right">
-        <span class="small-label">${money(bal)} DH</span>
         ${editable && isAdmin ? `<button class="icon-btn edit" data-action="open-edit-debt-category" data-category-id="${c.id}" title="Modifier">✏️</button>` : ""}
       </div>
     </li>`;
@@ -156,46 +155,64 @@ function renderCategoriesTab() {
 function renderMouvementCategoryRow(c) {
   const bal = categoryBalance(c.id);
   const isDette = c.kind === "dette";
-  const color = isDette ? "var(--month)" : "var(--week)";
   return `
     <li class="item-row">
       <div class="item-name">${esc(c.name)}</div>
       <div class="item-amount">${money(bal)} DH</div>
       <div class="item-actions">
-        <button type="button" class="icon-btn" data-action="open-debt-history" data-category-id="${c.id}" title="Historique">🧾</button>
-        ${isAdmin ? `
-        <button type="button" class="icon-btn add" data-action="open-debt-action" data-category-id="${c.id}" data-action-type="${isDette ? "borrow" : "deposit"}" title="${isDette ? "Prise" : "Versement"}">＋</button>
-        ${bal > 0 ? `<button type="button" class="btn-small" style="background:${color};padding:4px 8px;font-size:11px" data-action="open-debt-action" data-category-id="${c.id}" data-action-type="${isDette ? "repay" : "withdraw"}">${isDette ? "Rendu" : "Retrait"}</button>` : ""}
-        ` : ""}
+        <button type="button" class="icon-btn" data-action="open-debt-detail" data-category-id="${c.id}" title="Détails">🧾</button>
+        ${isAdmin ? `<button type="button" class="icon-btn add" data-action="open-debt-action" data-category-id="${c.id}" data-action-type="${isDette ? "borrow" : "deposit"}" title="${isDette ? "Prise" : "Versement"}">＋</button>` : ""}
       </div>
     </li>`;
 }
 
+function renderMouvementsKindCard(kind) {
+  const isDette = kind === "dette";
+  const cats = getCategoriesByKind(kind);
+  const s = summarySnapshot();
+  const total = isDette ? s.totalARendre : s.totalEpargne;
+  const previewLabel = isDette ? "À rendre" : "Total";
+  const borderColor = isDette ? "var(--month)" : "var(--week)";
+  const titleColor = borderColor;
+  const key = `dettes-mvt:${kind}`;
+  const open = ui.expanded.has(key);
+  const emptyMsg = isDette
+    ? "Aucune catégorie dettes."
+    : "Aucune catégorie épargne.";
+
+  return `
+    <div class="card" style="border-color:${borderColor}">
+      <div class="card-head" data-action="toggle-card" data-key="${key}">
+        <div>
+          <div class="card-title" style="color:${titleColor}">${isDette ? "Dettes" : "Épargne"}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="card-preview"><span class="small-label">${previewLabel} : ${money(total)} DH</span></div>
+          <span class="chevron">${open ? "▲" : "▼"}</span>
+        </div>
+      </div>
+      <div class="card-body ${open ? "open" : ""}">
+        ${cats.length === 0
+    ? `<div class="small-label">${emptyMsg}</div>`
+    : `<ul class="list">${cats.map(renderMouvementCategoryRow).join("")}</ul>`}
+      </div>
+    </div>`;
+}
+
 function renderMouvementsTab() {
-  const dettes = getCategoriesByKind("dette");
-  const epargnes = getCategoriesByKind("epargne");
   return `
     <div class="stack">
-      <div class="card" style="border-color:var(--month)">
-        <div class="card-title" style="padding:14px;color:var(--month)">Dettes</div>
-        ${dettes.length === 0
-    ? `<div class="small-label" style="padding:0 14px 14px">Crée une catégorie dette.</div>`
-    : `<ul class="list">${dettes.map(renderMouvementCategoryRow).join("")}</ul>`}
-      </div>
-      <div class="card" style="border-color:var(--week)">
-        <div class="card-title" style="padding:14px;color:var(--week)">Épargne</div>
-        ${epargnes.length === 0
-    ? `<div class="small-label" style="padding:0 14px 14px">Crée une catégorie épargne.</div>`
-    : `<ul class="list">${epargnes.map(renderMouvementCategoryRow).join("")}</ul>`}
-      </div>
+      ${renderMouvementsKindCard("dette")}
+      ${renderMouvementsKindCard("epargne")}
     </div>`;
 }
 
 function renderModal() {
   const m = ui.modal;
   if (m.type === "edit-debt-category") return renderEditCategoryModal(m);
-  if (m.type === "debt-history") return renderHistoryModal(m);
+  if (m.type === "debt-detail") return renderDetailModal(m);
   if (m.type === "debt-action") return renderActionModal(m);
+  if (m.type === "edit-debt-movement") return renderEditMovementModal(m);
   return "";
 }
 
@@ -217,28 +234,66 @@ function renderEditCategoryModal(m) {
     </div>`;
 }
 
-function renderHistoryModal(m) {
+function renderDetailMovementLine(row, c) {
+  const flowIn = walletFlowIn(row.action_type);
+  const editable = isAdmin && isDebtMovementEditable(row);
+  const isInbound = row.action_type === "borrow" || row.action_type === "deposit";
+  const rem = isInbound ? inboundRemainingAmount(row.id) : 0;
+  const canReturn = isAdmin && isInbound && rem > 0.001 && categoryBalance(c.id) > 0.001;
+  const returnType = c.kind === "dette" ? "repay" : "withdraw";
+  return `
+    <li class="list-item" style="flex-direction:column;align-items:stretch;gap:4px">
+      <div class="purchase-detail-row">
+        <div>
+          <div class="list-item-name">${ACTION_LABELS[row.action_type] || row.action_type} · ${money(row.amount)} DH</div>
+          <div class="small-label">${formatDateFull(parseISODate(row.movement_date))}${row.label ? ` · ${esc(row.label)}` : ""}</div>
+        </div>
+        <div class="purchase-detail-trailing">
+          ${renderPaymentBadge(row.payment_method, flowIn)}
+          ${editable ? `
+          <div class="purchase-detail-actions">
+            <button class="icon-btn edit" data-action="open-edit-debt-movement" data-movement-id="${row.id}" title="Modifier">✏️</button>
+            <button class="btn-delete" data-action="delete-debt-movement" data-movement-id="${row.id}" title="Supprimer">🗑️</button>
+          </div>` : ""}
+        </div>
+      </div>
+      ${canReturn ? `
+      <button type="button" class="btn-small" style="align-self:flex-start;background:${c.kind === "dette" ? "var(--month)" : "var(--week)"}" data-action="open-debt-action" data-category-id="${c.id}" data-action-type="${returnType}" data-from-movement-id="${row.id}" data-max-amount="${Math.min(rem, categoryBalance(c.id))}">${c.kind === "dette" ? "Retourner" : "Retirer"}</button>` : ""}
+    </li>`;
+}
+
+function renderDetailModal(m) {
   const c = getCategory(m.categoryId);
   if (!c) return "";
   const list = movementsForCategory(c.id);
   const rows = list.length === 0
     ? `<div class="small-label">Aucun mouvement.</div>`
-    : list.map(row => {
-      const flowIn = walletFlowIn(row.action_type);
-      return `
-        <div class="purchase-detail-row" style="margin-bottom:10px">
-          <div>
-            <div style="font-weight:600">${ACTION_LABELS[row.action_type] || row.action_type} · ${money(row.amount)} DH</div>
-            <div class="small-label">${formatDateFull(parseISODate(row.movement_date))}${row.label ? ` · ${esc(row.label)}` : ""}</div>
-          </div>
-          <div class="purchase-detail-trailing">${renderPaymentBadge(row.payment_method, flowIn)}</div>
-        </div>`;
-    }).join("");
+    : `<ul class="list">${list.map(row => renderDetailMovementLine(row, c)).join("")}</ul>`;
   return `
     <div class="overlay" data-overlay-close="modal">
       <div class="sheet">
         <div class="sheet-title">${esc(c.name)} — ${money(categoryBalance(c.id))} DH <button class="close-btn" data-action="close-modal">✕</button></div>
         ${rows}
+      </div>
+    </div>`;
+}
+
+function renderEditMovementModal(m) {
+  const mov = getMovement(m.movementId);
+  const c = mov ? getCategory(mov.category_id) : null;
+  if (!mov || !c || !isDebtMovementEditable(mov)) return "";
+  const flowIn = walletFlowIn(mov.action_type);
+  const showPicker = mov.action_type !== "withdraw";
+  return `
+    <div class="overlay" data-overlay-close="modal">
+      <div class="sheet">
+        <div class="sheet-title">Modifier — ${esc(c.name)} <button class="close-btn" data-action="close-modal">✕</button></div>
+        <form class="form-col" data-form="edit-debt-movement" data-movement-id="${mov.id}">
+          <input class="field" name="amount" type="number" min="0.01" step="0.01" value="${mov.amount}" required />
+          <input class="field" name="label" placeholder="Libellé (optionnel)" value="${esc(mov.label || "")}" />
+          ${showPicker ? renderPaymentMethodPicker(mov.payment_method, flowIn ? "in" : "out") : `<div class="small-label">Retrait épargne : Espèces uniquement</div>`}
+          <button type="submit" class="btn-primary">Enregistrer</button>
+        </form>
       </div>
     </div>`;
 }
@@ -255,9 +310,10 @@ function renderActionModal(m) {
   };
   const flowIn = walletFlowIn(actionType);
   const maxBal = categoryBalance(c.id);
-  const defaultAmount = (actionType === "repay" || actionType === "withdraw") && maxBal > 0
-    ? maxBal
-    : "";
+  let defaultAmount = "";
+  if (m.maxAmount) defaultAmount = m.maxAmount;
+  else if ((actionType === "repay" || actionType === "withdraw") && maxBal > 0) defaultAmount = maxBal;
+  const showPicker = actionType !== "withdraw";
   return `
     <div class="overlay" data-overlay-close="modal">
       <div class="sheet">
@@ -265,8 +321,8 @@ function renderActionModal(m) {
         <form class="form-col" data-form="debt-action" data-category-id="${c.id}" data-action-type="${actionType}">
           <input class="field" name="amount" type="number" min="0.01" step="0.01" placeholder="Montant en DH" value="${defaultAmount ? defaultAmount : ""}" required />
           <input class="field" name="label" placeholder="Libellé (optionnel)" />
-          ${renderDateField("movement_date", { value: toISO(new Date()), placeholder: "Date" })}
-          ${renderPaymentMethodPicker("banque", flowIn ? "in" : "out")}
+          ${showPicker ? renderPaymentMethodPicker("banque", flowIn ? "in" : "out") : `<div class="small-label">Retrait : Espèces uniquement<input type="hidden" name="payment_method" value="especes" /></div>`}
+          <div class="small-label">Date : aujourd'hui (${formatDateFull(new Date())})</div>
           ${(actionType === "repay" || actionType === "withdraw") && maxBal > 0
     ? `<div class="small-label">Solde disponible : ${money(maxBal)} DH</div>` : ""}
           <button type="submit" class="btn-primary">Enregistrer</button>

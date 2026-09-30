@@ -86,12 +86,14 @@ function manualMovementFlow(mov) {
 
 function systemMovementBadgeFlow(mov) {
   if (mov.source_type === "cnss" || mov.source_type === "assurance") return "revenue";
+  if (mov.source_type === "debt_borrow" || mov.source_type === "savings_withdraw") return "revenue";
   return "depense";
 }
 
 function movementShowsPaymentBadge(mov) {
   if (mov.source_type === "manual") return true;
-  return ["care", "elec_pay", "water_pay", "cnss", "assurance"].includes(mov.source_type);
+  return ["care", "elec_pay", "water_pay", "cnss", "assurance",
+    "debt_borrow", "debt_repay", "savings_deposit", "savings_withdraw"].includes(mov.source_type);
 }
 
 function renderPaymentMethodPicker(selected = "banque", flow = "depense") {

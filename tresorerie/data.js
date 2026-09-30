@@ -66,6 +66,12 @@ export function systemMovementDetailLabel(mov) {
     }
     return mov.label;
   }
+  if (mov.source_type === "debt_borrow" || mov.source_type === "debt_repay"
+    || mov.source_type === "savings_deposit" || mov.source_type === "savings_withdraw") {
+    const parts = mov.label.split(" — ");
+    if (parts.length >= 2) return stripPaymentMethodFromLabel(parts[1].split(" · ")[0]);
+    return stripPaymentMethodFromLabel(mov.label);
+  }
   const parts = mov.label.split(" — ");
   const base = parts.length >= 2 ? parts[parts.length - 1] : mov.label;
   return stripPaymentMethodFromLabel(base);
