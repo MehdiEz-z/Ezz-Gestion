@@ -1,7 +1,9 @@
 import { supabaseClient } from "../shared/supabase.js";
 import { isAdmin, currentUser } from "../shared/auth.js";
 import {
-  loadWalletData, canAfford, availableBalance,
+  loadWalletData, canAfford,
+  availableBankBalance, availableCashBalance,
+  normalizePaymentMethod, PAYMENT_BANQUE,
   syncCareAction, removeCareAction, syncDossierReimbursements,
 } from "../shared/wallet.js";
 import { flash, getErrorMessage, normalizeName, money } from "../shared/utils.js";
@@ -466,7 +468,7 @@ export async function updateReimbursements(dossierId, { cnssExpected, cnssReceiv
   return true;
 }
 
-export async function addCareAction(dossierId, categoryId, amount, place, actionDate) {
+export async function addCareAction(dossierId, categoryId, amount, place, actionDate, paymentMethod = PAYMENT_BANQUE) {
   if (!isAdmin) return false;
   const d = state.dossiers.find(x => x.id === dossierId);
   if (!d || !canEditCareActions(d)) { flash("Soins non modifiables.", true); return false; }
@@ -475,13 +477,22 @@ export async function addCareAction(dossierId, categoryId, amount, place, action
     flash("Prix, lieu et date obligatoires.", true); return false;
   }
   const monthKey = ad.slice(0, 7);
+  const pm = normalizePaymentMethod(paymentMethod);
   await loadWalletData();
-  if (!canAfford(monthKey, amount)) {
-    flash(`Solde insuffisant : reste ${money(availableBalance(monthKey))} DH, besoin ${money(amount)} DH.`, true);
+  if (!canAfford(monthKey, amount, null, pm)) {
+    const avail = pm === PAYMENT_BANQUE ? availableBankBalance(monthKey) : availableCashBalance(monthKey);
+    flash(`Solde insuffisant : reste ${money(avail)} DH, besoin ${money(amount)} DH.`, true);
     return false;
   }
   const { data, error } = await supabaseClient.from("care_actions")
-    .insert({ dossier_id: dossierId, category_id: categoryId, amount, place: place.trim(), action_date: ad })
+    .insert({
+      dossier_id: dossierId,
+      category_id: categoryId,
+      amount,
+      place: place.trim(),
+      action_date: ad,
+      payment_method: pm,
+    })
     .select().single();
   if (error) { flash(getErrorMessage(error, "Erreur ajout action."), true); return false; }
   state.careActions.unshift(data);
@@ -495,7 +506,7 @@ export async function addCareAction(dossierId, categoryId, amount, place, action
   return true;
 }
 
-export async function updateCareAction(id, amount, place, actionDate) {
+export async function updateCareAction(id, amount, place, actionDate, paymentMethod = null) {
   if (!isAdmin) return false;
   const action = state.careActions.find(a => a.id === id);
   if (!action) return false;
@@ -504,15 +515,20 @@ export async function updateCareAction(id, amount, place, actionDate) {
   const ad = parseDateInput(actionDate);
   if (!ad || isNaN(amount) || amount < 0 || !place.trim()) return false;
   const monthKey = ad.slice(0, 7);
-  const oldAmt = Number(action.amount);
-  const newAmt = Number(amount);
+  const pm = normalizePaymentMethod(paymentMethod ?? action.payment_method);
   await loadWalletData();
-  if (newAmt > oldAmt && !canAfford(monthKey, newAmt - oldAmt, `care:${id}`)) {
-    flash(`Solde insuffisant : reste ${money(availableBalance(monthKey))} DH, besoin ${money(newAmt - oldAmt)} DH.`, true);
+  if (!canAfford(monthKey, amount, `care:${id}`, pm)) {
+    const avail = pm === PAYMENT_BANQUE ? availableBankBalance(monthKey) : availableCashBalance(monthKey);
+    flash(`Solde insuffisant : reste ${money(avail)} DH, besoin ${money(amount)} DH.`, true);
     return false;
   }
   const { data, error } = await supabaseClient.from("care_actions")
-    .update({ amount, place: place.trim(), action_date: ad }).eq("id", id).select().single();
+    .update({
+      amount,
+      place: place.trim(),
+      action_date: ad,
+      payment_method: pm,
+    }).eq("id", id).select().single();
   if (error) { flash(getErrorMessage(error, "Erreur modification action."), true); return false; }
   const idx = state.careActions.findIndex(a => a.id === id);
   if (idx >= 0) state.careActions[idx] = data;
