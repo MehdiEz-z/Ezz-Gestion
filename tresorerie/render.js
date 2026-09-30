@@ -72,24 +72,31 @@ function renderModal() {
   return "";
 }
 
-function renderPaymentMethodBadge(paymentMethod) {
+function renderPaymentMethodBadge(paymentMethod, flow = "depense") {
   const pm = paymentMethod === "especes" ? "especes" : "banque";
   const cls = pm === "especes" ? "badge badge-pay-especes" : "badge badge-pay-carte";
-  const label = pm === "especes" ? "Espèces" : "Carte";
+  const label = pm === "especes" ? "Espèces" : (flow === "revenue" ? "Banque" : "Carte");
   return `<span class="${cls}">${label}</span>`;
 }
 
+function manualMovementFlow(mov) {
+  const cat = getWalletCategories().find(c => c.id === mov.category_id);
+  return cat?.direction || (Number(mov.amount) < 0 ? "depense" : "revenue");
+}
+
 function movementShowsPaymentBadge(mov) {
-  if (mov.source_type === "manual") return Number(mov.amount) < 0;
+  if (mov.source_type === "manual") return true;
   return ["care", "elec_pay", "water_pay"].includes(mov.source_type);
 }
 
-function renderPaymentMethodPicker(selected = "banque") {
+function renderPaymentMethodPicker(selected = "banque", flow = "depense") {
   const pm = selected === "especes" ? "especes" : "banque";
+  const bankLabel = flow === "revenue" ? "Banque" : "Carte";
+  const sectionLabel = flow === "revenue" ? "Encaissement" : "Paiement";
   return `
-    <div class="small-label">Paiement</div>
+    <div class="small-label">${sectionLabel}</div>
     <div class="segment-row">
-      <button type="button" class="segment ${pm === "banque" ? "active-month" : ""}" data-action="pick-payment-method" data-value="banque">Carte</button>
+      <button type="button" class="segment ${pm === "banque" ? "active-month" : ""}" data-action="pick-payment-method" data-value="banque">${bankLabel}</button>
       <button type="button" class="segment ${pm === "especes" ? "active-week" : ""}" data-action="pick-payment-method" data-value="especes">Espèces</button>
     </div>
     <input type="hidden" name="payment_method" value="${pm}" />`;
@@ -200,7 +207,7 @@ function renderAddManualMovementModal(m) {
         <form class="form-col" data-form="add-manual-movement" data-month-key="${m.monthKey}" data-category-id="${cat.id}" data-direction="${m.direction}">
           <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant en DH" required />
           <input class="field" name="label" placeholder="Libellé" required />
-          ${isDepense ? renderPaymentMethodPicker("banque") : ""}
+          ${renderPaymentMethodPicker("banque", m.direction)}
           <div class="small-label">Date : aujourd'hui (${formatDateFull(new Date())})</div>
           <button type="submit" class="btn-primary">${isDepense ? "Enregistrer la dépense" : "Enregistrer le revenu"}</button>
         </form>
@@ -219,7 +226,7 @@ function renderMovementDetailLine(mov, editable) {
           <div class="small-label">${formatDateFull(parseISODate(mov.movement_date))}</div>
         </div>
         <div class="purchase-detail-trailing">
-          ${showBadge ? renderPaymentMethodBadge(mov.payment_method) : ""}
+          ${showBadge ? renderPaymentMethodBadge(mov.payment_method, manualMovementFlow(mov)) : ""}
           ${editable ? `
         <div class="purchase-detail-actions">
           <button class="icon-btn edit" data-action="open-edit-manual-movement" data-movement-id="${mov.id}" title="Modifier">✏️</button>
@@ -275,7 +282,7 @@ function renderWalletManualDetailsModal(m) {
 function renderEditManualMovementModal(m) {
   const mov = getMovements().find(x => x.id === m.movementId);
   if (!mov) return "";
-  const isDepense = Number(mov.amount) < 0;
+  const flow = manualMovementFlow(mov);
   return `
     <div class="overlay" data-overlay-close="modal">
       <div class="sheet">
@@ -283,7 +290,7 @@ function renderEditManualMovementModal(m) {
         <form class="form-col" data-form="edit-manual-movement" data-movement-id="${mov.id}">
           <input class="field" name="amount" type="number" min="0" step="0.01" value="${Math.abs(Number(mov.amount))}" required />
           <input class="field" name="label" value="${esc(mov.label)}" placeholder="Libellé" required />
-          ${isDepense ? renderPaymentMethodPicker(mov.payment_method || "banque") : ""}
+          ${renderPaymentMethodPicker(mov.payment_method || "banque", flow)}
           <div class="small-label">Date : ${formatDateFull(parseISODate(mov.movement_date))}</div>
           <button type="submit" class="btn-primary">Enregistrer</button>
         </form>
@@ -405,9 +412,9 @@ function renderSyntheseTab() {
           <span class="chevron">${ui.expanded.has("treasury-cash:" + mk) ? "▲" : "▼"}</span>
         </div>
         <div class="card-body ${ui.expanded.has("treasury-cash:" + mk) ? "open" : ""}">
-          <div class="small-label" style="margin-bottom:8px">Virement interne banque → espèces (hors total dépenses).</div>
+          <div class="small-label" style="margin-bottom:8px">Virement banque → espèces</div>
           <form class="inline-form" data-form="cash-withdraw" data-month-key="${mk}">
-            <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant retiré en DH" required />
+            <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant" required />
             <button type="submit" class="btn-small" style="background:var(--week)">Enregistrer</button>
           </form>
         </div>
