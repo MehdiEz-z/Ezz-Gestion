@@ -40,13 +40,12 @@ export function systemMovementDetailLabel(mov) {
   if (mov.source_type === "care") {
     const actionId = mov.ref_key?.startsWith("care:") ? mov.ref_key.slice(5) : null;
     const action = actionId ? maladieLookup.actions.get(actionId) : null;
-    const pay = ` · ${paymentMethodLabel(mov.payment_method)}`;
     if (action) {
       const catName = maladieLookup.categories.get(action.category_id);
-      if (catName) return catName + pay;
+      if (catName) return catName;
     }
-    if (mov.label.startsWith("Soin — ")) return "Soin" + pay;
-    return mov.label + pay;
+    if (mov.label.startsWith("Soin — ")) return "Soin";
+    return mov.label;
   }
   if (mov.source_type === "cnss" || mov.source_type === "assurance") {
     if (mov.label.startsWith("N°") || mov.label === "Sans N°") return mov.label;
@@ -61,11 +60,7 @@ export function systemMovementDetailLabel(mov) {
     return mov.label;
   }
   const parts = mov.label.split(" — ");
-  const base = parts.length >= 2 ? parts[parts.length - 1] : mov.label;
-  if (["elec_pay", "water_pay", "manual"].includes(mov.source_type)) {
-    return `${base} · ${paymentMethodLabel(mov.payment_method)}`;
-  }
-  return base;
+  return parts.length >= 2 ? parts[parts.length - 1] : mov.label;
 }
 
 export function getSystemDetailTitle(sourceType) {
