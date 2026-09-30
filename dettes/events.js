@@ -4,6 +4,7 @@ import {
   ui,
   addCategory, updateCategory, deleteCategory,
   recordBorrow, recordRepay, recordDeposit, recordWithdraw,
+  updateDebtMovement, deleteDebtMovement, getMovement,
 } from "./data.js";
 import { render } from "./render.js";
 
@@ -57,8 +58,8 @@ function onClick(e) {
     ui.modal = { type: "edit-debt-category", categoryId: target.dataset.categoryId };
     render();
   }
-  else if (action === "open-debt-history") {
-    ui.modal = { type: "debt-history", categoryId: target.dataset.categoryId };
+  else if (action === "open-debt-detail") {
+    ui.modal = { type: "debt-detail", categoryId: target.dataset.categoryId };
     render();
   }
   else if (action === "open-debt-action") {
@@ -66,8 +67,25 @@ function onClick(e) {
       type: "debt-action",
       categoryId: target.dataset.categoryId,
       actionType: target.dataset.actionType,
+      maxAmount: target.dataset.maxAmount ? Number(target.dataset.maxAmount) : null,
     };
     render();
+  }
+  else if (action === "open-edit-debt-movement") {
+    ui.modal = { type: "edit-debt-movement", movementId: target.dataset.movementId };
+    render();
+  }
+  else if (action === "delete-debt-movement") {
+    const movId = target.dataset.movementId;
+    const mov = getMovement(movId);
+    const detailCat = ui.modal?.type === "debt-detail" ? ui.modal.categoryId : mov?.category_id;
+    deleteDebtMovement(movId).then(async ok => {
+      if (ok) {
+        await loadWalletData();
+        ui.modal = detailCat ? { type: "debt-detail", categoryId: detailCat } : null;
+      }
+      render();
+    });
   }
   else if (action === "delete-debt-category") {
     deleteCategory(target.dataset.categoryId).then(ok => {
@@ -96,22 +114,31 @@ async function onSubmit(e) {
   }
   else if (form.dataset.form === "debt-action") {
     const { categoryId, actionType } = form.dataset;
-    const pm = form.payment_method?.value;
-    const payload = [
-      categoryId,
-      form.amount.value,
-      form.movement_date.value,
-      pm,
-      form.label?.value,
-    ];
+    const pm = form.payment_method?.value || "banque";
+    const payload = [categoryId, form.amount.value, pm, form.label?.value];
     let ok = false;
     if (actionType === "borrow") ok = await recordBorrow(...payload);
     else if (actionType === "repay") ok = await recordRepay(...payload);
     else if (actionType === "deposit") ok = await recordDeposit(...payload);
     else if (actionType === "withdraw") ok = await recordWithdraw(...payload);
     if (ok) {
-      ui.modal = null;
       await loadWalletData();
+      ui.modal = { type: "debt-detail", categoryId };
+    }
+    render();
+  }
+  else if (form.dataset.form === "edit-debt-movement") {
+    const pm = form.payment_method?.value || "banque";
+    const ok = await updateDebtMovement(
+      form.dataset.movementId,
+      form.amount.value,
+      pm,
+      form.label?.value,
+    );
+    if (ok) {
+      await loadWalletData();
+      const mov = getMovement(form.dataset.movementId);
+      if (mov) ui.modal = { type: "debt-detail", categoryId: mov.category_id };
     }
     render();
   }
