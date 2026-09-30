@@ -43,44 +43,48 @@ function walletFlowIn(actionType) {
   return actionType === "borrow" || actionType === "withdraw";
 }
 
-function renderKvRow(label, value, bold = false) {
+function renderExpandableAddCard(key, title, bodyHtml) {
+  const open = ui.expanded.has(key);
   return `
-    <div class="utility-kv-row${bold ? " utility-kv-row-bold" : ""}">
-      <span>${label}</span>
-      <span>${value}</span>
+    <div class="card card-add">
+      <div class="card-head" data-action="toggle-card" data-key="${key}">
+        <div class="card-title">${title}</div>
+        <span class="chevron">${open ? "▲" : "▼"}</span>
+      </div>
+      <div class="card-body ${open ? "open" : ""}">${bodyHtml}</div>
     </div>`;
 }
 
 function renderSyntheseTab() {
   const s = summarySnapshot();
+  const denom = s.totalEmprunte > 0 ? s.totalEmprunte : (s.totalRendu + s.totalARendre);
+  const repayPct = denom > 0 ? Math.min(100, (s.totalRendu / denom) * 100) : 0;
+
   return `
     <div class="stack">
       <div class="card" style="border-color:var(--month)">
-        <div class="card-head" data-action="toggle-card" data-key="dettes-synth:dette">
+        <div class="card-head">
           <div>
-            <div class="card-title" style="color:var(--month)">Dettes à rendre</div>
-            <div class="card-preview">${money(s.totalDette)} DH</div>
+            <div class="card-title" style="color:var(--month)">Total Dette</div>
           </div>
-          <span class="chevron">${ui.expanded.has("dettes-synth:dette") ? "▲" : "▼"}</span>
+          <div class="card-preview" style="text-align:right">
+            À rendre : ${money(s.totalARendre)} DH<br>
+            <span class="small-label success">Rendu : ${money(s.totalRendu)} DH</span>
+          </div>
         </div>
-        <div class="card-body ${ui.expanded.has("dettes-synth:dette") ? "open" : ""}">
-          ${s.categoriesDette.length === 0
-    ? `<div class="small-label">Aucune catégorie dette.</div>`
-    : s.categoriesDette.map(c => renderKvRow(esc(c.name), `${money(categoryBalance(c.id))} DH`)).join("")}
+        <div class="card-body open">
+          <div class="progress-row">
+            <div class="progress-track">
+              <div class="progress-fill" style="width:${repayPct}%;background:var(--month)"></div>
+            </div>
+          </div>
         </div>
       </div>
+
       <div class="card" style="border-color:var(--week)">
-        <div class="card-head" data-action="toggle-card" data-key="dettes-synth:epargne">
-          <div>
-            <div class="card-title" style="color:var(--week)">Épargne</div>
-            <div class="card-preview">${money(s.totalEpargne)} DH</div>
-          </div>
-          <span class="chevron">${ui.expanded.has("dettes-synth:epargne") ? "▲" : "▼"}</span>
-        </div>
-        <div class="card-body ${ui.expanded.has("dettes-synth:epargne") ? "open" : ""}">
-          ${s.categoriesEpargne.length === 0
-    ? `<div class="small-label">Aucune catégorie épargne.</div>`
-    : s.categoriesEpargne.map(c => renderKvRow(esc(c.name), `${money(categoryBalance(c.id))} DH`)).join("")}
+        <div class="card-head">
+          <div class="card-title" style="color:var(--week)">Épargne</div>
+          <div class="card-preview">${money(s.totalEpargne)} DH</div>
         </div>
       </div>
     </div>`;
@@ -101,6 +105,9 @@ function renderCategoryListItem(c, editable) {
 function renderCategoriesTab() {
   const dettes = getCategoriesByKind("dette");
   const epargnes = getCategoriesByKind("epargne");
+  const dettesOpen = ui.expanded.has("dettes-cat:dette");
+  const epargneOpen = ui.expanded.has("dettes-cat:epargne");
+
   const addForm = isAdmin ? `
     <form class="form-col" data-form="add-debt-category">
       <input class="field" name="name" placeholder="Nom de la catégorie" required />
@@ -114,21 +121,34 @@ function renderCategoriesTab() {
 
   return `
     <div class="stack">
-      ${isAdmin ? `
-      <div class="card card-add">
-        <div class="card-head" data-action="toggle-card" data-key="dettes-cat:add">
-          <div class="card-title">Ajouter une catégorie</div>
-          <span class="chevron">${ui.expanded.has("dettes-cat:add") ? "▲" : "▼"}</span>
-        </div>
-        <div class="card-body ${ui.expanded.has("dettes-cat:add") ? "open" : ""}">${addForm}</div>
-      </div>` : ""}
+      ${isAdmin ? renderExpandableAddCard("dettes-cat:add", "Ajouter une catégorie", addForm) : ""}
       <div class="card" style="border-color:var(--month)">
-        <div class="card-title" style="padding:14px 14px 0;color:var(--month)">Dettes</div>
-        <ul class="list">${dettes.length ? dettes.map(c => renderCategoryListItem(c, true)).join("") : `<li class="list-item"><div class="small-label">Aucune.</div></li>`}</ul>
+        <div class="card-head" data-action="toggle-card" data-key="dettes-cat:dette">
+          <div class="card-title" style="color:var(--month)">Catégories Dettes</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="card-preview">${dettes.length} catégorie${dettes.length > 1 ? "s" : ""}</div>
+            <span class="chevron">${dettesOpen ? "▲" : "▼"}</span>
+          </div>
+        </div>
+        <div class="card-body ${dettesOpen ? "open" : ""}">
+          ${dettes.length === 0
+    ? `<div class="small-label">Aucune catégorie dettes.</div>`
+    : `<ul class="list">${dettes.map(c => renderCategoryListItem(c, true)).join("")}</ul>`}
+        </div>
       </div>
       <div class="card" style="border-color:var(--week)">
-        <div class="card-title" style="padding:14px 14px 0;color:var(--week)">Épargne</div>
-        <ul class="list">${epargnes.length ? epargnes.map(c => renderCategoryListItem(c, true)).join("") : `<li class="list-item"><div class="small-label">Aucune.</div></li>`}</ul>
+        <div class="card-head" data-action="toggle-card" data-key="dettes-cat:epargne">
+          <div class="card-title" style="color:var(--week)">Catégories Épargne</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="card-preview">${epargnes.length} catégorie${epargnes.length > 1 ? "s" : ""}</div>
+            <span class="chevron">${epargneOpen ? "▲" : "▼"}</span>
+          </div>
+        </div>
+        <div class="card-body ${epargneOpen ? "open" : ""}">
+          ${epargnes.length === 0
+    ? `<div class="small-label">Aucune catégorie épargne.</div>`
+    : `<ul class="list">${epargnes.map(c => renderCategoryListItem(c, true)).join("")}</ul>`}
+        </div>
       </div>
     </div>`;
 }
