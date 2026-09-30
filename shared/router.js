@@ -22,7 +22,7 @@ export function getActiveModule() {
 }
 
 export function getStoredModule() {
-  const stored = sessionStorage.getItem("ezz-module") || "maison";
+  const stored = sessionStorage.getItem("ezz-module") || "tresorerie";
   if (stored === "eau") return "eau-elec";
   return stored;
 }
@@ -34,7 +34,7 @@ function updateNavUI(id) {
 }
 
 function updateHeaderUI(id) {
-  const meta = MODULE_META[id] || MODULE_META.maison;
+  const meta = MODULE_META[id] || MODULE_META.tresorerie;
   document.getElementById("header-title").textContent = meta.title;
   const controls = document.getElementById("maison-controls");
   if (controls && id !== "eau-elec") {
