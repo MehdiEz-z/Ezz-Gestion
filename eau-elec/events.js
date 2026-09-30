@@ -1,6 +1,6 @@
 import { getActiveModule } from "../shared/router.js";
 import {
-  ui,
+  ui, state,
   addPerson, updatePerson, setPersonAppOwner,
   saveElecBillTotal, saveElecMeters, saveWaterMonth,
   markElecPaid, markWaterPaid,
@@ -49,11 +49,37 @@ function onClick(e) {
   else if (action === "set-app-owner") {
     setPersonAppOwner(target.dataset.personId).then(() => render());
   }
+  else if (action === "pick-payment-method") {
+    const form = target.closest("form");
+    if (!form) return;
+    form.querySelectorAll("[data-action='pick-payment-method']").forEach(b => {
+      b.classList.remove("active-month", "active-week");
+    });
+    target.classList.add(target.dataset.value === "especes" ? "active-week" : "active-month");
+    const hidden = form.querySelector("[name='payment_method']");
+    if (hidden) hidden.value = target.dataset.value;
+  }
   else if (action === "pay-elec") {
-    markElecPaid(target.dataset.monthKey, target.dataset.personId).then(() => render());
+    const personId = target.dataset.personId;
+    const monthKey = target.dataset.monthKey;
+    const p = state.persons.find(x => x.id === personId);
+    if (p?.is_app_owner) {
+      ui.modal = { type: "utility-pay", utility: "elec", monthKey, personId };
+      render();
+    } else {
+      markElecPaid(monthKey, personId).then(() => render());
+    }
   }
   else if (action === "pay-water") {
-    markWaterPaid(target.dataset.monthKey, target.dataset.personId).then(() => render());
+    const personId = target.dataset.personId;
+    const monthKey = target.dataset.monthKey;
+    const p = state.persons.find(x => x.id === personId);
+    if (p?.is_app_owner) {
+      ui.modal = { type: "utility-pay", utility: "water", monthKey, personId };
+      render();
+    } else {
+      markWaterPaid(monthKey, personId).then(() => render());
+    }
   }
   else if (action === "close-modal") { ui.modal = null; render(); }
 }
@@ -88,6 +114,15 @@ async function onSubmit(e) {
   }
   else if (type === "save-water-bill") {
     await saveWaterMonth(form.dataset.monthKey, form.bill_total.value);
+    render();
+  }
+  else if (type === "confirm-utility-pay") {
+    const { monthKey, personId, utility } = form.dataset;
+    const pm = form.payment_method?.value || "banque";
+    const ok = utility === "water"
+      ? await markWaterPaid(monthKey, personId, pm)
+      : await markElecPaid(monthKey, personId, pm);
+    if (ok) ui.modal = null;
     render();
   }
 }
