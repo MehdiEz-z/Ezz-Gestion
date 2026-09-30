@@ -50,6 +50,16 @@ function onClick(e) {
     target.classList.add("active-week");
     form.querySelector("[name='facility_type']").value = target.dataset.value;
   }
+  else if (action === "pick-payment-method") {
+    const form = target.closest("form");
+    if (!form) return;
+    form.querySelectorAll("[data-action='pick-payment-method']").forEach(b => {
+      b.classList.remove("active-month", "active-week");
+    });
+    target.classList.add(target.dataset.value === "especes" ? "active-week" : "active-month");
+    const hidden = form.querySelector("[name='payment_method']");
+    if (hidden) hidden.value = target.dataset.value;
+  }
   else if (action === "open-init-dossier") { ui.modal = { type: "init-dossier" }; render(); }
   else if (action === "open-edit-beneficiary") {
     ui.modal = { type: "edit-beneficiary", beneficiaryId: target.dataset.beneficiaryId };
@@ -178,14 +188,27 @@ async function onSubmit(e) {
   }
   else if (type === "add-action") {
     const price = parseFloat(form.price.value);
-    const ok = await addCareAction(form.dataset.dossierId, form.dataset.categoryId, price, form.place.value, form.action_date.value);
+    const ok = await addCareAction(
+      form.dataset.dossierId,
+      form.dataset.categoryId,
+      price,
+      form.place.value,
+      form.action_date.value,
+      form.payment_method?.value,
+    );
     if (ok) ui.modal = null;
     render();
   }
   else if (type === "edit-action") {
     const price = parseFloat(form.price.value);
     const returnTo = ui.modal && ui.modal.returnTo;
-    const ok = await updateCareAction(form.dataset.id, price, form.place.value, form.action_date.value);
+    const ok = await updateCareAction(
+      form.dataset.id,
+      price,
+      form.place.value,
+      form.action_date.value,
+      form.payment_method?.value,
+    );
     if (ok) ui.modal = returnTo || null;
     render();
   }
