@@ -376,11 +376,15 @@ function renderSyntheseTab() {
       ${renderKvRow("Budget (mensuel + hebdos)", `${money(s.budget)} DH`)}
       ${renderKvRow("Dépense Maladie", `${money(s.maladie)} DH`)}
       ${renderKvRow("Eau et électricité", `${money(s.utilities)} DH`)}
+      ${renderKvRow("Remboursement dette", `${money(s.detteRendu)} DH`)}
+      ${renderKvRow("Versement épargne", `${money(s.epargneVerse)} DH`)}
       ${renderKvRow("Autres charges", `${money(s.autres)} DH`)}
       ${renderKvRow("Total Dépense", `${money(s.totalExpenses)} DH`, true)}
       <hr class="utility-recap-sep" />
       <div class="utility-recap-section-title">Entrées complémentaires</div>
       ${renderKvRow("Remboursement (CNSS + assurance)", `${money(s.reimbursements)} DH`)}
+      ${renderKvRow("Dette (emprunt)", `${money(s.dettePrise)} DH`)}
+      ${renderKvRow("Retrait épargne", `${money(s.epargneRetrait)} DH`)}
       ${renderKvRow("Autre source de revenu", `${money(s.otherIncome)} DH`)}
       ${renderKvRow("Total", `${money(s.totalIncomes)} DH`, true)}
       <hr class="utility-recap-sep" />
