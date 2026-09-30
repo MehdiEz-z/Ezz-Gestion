@@ -6,7 +6,7 @@ import {
   movementsForSystemType, manualMovementsForCategory,
   isManualMovementEditable, isSaisieCategoryPinned,
   SOURCE_LABELS, systemMovementDetailLabel, getSystemDetailTitle,
-  addCashWithdrawal,
+  addCashWithdrawal, stripPaymentMethodFromLabel,
 } from "./data.js";
 import { getWalletCategories, getMovements } from "../shared/wallet.js";
 import { isAdmin } from "../shared/auth.js";
@@ -215,7 +215,7 @@ function renderMovementDetailLine(mov, editable) {
     <li class="list-item" style="flex-direction:column;align-items:stretch;gap:4px">
       <div class="purchase-detail-row">
         <div>
-          <div class="list-item-name">${money(amt)} DH — ${esc(mov.label)}</div>
+          <div class="list-item-name">${money(amt)} DH — ${esc(stripPaymentMethodFromLabel(mov.label))}</div>
           <div class="small-label">${formatDateFull(parseISODate(mov.movement_date))}</div>
         </div>
         <div class="purchase-detail-trailing">

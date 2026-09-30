@@ -35,6 +35,13 @@ export async function loadMaladieLookup() {
   for (const d of dossiers.data || []) maladieLookup.dossiers.set(d.id, d.dossier_number);
 }
 
+const PAYMENT_LABEL_SUFFIX_RE = /\s*(?:·|—|-)\s*(?:Carte|Espèces)\s*$/i;
+
+/** Retire un mode de paiement déjà présent dans le texte (évite doublon avec le badge). */
+export function stripPaymentMethodFromLabel(text) {
+  return (text || "").replace(PAYMENT_LABEL_SUFFIX_RE, "").trim();
+}
+
 /** Libellé affiché dans le détail d'un mouvement système. */
 export function systemMovementDetailLabel(mov) {
   if (mov.source_type === "care") {
@@ -42,10 +49,10 @@ export function systemMovementDetailLabel(mov) {
     const action = actionId ? maladieLookup.actions.get(actionId) : null;
     if (action) {
       const catName = maladieLookup.categories.get(action.category_id);
-      if (catName) return catName;
+      if (catName) return stripPaymentMethodFromLabel(catName);
     }
     if (mov.label.startsWith("Soin — ")) return "Soin";
-    return mov.label;
+    return stripPaymentMethodFromLabel(mov.label);
   }
   if (mov.source_type === "cnss" || mov.source_type === "assurance") {
     if (mov.label.startsWith("N°") || mov.label === "Sans N°") return mov.label;
@@ -60,7 +67,8 @@ export function systemMovementDetailLabel(mov) {
     return mov.label;
   }
   const parts = mov.label.split(" — ");
-  return parts.length >= 2 ? parts[parts.length - 1] : mov.label;
+  const base = parts.length >= 2 ? parts[parts.length - 1] : mov.label;
+  return stripPaymentMethodFromLabel(base);
 }
 
 export function getSystemDetailTitle(sourceType) {
@@ -155,6 +163,7 @@ export {
   addWalletCategory, updateWalletCategory,
   addCashWithdrawal,
   paymentMethodLabel,
+  stripPaymentMethodFromLabel,
   monthSummary, hasOpeningBalance, hasSalary,
   getUserWalletCategories, getWalletCategoriesByDirection,
   movementsForSystemType, manualMovementsForCategory,
