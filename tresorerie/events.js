@@ -4,7 +4,7 @@ import { activeMonthKey } from "../shared/utils.js";
 import {
   ui, setOpeningBalance, setSalary,
   addManualExpense, addManualRevenue, updateManualMovement, deleteManualMovement,
-  addWalletCategory, updateWalletCategory,
+  addWalletCategory, updateWalletCategory, addCashWithdrawal,
   pinSaisieCategory, unpinSaisieCategory, loadMaladieLookup,
 } from "./data.js";
 import { render } from "./render.js";
@@ -51,6 +51,16 @@ async function onClick(e) {
     });
     target.classList.add(target.dataset.value === "revenue" ? "active-week" : "active-month");
     form.querySelector("[name='direction']").value = target.dataset.value;
+  }
+  else if (action === "pick-payment-method") {
+    const form = target.closest("form");
+    if (!form) return;
+    form.querySelectorAll("[data-action='pick-payment-method']").forEach(b => {
+      b.classList.remove("active-month", "active-week");
+    });
+    target.classList.add(target.dataset.value === "especes" ? "active-week" : "active-month");
+    const hidden = form.querySelector("[name='payment_method']");
+    if (hidden) hidden.value = target.dataset.value;
   }
   else if (action === "open-edit-wallet-category") {
     ui.modal = { type: "edit-wallet-category", categoryId: target.dataset.categoryId };
@@ -142,6 +152,14 @@ async function onSubmit(e) {
     const ok = await setSalary(form.dataset.monthKey, form.amount.value);
     if (ok) { await Promise.all([loadWalletData(), loadMaladieLookup()]); render(); }
   }
+  else if (form.dataset.form === "cash-withdraw") {
+    const ok = await addCashWithdrawal(form.dataset.monthKey, form.amount.value);
+    if (ok) {
+      form.reset();
+      await Promise.all([loadWalletData(), loadMaladieLookup()]);
+      render();
+    }
+  }
   else if (form.dataset.form === "add-wallet-category") {
     const ok = await addWalletCategory(form.name.value, form.direction.value);
     if (ok) render();
@@ -156,9 +174,10 @@ async function onSubmit(e) {
   }
   else if (form.dataset.form === "add-manual-movement") {
     const { monthKey, categoryId, direction } = form.dataset;
+    const pm = form.payment_method?.value;
     const ok = direction === "revenue"
       ? await addManualRevenue(monthKey, categoryId, form.amount.value, form.label.value)
-      : await addManualExpense(monthKey, categoryId, form.amount.value, form.label.value);
+      : await addManualExpense(monthKey, categoryId, form.amount.value, form.label.value, pm);
     if (ok) {
       ui.modal = null;
       await Promise.all([loadWalletData(), loadMaladieLookup()]);
@@ -170,6 +189,7 @@ async function onSubmit(e) {
       form.dataset.movementId,
       form.amount.value,
       form.label.value,
+      form.payment_method?.value,
     );
     if (ok) {
       const returnTo = ui.modal && ui.modal.returnTo;
