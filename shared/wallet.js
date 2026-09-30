@@ -25,6 +25,10 @@ export const SOURCE_LABELS = {
   manual: "Charge manuelle",
   cash_withdraw: "Retrait DAB",
   cash_deposit: "Retrait DAB (espèces)",
+  debt_borrow: "Emprunt",
+  debt_repay: "Remboursement dette",
+  savings_deposit: "Versement épargne",
+  savings_withdraw: "Retrait épargne",
 };
 
 export function normalizePaymentMethod(value) {
@@ -731,6 +735,67 @@ export function hasOpeningBalance() {
 
 export function hasSalary(monthKey) {
   return !!movementByRef(`salary:${monthKey}`);
+}
+
+const DEBT_WALLET_OUT = new Set(["repay", "deposit"]);
+
+/** Sync trésorerie pour une ligne dettes/épargne (ref debt:{id}). */
+export async function syncDebtLedgerWallet(entry, categoryName) {
+  const monthKey = entry.movement_date.slice(0, 7);
+  const refKey = `debt:${entry.id}`;
+  const amt = Number(entry.amount);
+  const pm = normalizePaymentMethod(entry.payment_method);
+  const cat = categoryName || "Dette";
+  let amount;
+  let sourceType;
+  let walletLabel;
+
+  switch (entry.action_type) {
+    case "borrow":
+      amount = amt;
+      sourceType = "debt_borrow";
+      walletLabel = `Emprunt — ${cat}`;
+      break;
+    case "repay":
+      amount = -amt;
+      sourceType = "debt_repay";
+      walletLabel = `Remboursement — ${cat}`;
+      break;
+    case "deposit":
+      amount = -amt;
+      sourceType = "savings_deposit";
+      walletLabel = `Versement épargne — ${cat}`;
+      break;
+    case "withdraw":
+      amount = amt;
+      sourceType = "savings_withdraw";
+      walletLabel = `Retrait épargne — ${cat}`;
+      break;
+    default:
+      return false;
+  }
+
+  if (entry.label?.trim()) walletLabel = `${walletLabel} · ${entry.label.trim()}`;
+
+  if (DEBT_WALLET_OUT.has(entry.action_type)) {
+    const msg = affordMessage(monthKey, amt, refKey, pm);
+    if (msg) { flash(msg, true); return false; }
+  }
+
+  return !!(await upsertMovement({
+    monthKey,
+    amount,
+    sourceModule: "dettes",
+    sourceType,
+    refKey,
+    label: walletLabel,
+    movementDate: entry.movement_date,
+    paymentMethod: pm,
+  }));
+}
+
+export async function removeDebtLedgerWallet(entryId) {
+  return deleteMovementByRef(`debt:${entryId}`);
 }
 
 export async function getAppOwnerPerson() {
