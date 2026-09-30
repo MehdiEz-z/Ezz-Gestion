@@ -54,6 +54,12 @@ export const SYSTEM_REVENUE_TYPES = [
   "salary", "cnss", "assurance",
 ];
 
+/** Toujours crédit/débit banque (pas espèces). */
+const BANK_ONLY_SOURCE_TYPES = new Set([
+  "opening", "salary", "cnss", "assurance",
+  "budget_month", "budget_week", "cash_withdraw",
+]);
+
 export function invalidateWalletCache() {
   movementsCache = null;
   categoriesCache = null;
@@ -196,6 +202,8 @@ export async function upsertMovement({
   movementDate = null,
   paymentMethod = PAYMENT_BANQUE,
 }) {
+  let pm = normalizePaymentMethod(paymentMethod);
+  if (BANK_ONLY_SOURCE_TYPES.has(sourceType)) pm = PAYMENT_BANQUE;
   const payload = {
     month_key: monthKey,
     movement_date: movementDate || toISO(new Date()),
@@ -205,7 +213,7 @@ export async function upsertMovement({
     ref_key: refKey,
     label: label || SOURCE_LABELS[sourceType] || sourceType,
     category_id: categoryId,
-    payment_method: normalizePaymentMethod(paymentMethod),
+    payment_method: pm,
   };
 
   const existing = refKey ? movementByRef(refKey) : null;
@@ -361,6 +369,7 @@ export async function syncDossierReimbursements(dossier) {
         sourceType: "cnss",
         refKey: `cnss:${dossier.id}`,
         label: numLabel,
+        paymentMethod: PAYMENT_BANQUE,
       });
       if (!r) ok = false;
     }
@@ -378,6 +387,7 @@ export async function syncDossierReimbursements(dossier) {
         sourceType: "assurance",
         refKey: `assurance:${dossier.id}`,
         label: numLabel,
+        paymentMethod: PAYMENT_BANQUE,
       });
       if (!r) ok = false;
     }
