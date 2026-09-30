@@ -87,7 +87,29 @@ export function getMovement(id) {
   return state.movements.find(m => m.id === id) || null;
 }
 
-/** Reste non « consommé » par rendus/retraits (FIFO) sur une prise ou un versement. */
+/** Remboursements / retraits liés à un emprunt ou versement. */
+export function linkedOutbounds(inboundId) {
+  const inbound = getMovement(inboundId);
+  if (!inbound) return [];
+  const outbound = inbound.action_type === "borrow" ? "repay"
+    : inbound.action_type === "deposit" ? "withdraw" : null;
+  if (!outbound) return [];
+  return state.movements
+    .filter(m => m.category_id === inbound.category_id
+      && m.action_type === outbound
+      && m.linked_inbound_id === inboundId)
+    .sort((a, b) => (a.movement_date < b.movement_date ? -1 : 1));
+}
+
+/** Lignes affichées dans le détail (emprunts / versements seulement). */
+export function detailInboundMovements(categoryId) {
+  const cat = getCategory(categoryId);
+  if (!cat) return [];
+  const inbound = cat.kind === "dette" ? "borrow" : "deposit";
+  return movementsForCategory(categoryId).filter(m => m.action_type === inbound);
+}
+
+/** Reste non remboursé sur un emprunt/versement (liens explicites, sinon FIFO legacy). */
 export function inboundRemainingAmount(movementId) {
   const mov = getMovement(movementId);
   if (!mov) return 0;
@@ -96,8 +118,15 @@ export function inboundRemainingAmount(movementId) {
   const inbound = cat.kind === "dette" ? "borrow" : "deposit";
   const outbound = cat.kind === "dette" ? "repay" : "withdraw";
   if (mov.action_type !== inbound) return 0;
+
+  const linked = linkedOutbounds(movementId);
+  if (linked.length > 0) {
+    const paid = linked.reduce((s, m) => s + Number(m.amount), 0);
+    return Math.max(0, Number(mov.amount) - paid);
+  }
+
   let outboundLeft = movementsForCategory(mov.category_id)
-    .filter(m => m.action_type === outbound)
+    .filter(m => m.action_type === outbound && !m.linked_inbound_id)
     .reduce((s, m) => s + Number(m.amount), 0);
   const chron = movementsForCategory(mov.category_id).slice().reverse();
   for (const m of chron) {
@@ -212,7 +241,7 @@ export async function deleteCategory(id) {
   return true;
 }
 
-async function insertMovementWithWallet(categoryId, actionType, amount, paymentMethod, label) {
+async function insertMovementWithWallet(categoryId, actionType, amount, paymentMethod, label, linkedInboundId = null) {
   if (!isAdmin) return false;
   const cat = getCategory(categoryId);
   if (!cat) return false;
@@ -231,6 +260,13 @@ async function insertMovementWithWallet(categoryId, actionType, amount, paymentM
       flash(`Montant trop élevé : reste ${money(categoryBalance(categoryId))} DH à rendre.`, true);
       return false;
     }
+    if (actionType === "repay" && linkedInboundId) {
+      const rem = inboundRemainingAmount(linkedInboundId);
+      if (amt > rem + 0.001) {
+        flash(`Montant trop élevé : reste ${money(rem)} DH sur cet emprunt.`, true);
+        return false;
+      }
+    }
   } else {
     if (!["deposit", "withdraw"].includes(actionType)) {
       flash("Action invalide pour l'épargne.", true);
@@ -240,18 +276,36 @@ async function insertMovementWithWallet(categoryId, actionType, amount, paymentM
       flash(`Retrait impossible : épargne ${money(categoryBalance(categoryId))} DH.`, true);
       return false;
     }
+    if (actionType === "withdraw" && linkedInboundId) {
+      const rem = inboundRemainingAmount(linkedInboundId);
+      if (amt > rem + 0.001) {
+        flash(`Montant trop élevé : reste ${money(rem)} DH sur ce versement.`, true);
+        return false;
+      }
+    }
+  }
+
+  if (linkedInboundId) {
+    const parent = getMovement(linkedInboundId);
+    if (!parent || parent.category_id !== categoryId) {
+      flash("Emprunt ou versement lié invalide.", true);
+      return false;
+    }
   }
 
   const lbl = (label || "").trim();
+  const row = {
+    category_id: categoryId,
+    action_type: actionType,
+    amount: amt,
+    movement_date: date,
+    payment_method: pm,
+    label: lbl,
+  };
+  if (linkedInboundId) row.linked_inbound_id = linkedInboundId;
+
   const { data, error } = await supabaseClient.from("debt_movements")
-    .insert({
-      category_id: categoryId,
-      action_type: actionType,
-      amount: amt,
-      movement_date: date,
-      payment_method: pm,
-      label: lbl,
-    })
+    .insert(row)
     .select()
     .single();
   if (error) { flash(getErrorMessage(error, "Erreur enregistrement."), true); return false; }
@@ -324,6 +378,10 @@ export async function deleteDebtMovement(id) {
     flash("Mouvement non supprimable.", true);
     return false;
   }
+  if (linkedOutbounds(id).length > 0) {
+    flash("Supprime d'abord le remboursement lié.", true);
+    return false;
+  }
   const { removeDebtLedgerWallet } = await import("../shared/wallet.js");
   await removeDebtLedgerWallet(id);
   const { error } = await supabaseClient.from("debt_movements").delete().eq("id", id);
@@ -338,14 +396,14 @@ export async function recordBorrow(categoryId, amount, paymentMethod, label) {
   return insertMovementWithWallet(categoryId, "borrow", amount, paymentMethod, label);
 }
 
-export async function recordRepay(categoryId, amount, paymentMethod, label) {
-  return insertMovementWithWallet(categoryId, "repay", amount, paymentMethod, label);
+export async function recordRepay(categoryId, amount, paymentMethod, label, linkedInboundId = null) {
+  return insertMovementWithWallet(categoryId, "repay", amount, paymentMethod, label, linkedInboundId);
 }
 
 export async function recordDeposit(categoryId, amount, paymentMethod, label) {
   return insertMovementWithWallet(categoryId, "deposit", amount, paymentMethod, label);
 }
 
-export async function recordWithdraw(categoryId, amount, paymentMethod, label) {
-  return insertMovementWithWallet(categoryId, "withdraw", amount, paymentMethod, label);
+export async function recordWithdraw(categoryId, amount, paymentMethod, label, linkedInboundId = null) {
+  return insertMovementWithWallet(categoryId, "withdraw", amount, paymentMethod, label, linkedInboundId);
 }
