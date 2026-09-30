@@ -9,6 +9,17 @@ import {
 import { isAdmin } from "../shared/auth.js";
 import { esc, formatDateFull, money, parseISODate, renderDateField } from "../shared/utils.js";
 
+function renderPaymentMethodPicker(selected = "banque") {
+  const pm = selected === "especes" ? "especes" : "banque";
+  return `
+    <div class="small-label">Paiement</div>
+    <div class="segment-row">
+      <button type="button" class="segment ${pm === "banque" ? "active-month" : ""}" data-action="pick-payment-method" data-value="banque">Carte (banque)</button>
+      <button type="button" class="segment ${pm === "especes" ? "active-week" : ""}" data-action="pick-payment-method" data-value="especes">Espèces</button>
+    </div>
+    <input type="hidden" name="payment_method" value="${pm}" />`;
+}
+
 export function render() {
   document.getElementById("subtabs").innerHTML = `
     <button class="subtab ${ui.subTab === "synthese" ? "active" : ""}" data-action="set-subtab" data-tab="synthese">Synthèse</button>
@@ -491,6 +502,7 @@ function renderModal() {
             <input class="field" name="price" type="number" min="0" step="0.01" placeholder="Prix en DH" required />
             <input class="field" name="place" placeholder="Lieu" required />
             ${renderDateField("action_date")}
+            ${renderPaymentMethodPicker("banque")}
             <button type="submit" class="btn-primary">Enregistrer</button>
           </form>
         </div>
@@ -535,6 +547,7 @@ function renderModal() {
             <input class="field" name="price" type="number" min="0" step="0.01" value="${a.amount}" required />
             <input class="field" name="place" value="${esc(a.place)}" required />
             ${renderDateField("action_date", { value: a.action_date })}
+            ${renderPaymentMethodPicker(a.payment_method || "banque")}
             <button type="submit" class="btn-primary">Enregistrer</button>
           </form>
         </div>

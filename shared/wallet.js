@@ -9,6 +9,9 @@ let movementsCache = null;
 /** @type {object[]|null} */
 let categoriesCache = null;
 
+export const PAYMENT_BANQUE = "banque";
+export const PAYMENT_ESPECES = "especes";
+
 export const SOURCE_LABELS = {
   opening: "Solde banque",
   salary: "Salaire",
@@ -20,7 +23,22 @@ export const SOURCE_LABELS = {
   elec_pay: "Paiement électricité",
   water_pay: "Paiement eau",
   manual: "Charge manuelle",
+  cash_withdraw: "Retrait DAB",
+  cash_deposit: "Retrait DAB (espèces)",
 };
+
+export function normalizePaymentMethod(value) {
+  return value === PAYMENT_ESPECES ? PAYMENT_ESPECES : PAYMENT_BANQUE;
+}
+
+export function paymentMethodLabel(method) {
+  return normalizePaymentMethod(method) === PAYMENT_ESPECES ? "Espèces" : "Carte (banque)";
+}
+
+function movementPot(m) {
+  if (m.source_type === "cash_deposit") return PAYMENT_ESPECES;
+  return normalizePaymentMethod(m.payment_method);
+}
 
 export const SYSTEM_EXPENSE_TYPES = [
   "budget_month", "budget_week", "care", "elec_pay", "water_pay",
@@ -85,52 +103,80 @@ function movementByRef(refKey) {
   return getMovements().find(m => m.ref_key === refKey) || null;
 }
 
-function sumMovements(monthKey) {
-  return movementsForMonth(monthKey).reduce((s, m) => s + Number(m.amount), 0);
+function sumMovementsForPot(monthKey, pot) {
+  return movementsForMonth(monthKey)
+    .filter(m => movementPot(m) === pot)
+    .reduce((s, m) => s + Number(m.amount), 0);
 }
 
-/** Solde de clôture d'un mois (report vers le mois suivant). */
-export function closingBalance(monthKey) {
-  if (monthKey < TRESORERIE_START_MONTH) return 0;
-  const carry = carryIn(monthKey);
-  return carry + sumMovements(monthKey);
-}
-
-/** Entrée du mois : solde banque (1er mois) ou report du mois précédent. */
-export function carryIn(monthKey) {
+/** Entrée banque du mois (ouverture ou report banque du mois précédent). */
+export function carryInBank(monthKey) {
   if (monthKey < TRESORERIE_START_MONTH) return 0;
   if (monthKey === TRESORERIE_START_MONTH) {
     const opening = movementByRef(`opening:${monthKey}`);
     return opening ? Number(opening.amount) : 0;
   }
-  return closingBalance(previousMonthKey(monthKey));
+  return closingBankBalance(previousMonthKey(monthKey));
 }
 
-/** Solde disponible dans un mois (avant nouvelle sortie). */
+/** Solde banque de clôture (report vers le mois suivant). */
+export function closingBankBalance(monthKey) {
+  if (monthKey < TRESORERIE_START_MONTH) return 0;
+  return carryInBank(monthKey) + sumMovementsForPot(monthKey, PAYMENT_BANQUE);
+}
+
+/** Solde de clôture banque (alias historique). */
+export function closingBalance(monthKey) {
+  return closingBankBalance(monthKey);
+}
+
+/** Entrée du mois banque (alias historique). */
+export function carryIn(monthKey) {
+  return carryInBank(monthKey);
+}
+
+export function availableBankBalance(monthKey) {
+  return closingBankBalance(monthKey);
+}
+
+/** Espèces : pas de report d'un mois à l'autre. */
+export function availableCashBalance(monthKey) {
+  if (monthKey < TRESORERIE_START_MONTH) return 0;
+  return sumMovementsForPot(monthKey, PAYMENT_ESPECES);
+}
+
+/** Solde banque disponible (alias historique). */
 export function availableBalance(monthKey) {
-  return carryIn(monthKey) + sumMovements(monthKey);
+  return availableBankBalance(monthKey);
 }
 
-export function canAfford(monthKey, amountNeeded, excludeRefKey = null) {
+function availableForPot(monthKey, pot, excludeRefKey = null) {
+  let avail = pot === PAYMENT_ESPECES
+    ? availableCashBalance(monthKey)
+    : availableBankBalance(monthKey);
+  if (excludeRefKey) {
+    const ex = movementByRef(excludeRefKey);
+    if (ex && ex.month_key === monthKey && movementPot(ex) === pot) {
+      avail -= Number(ex.amount);
+    }
+  }
+  return avail;
+}
+
+export function canAfford(monthKey, amountNeeded, excludeRefKey = null, paymentMethod = PAYMENT_BANQUE) {
   const need = Number(amountNeeded) || 0;
   if (need <= 0) return true;
-  let avail = availableBalance(monthKey);
-  if (excludeRefKey) {
-    const ex = movementByRef(excludeRefKey);
-    if (ex && ex.month_key === monthKey) avail -= Number(ex.amount);
-  }
-  return avail >= need;
+  const pot = normalizePaymentMethod(paymentMethod);
+  return availableForPot(monthKey, pot, excludeRefKey) >= need;
 }
 
-function affordMessage(monthKey, amountNeeded, excludeRefKey = null) {
+function affordMessage(monthKey, amountNeeded, excludeRefKey = null, paymentMethod = PAYMENT_BANQUE) {
   const need = Number(amountNeeded) || 0;
-  let avail = availableBalance(monthKey);
-  if (excludeRefKey) {
-    const ex = movementByRef(excludeRefKey);
-    if (ex && ex.month_key === monthKey) avail -= Number(ex.amount);
-  }
+  const pot = normalizePaymentMethod(paymentMethod);
+  const avail = availableForPot(monthKey, pot, excludeRefKey);
   if (avail >= need) return null;
-  return `Solde insuffisant : reste ${money(avail)} DH, besoin ${money(need)} DH.`;
+  const potLabel = pot === PAYMENT_ESPECES ? "espèces" : "banque";
+  return `Solde ${potLabel} insuffisant : reste ${money(avail)} DH, besoin ${money(need)} DH.`;
 }
 
 export async function upsertMovement({
@@ -142,6 +188,7 @@ export async function upsertMovement({
   label,
   categoryId = null,
   movementDate = null,
+  paymentMethod = PAYMENT_BANQUE,
 }) {
   const payload = {
     month_key: monthKey,
@@ -152,6 +199,7 @@ export async function upsertMovement({
     ref_key: refKey,
     label: label || SOURCE_LABELS[sourceType] || sourceType,
     category_id: categoryId,
+    payment_method: normalizePaymentMethod(paymentMethod),
   };
 
   const existing = refKey ? movementByRef(refKey) : null;
@@ -273,7 +321,8 @@ export async function syncCareAction(action, categoryName) {
   const monthKey = action.action_date.slice(0, 7);
   const refKey = `care:${action.id}`;
   const amt = Number(action.amount);
-  const msg = affordMessage(monthKey, amt, refKey);
+  const pm = normalizePaymentMethod(action.payment_method);
+  const msg = affordMessage(monthKey, amt, refKey, pm);
   if (msg) { flash(msg, true); return false; }
   return !!(await upsertMovement({
     monthKey,
@@ -283,6 +332,7 @@ export async function syncCareAction(action, categoryName) {
     refKey,
     label: categoryName || "Soin",
     movementDate: action.action_date,
+    paymentMethod: pm,
   }));
 }
 
@@ -332,10 +382,11 @@ export async function syncDossierReimbursements(dossier) {
   return ok;
 }
 
-export async function syncUtilityPayment({ monthKey, personName, amount, sourceType, refKey }) {
+export async function syncUtilityPayment({ monthKey, personName, amount, sourceType, refKey, paymentMethod = PAYMENT_BANQUE }) {
   const amt = Number(amount);
   if (!Number.isFinite(amt) || amt <= 0) return true;
-  const msg = affordMessage(monthKey, amt, refKey);
+  const pm = normalizePaymentMethod(paymentMethod);
+  const msg = affordMessage(monthKey, amt, refKey, pm);
   if (msg) { flash(msg, true); return false; }
   const label = sourceType === "elec_pay"
     ? `Électricité — ${personName}`
@@ -347,10 +398,50 @@ export async function syncUtilityPayment({ monthKey, personName, amount, sourceT
     sourceType,
     refKey,
     label,
+    paymentMethod: pm,
   }));
 }
 
-export async function addManualExpense(monthKey, categoryId, amount, label) {
+/** Virement interne banque → espèces (retrait DAB). */
+export async function addCashWithdrawal(monthKey, amount) {
+  const amt = Number(amount);
+  if (!Number.isFinite(amt) || amt <= 0) { flash("Montant invalide.", true); return false; }
+  const msg = affordMessage(monthKey, amt, null, PAYMENT_BANQUE);
+  if (msg) { flash(msg, true); return false; }
+  const xferId = crypto.randomUUID();
+  const date = toISO(new Date());
+  const bankRef = `cash_xfer:${xferId}:bank`;
+  const cashRef = `cash_xfer:${xferId}:cash`;
+  const bankOk = await upsertMovement({
+    monthKey,
+    amount: -amt,
+    sourceModule: "tresorerie",
+    sourceType: "cash_withdraw",
+    refKey: bankRef,
+    label: "Retrait DAB",
+    movementDate: date,
+    paymentMethod: PAYMENT_BANQUE,
+  });
+  if (!bankOk) return false;
+  const cashOk = await upsertMovement({
+    monthKey,
+    amount: amt,
+    sourceModule: "tresorerie",
+    sourceType: "cash_deposit",
+    refKey: cashRef,
+    label: "Retrait DAB",
+    movementDate: date,
+    paymentMethod: PAYMENT_ESPECES,
+  });
+  if (!cashOk) {
+    await deleteMovementByRef(bankRef);
+    return false;
+  }
+  flash("Retrait DAB enregistré.");
+  return true;
+}
+
+export async function addManualExpense(monthKey, categoryId, amount, label, paymentMethod = PAYMENT_BANQUE) {
   const amt = Number(amount);
   if (!Number.isFinite(amt) || amt <= 0) { flash("Montant invalide.", true); return false; }
   const cat = getWalletCategories().find(c => c.id === categoryId);
@@ -361,7 +452,8 @@ export async function addManualExpense(monthKey, categoryId, amount, label) {
   }
   const lbl = label?.trim();
   if (!lbl) { flash("Le libellé est obligatoire.", true); return false; }
-  const msg = affordMessage(monthKey, amt);
+  const pm = normalizePaymentMethod(paymentMethod);
+  const msg = affordMessage(monthKey, amt, null, pm);
   if (msg) { flash(msg, true); return false; }
   const { data, error } = await supabaseClient.from("wallet_movements")
     .insert({
@@ -372,6 +464,7 @@ export async function addManualExpense(monthKey, categoryId, amount, label) {
       source_type: "manual",
       category_id: categoryId,
       label: lbl,
+      payment_method: pm,
     })
     .select()
     .single();
@@ -401,6 +494,7 @@ export async function addManualRevenue(monthKey, categoryId, amount, label) {
       source_type: "manual",
       category_id: categoryId,
       label: lbl,
+      payment_method: PAYMENT_BANQUE,
     })
     .select()
     .single();
@@ -410,7 +504,7 @@ export async function addManualRevenue(monthKey, categoryId, amount, label) {
   return true;
 }
 
-export async function updateManualMovement(id, amount, label) {
+export async function updateManualMovement(id, amount, label, paymentMethod = null) {
   const mov = getMovements().find(m => m.id === id);
   if (!mov || mov.source_type !== "manual") return false;
   if (!isManualMovementEditable(mov)) {
@@ -421,22 +515,25 @@ export async function updateManualMovement(id, amount, label) {
   const amt = Number(amount);
   if (!Number.isFinite(amt) || amt <= 0) { flash("Montant invalide.", true); return false; }
   const direction = cat?.direction || (Number(mov.amount) < 0 ? "depense" : "revenue");
-  const oldAbs = Math.abs(Number(mov.amount));
+  const pm = direction === "depense"
+    ? normalizePaymentMethod(paymentMethod ?? mov.payment_method)
+    : PAYMENT_BANQUE;
   if (direction === "depense") {
-    const delta = amt - oldAbs;
-    if (delta > 0) {
-      const msg = affordMessage(mov.month_key, delta);
-      if (msg) { flash(msg, true); return false; }
+    let avail = availableForPot(mov.month_key, pm);
+    if (movementPot(mov) === pm) avail -= Number(mov.amount);
+    if (avail < amt) {
+      const potLabel = pm === PAYMENT_ESPECES ? "espèces" : "banque";
+      flash(`Solde ${potLabel} insuffisant : reste ${money(avail)} DH, besoin ${money(amt)} DH.`, true);
+      return false;
     }
   }
   const lbl = label?.trim();
   if (!lbl) { flash("Le libellé est obligatoire.", true); return false; }
   const nextAmount = direction === "depense" ? -amt : amt;
+  const updatePayload = { amount: nextAmount, label: lbl };
+  if (direction === "depense") updatePayload.payment_method = pm;
   const { data, error } = await supabaseClient.from("wallet_movements")
-    .update({
-      amount: nextAmount,
-      label: lbl,
-    })
+    .update(updatePayload)
     .eq("id", id)
     .select()
     .single();
@@ -590,7 +687,8 @@ export function monthSummary(monthKey) {
   const totalResources = salary + soldePrev;
   const totalExpenses = budget + maladie + utilities + autres;
   const totalIncomes = reimbursements + otherIncome;
-  const soldeDisponible = totalResources - totalExpenses + totalIncomes;
+  const soldeBanque = availableBankBalance(monthKey);
+  const soldeEspeces = availableCashBalance(monthKey);
 
   return {
     isFirst,
@@ -605,7 +703,9 @@ export function monthSummary(monthKey) {
     reimbursements,
     otherIncome,
     totalIncomes,
-    soldeDisponible,
+    soldeBanque,
+    soldeEspeces,
+    soldeDisponible: soldeBanque,
     needsOpeningSetup: isFirst && !hasOpeningBalance(),
     needsSalarySetup: !isFirst && !hasSalary(monthKey),
   };

@@ -501,7 +501,7 @@ export async function saveWaterMonth(monthKey, billTotal) {
   return true;
 }
 
-export async function markElecPaid(monthKey, personId) {
+export async function markElecPaid(monthKey, personId, paymentMethod = "banque") {
   if (!isAdmin) return false;
   const bill = getBill(monthKey);
   const r = bill ? elecReading(bill.id, personId) : null;
@@ -517,6 +517,7 @@ export async function markElecPaid(monthKey, personId) {
       amount: Number(r.share_amount),
       sourceType: "elec_pay",
       refKey: `elec:${r.id}`,
+      paymentMethod,
     });
     if (!walletOk) return false;
   }
@@ -529,7 +530,7 @@ export async function markElecPaid(monthKey, personId) {
   return true;
 }
 
-export async function markWaterPaid(monthKey, personId) {
+export async function markWaterPaid(monthKey, personId, paymentMethod = "banque") {
   if (!isAdmin) return false;
   const bill = getBill(monthKey);
   const s = bill ? waterShare(bill.id, personId) : null;
@@ -545,6 +546,7 @@ export async function markWaterPaid(monthKey, personId) {
       amount: Number(s.share_amount),
       sourceType: "water_pay",
       refKey: `water:${s.id}`,
+      paymentMethod,
     });
     if (!walletOk) return false;
   }

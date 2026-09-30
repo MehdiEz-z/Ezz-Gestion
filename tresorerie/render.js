@@ -6,6 +6,7 @@ import {
   movementsForSystemType, manualMovementsForCategory,
   isManualMovementEditable, isSaisieCategoryPinned,
   SOURCE_LABELS, systemMovementDetailLabel, getSystemDetailTitle,
+  addCashWithdrawal, paymentMethodLabel,
 } from "./data.js";
 import { getWalletCategories, getMovements } from "../shared/wallet.js";
 import { isAdmin } from "../shared/auth.js";
@@ -69,6 +70,17 @@ function renderModal() {
   if (m.type === "edit-manual-movement") return renderEditManualMovementModal(m);
   if (m.type === "confirm-delete") return renderConfirmDeleteModal(m);
   return "";
+}
+
+function renderPaymentMethodPicker(selected = "banque") {
+  const pm = selected === "especes" ? "especes" : "banque";
+  return `
+    <div class="small-label">Paiement</div>
+    <div class="segment-row">
+      <button type="button" class="segment ${pm === "banque" ? "active-month" : ""}" data-action="pick-payment-method" data-value="banque">Carte (banque)</button>
+      <button type="button" class="segment ${pm === "especes" ? "active-week" : ""}" data-action="pick-payment-method" data-value="especes">Espèces</button>
+    </div>
+    <input type="hidden" name="payment_method" value="${pm}" />`;
 }
 
 function renderEditWalletCategoryModal(m) {
@@ -176,6 +188,7 @@ function renderAddManualMovementModal(m) {
         <form class="form-col" data-form="add-manual-movement" data-month-key="${m.monthKey}" data-category-id="${cat.id}" data-direction="${m.direction}">
           <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant en DH" required />
           <input class="field" name="label" placeholder="Libellé" required />
+          ${isDepense ? renderPaymentMethodPicker("banque") : ""}
           <div class="small-label">Date : aujourd'hui (${formatDateFull(new Date())})</div>
           <button type="submit" class="btn-primary">${isDepense ? "Enregistrer la dépense" : "Enregistrer le revenu"}</button>
         </form>
@@ -245,6 +258,7 @@ function renderWalletManualDetailsModal(m) {
 function renderEditManualMovementModal(m) {
   const mov = getMovements().find(x => x.id === m.movementId);
   if (!mov) return "";
+  const isDepense = Number(mov.amount) < 0;
   return `
     <div class="overlay" data-overlay-close="modal">
       <div class="sheet">
@@ -252,6 +266,7 @@ function renderEditManualMovementModal(m) {
         <form class="form-col" data-form="edit-manual-movement" data-movement-id="${mov.id}">
           <input class="field" name="amount" type="number" min="0" step="0.01" value="${Math.abs(Number(mov.amount))}" required />
           <input class="field" name="label" value="${esc(mov.label)}" placeholder="Libellé" required />
+          ${isDepense ? renderPaymentMethodPicker(mov.payment_method || "banque") : ""}
           <div class="small-label">Date : ${formatDateFull(parseISODate(mov.movement_date))}</div>
           <button type="submit" class="btn-primary">Enregistrer</button>
         </form>
@@ -338,7 +353,8 @@ function renderSyntheseTab() {
       ${renderKvRow("Autre source de revenu", `${money(s.otherIncome)} DH`)}
       ${renderKvRow("Total", `${money(s.totalIncomes)} DH`, true)}
       <hr class="utility-recap-sep" />
-      ${renderKvRow("Solde disponible", `${money(s.soldeDisponible)} DH`, true)}
+      ${renderKvRow("Solde banque", `${money(s.soldeBanque)} DH`, true)}
+      ${renderKvRow("Espèces en poche", `${money(s.soldeEspeces)} DH`, true)}
     </div>` : `
     <div class="card-body-inner">
       ${renderSetupBlock(s, mk)}
@@ -357,13 +373,28 @@ function renderSyntheseTab() {
           <div style="display:flex;align-items:center;gap:10px">
             <div class="card-preview">
               <span class="small-label">Salaire : ${money(s.salary)} DH</span><br>
-              <span class="small-label success">Solde : ${money(s.soldeDisponible)} DH</span>
+              <span class="small-label success">Banque : ${money(s.soldeBanque)} DH</span><br>
+              <span class="small-label">Espèces : ${money(s.soldeEspeces)} DH</span>
             </div>
             ${canExpand ? `<span class="chevron">${open ? "▲" : "▼"}</span>` : ""}
           </div>
         </div>
         <div class="card-body ${canExpand && open ? "open" : canExpand ? "" : "open"}">${recap}</div>
       </div>
+      ${isAdmin && mk === activeMonthKey() && canExpand ? `
+      <div class="card" style="border-color:var(--week)">
+        <div class="card-head" data-action="toggle-card" data-key="treasury-cash:${mk}">
+          <div class="card-title" style="color:var(--week)">Retrait DAB</div>
+          <span class="chevron">${ui.expanded.has("treasury-cash:" + mk) ? "▲" : "▼"}</span>
+        </div>
+        <div class="card-body ${ui.expanded.has("treasury-cash:" + mk) ? "open" : ""}">
+          <div class="small-label" style="margin-bottom:8px">Virement interne banque → espèces (hors total dépenses).</div>
+          <form class="inline-form" data-form="cash-withdraw" data-month-key="${mk}">
+            <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant retiré en DH" required />
+            <button type="submit" class="btn-small" style="background:var(--week)">Enregistrer</button>
+          </form>
+        </div>
+      </div>` : ""}
     </div>`;
 }
 
