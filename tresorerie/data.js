@@ -35,7 +35,7 @@ export async function loadMaladieLookup() {
   for (const d of dossiers.data || []) maladieLookup.dossiers.set(d.id, d.dossier_number);
 }
 
-const PAYMENT_LABEL_SUFFIX_RE = /\s*(?:·|—|-)\s*(?:Carte|Espèces)\s*$/i;
+const PAYMENT_LABEL_SUFFIX_RE = /\s*(?:·|—|-)\s*(?:Carte|Espèces|Banque)\s*$/i;
 
 /** Retire un mode de paiement déjà présent dans le texte (évite doublon avec le badge). */
 export function stripPaymentMethodFromLabel(text) {
