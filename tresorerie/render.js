@@ -6,7 +6,7 @@ import {
   movementsForSystemType, manualMovementsForCategory,
   isManualMovementEditable, isSaisieCategoryPinned,
   SOURCE_LABELS, systemMovementDetailLabel, getSystemDetailTitle,
-  addCashWithdrawal, paymentMethodLabel,
+  addCashWithdrawal,
 } from "./data.js";
 import { getWalletCategories, getMovements } from "../shared/wallet.js";
 import { isAdmin } from "../shared/auth.js";
@@ -70,6 +70,18 @@ function renderModal() {
   if (m.type === "edit-manual-movement") return renderEditManualMovementModal(m);
   if (m.type === "confirm-delete") return renderConfirmDeleteModal(m);
   return "";
+}
+
+function renderPaymentMethodBadge(paymentMethod) {
+  const pm = paymentMethod === "especes" ? "especes" : "banque";
+  const cls = pm === "especes" ? "badge badge-pay-especes" : "badge badge-pay-carte";
+  const label = pm === "especes" ? "Espèces" : "Carte";
+  return `<span class="${cls}">${label}</span>`;
+}
+
+function movementShowsPaymentBadge(mov) {
+  if (mov.source_type === "manual") return Number(mov.amount) < 0;
+  return ["care", "elec_pay", "water_pay"].includes(mov.source_type);
 }
 
 function renderPaymentMethodPicker(selected = "banque") {
@@ -198,6 +210,7 @@ function renderAddManualMovementModal(m) {
 
 function renderMovementDetailLine(mov, editable) {
   const amt = Math.abs(Number(mov.amount));
+  const showBadge = movementShowsPaymentBadge(mov);
   return `
     <li class="list-item" style="flex-direction:column;align-items:stretch;gap:4px">
       <div class="purchase-detail-row">
@@ -205,11 +218,14 @@ function renderMovementDetailLine(mov, editable) {
           <div class="list-item-name">${money(amt)} DH — ${esc(mov.label)}</div>
           <div class="small-label">${formatDateFull(parseISODate(mov.movement_date))}</div>
         </div>
-        ${editable ? `
+        <div class="purchase-detail-trailing">
+          ${showBadge ? renderPaymentMethodBadge(mov.payment_method) : ""}
+          ${editable ? `
         <div class="purchase-detail-actions">
           <button class="icon-btn edit" data-action="open-edit-manual-movement" data-movement-id="${mov.id}" title="Modifier">✏️</button>
           <button class="btn-delete" data-action="open-delete-confirm" data-entity="manual-movement" data-id="${mov.id}" data-label="${money(amt)} DH" title="Supprimer">🗑️</button>
         </div>` : ""}
+        </div>
       </div>
     </li>`;
 }
@@ -230,6 +246,7 @@ function renderWalletSystemDetailsModal(m) {
                   <div class="list-item-name">${money(Math.abs(Number(x.amount)))} DH — ${esc(systemMovementDetailLabel(x))}</div>
                   <div class="small-label">${formatDateFull(parseISODate(x.movement_date))}</div>
                 </div>
+                ${movementShowsPaymentBadge(x) ? `<div class="purchase-detail-trailing">${renderPaymentMethodBadge(x.payment_method)}</div>` : ""}
               </div>
             </li>`).join("")}
         </ul>
