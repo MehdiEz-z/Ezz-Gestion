@@ -1,13 +1,7 @@
 import { supabaseClient } from "../shared/supabase.js";
 import { isAdmin } from "../shared/auth.js";
-import {
-  loadWalletData,
-  syncDebtLedgerWallet,
-  removeDebtLedgerWallet,
-  normalizePaymentMethod,
-  PAYMENT_BANQUE,
-} from "../shared/wallet.js";
-import { flash, getErrorMessage, money, parseISODate, toISO } from "../shared/utils.js";
+import { loadWalletData, normalizePaymentMethod } from "../shared/wallet.js";
+import { flash, getErrorMessage, money, toISO } from "../shared/utils.js";
 
 export let state = {
   categories: [],
@@ -211,6 +205,12 @@ async function insertMovementWithWallet(categoryId, actionType, amount, movement
   if (error) { flash(getErrorMessage(error, "Erreur enregistrement."), true); return false; }
 
   await loadWalletData();
+  const { syncDebtLedgerWallet } = await import("../shared/wallet.js");
+  if (typeof syncDebtLedgerWallet !== "function") {
+    flash("Module trésorerie obsolète : déployez shared/wallet.js à jour.", true);
+    await supabaseClient.from("debt_movements").delete().eq("id", data.id);
+    return false;
+  }
   const walletOk = await syncDebtLedgerWallet(data, cat.name);
   if (!walletOk) {
     await supabaseClient.from("debt_movements").delete().eq("id", data.id);
@@ -238,5 +238,3 @@ export async function recordDeposit(categoryId, amount, movementDate, paymentMet
 export async function recordWithdraw(categoryId, amount, movementDate, paymentMethod, label) {
   return insertMovementWithWallet(categoryId, "withdraw", amount, movementDate, paymentMethod, label);
 }
-
-export { PAYMENT_BANQUE };
