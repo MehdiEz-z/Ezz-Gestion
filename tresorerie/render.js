@@ -84,9 +84,14 @@ function manualMovementFlow(mov) {
   return cat?.direction || (Number(mov.amount) < 0 ? "depense" : "revenue");
 }
 
+function systemMovementBadgeFlow(mov) {
+  if (mov.source_type === "cnss" || mov.source_type === "assurance") return "revenue";
+  return "depense";
+}
+
 function movementShowsPaymentBadge(mov) {
   if (mov.source_type === "manual") return true;
-  return ["care", "elec_pay", "water_pay"].includes(mov.source_type);
+  return ["care", "elec_pay", "water_pay", "cnss", "assurance"].includes(mov.source_type);
 }
 
 function renderPaymentMethodPicker(selected = "banque", flow = "depense") {
@@ -253,7 +258,7 @@ function renderWalletSystemDetailsModal(m) {
                   <div class="list-item-name">${money(Math.abs(Number(x.amount)))} DH — ${esc(systemMovementDetailLabel(x))}</div>
                   <div class="small-label">${formatDateFull(parseISODate(x.movement_date))}</div>
                 </div>
-                ${movementShowsPaymentBadge(x) ? `<div class="purchase-detail-trailing">${renderPaymentMethodBadge(x.payment_method)}</div>` : ""}
+                ${movementShowsPaymentBadge(x) ? `<div class="purchase-detail-trailing">${renderPaymentMethodBadge(x.payment_method, systemMovementBadgeFlow(x))}</div>` : ""}
               </div>
             </li>`).join("")}
         </ul>

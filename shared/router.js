@@ -3,6 +3,7 @@ import { flash } from "./utils.js";
 const MODULE_META = {
   maison: { title: "Gestion course", maisonControls: true },
   tresorerie: { title: "Trésorerie", maisonControls: true },
+  dettes: { title: "Dettes & épargne", maisonControls: false },
   maladie: { title: "Dossier maladie", maisonControls: false },
   "eau-elec": { title: "Eau & Électricité", maisonControls: true },
 };
@@ -10,6 +11,7 @@ const MODULE_META = {
 const LOADERS = {
   maison: () => import("../maison/boot.js"),
   tresorerie: () => import("../tresorerie/boot.js"),
+  dettes: () => import("../dettes/boot.js"),
   maladie: () => import("../maladie/boot.js"),
   "eau-elec": () => import("../eau-elec/boot.js"),
 };
@@ -40,7 +42,7 @@ function updateHeaderUI(id) {
   if (controls && id !== "eau-elec") {
     controls.style.display = meta.maisonControls ? "flex" : "none";
   }
-  document.body.classList.remove("module-maison", "module-tresorerie", "module-maladie", "module-eau-elec");
+  document.body.classList.remove("module-maison", "module-tresorerie", "module-dettes", "module-maladie", "module-eau-elec");
   document.body.classList.add("module-" + id);
 }
 
