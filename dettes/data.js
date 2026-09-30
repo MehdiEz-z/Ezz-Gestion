@@ -1,6 +1,6 @@
 import { supabaseClient } from "../shared/supabase.js";
 import { isAdmin } from "../shared/auth.js";
-import { loadWalletData, normalizePaymentMethod } from "../shared/wallet.js";
+import { loadWalletData, normalizePaymentMethod, PAYMENT_ESPECES } from "../shared/wallet.js";
 import { flash, getErrorMessage, money, toISO } from "../shared/utils.js";
 
 export let state = {
@@ -30,13 +30,6 @@ export function resetState() {
   state = { categories: [], movements: [] };
   ui.expanded.clear();
   ui.modal = null;
-}
-
-function parseDateInput(val) {
-  if (!val) return null;
-  const s = String(val).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  return null;
 }
 
 export async function fetchStateFromSupabase() {
@@ -88,6 +81,51 @@ export function movementsForCategory(categoryId) {
   return state.movements
     .filter(m => m.category_id === categoryId)
     .sort((a, b) => (a.movement_date < b.movement_date ? 1 : -1));
+}
+
+export function getMovement(id) {
+  return state.movements.find(m => m.id === id) || null;
+}
+
+/** Reste non « consommé » par rendus/retraits (FIFO) sur une prise ou un versement. */
+export function inboundRemainingAmount(movementId) {
+  const mov = getMovement(movementId);
+  if (!mov) return 0;
+  const cat = getCategory(mov.category_id);
+  if (!cat) return 0;
+  const inbound = cat.kind === "dette" ? "borrow" : "deposit";
+  const outbound = cat.kind === "dette" ? "repay" : "withdraw";
+  if (mov.action_type !== inbound) return 0;
+  let outboundLeft = movementsForCategory(mov.category_id)
+    .filter(m => m.action_type === outbound)
+    .reduce((s, m) => s + Number(m.amount), 0);
+  const chron = movementsForCategory(mov.category_id).slice().reverse();
+  for (const m of chron) {
+    if (m.action_type === inbound) {
+      const amt = Number(m.amount);
+      const applied = Math.min(amt, outboundLeft);
+      outboundLeft -= applied;
+      if (m.id === movementId) return Math.max(0, amt - applied);
+    }
+  }
+  return Number(mov.amount);
+}
+
+/** Prise/versement modifiables tant qu'il reste du non rendu ; rendu/retrait figés. */
+export function isDebtMovementEditable(m) {
+  if (!m) return false;
+  if (m.action_type === "repay" || m.action_type === "withdraw") return false;
+  if (m.action_type === "borrow" || m.action_type === "deposit") {
+    return inboundRemainingAmount(m.id) > 0.001;
+  }
+  return false;
+}
+
+async function resyncWalletForEntry(entry, categoryName) {
+  const { syncDebtLedgerWallet, removeDebtLedgerWallet } = await import("../shared/wallet.js");
+  await removeDebtLedgerWallet(entry.id);
+  await loadWalletData();
+  return syncDebtLedgerWallet(entry, categoryName);
 }
 
 export function totalBalanceByKind(kind) {
@@ -174,14 +212,15 @@ export async function deleteCategory(id) {
   return true;
 }
 
-async function insertMovementWithWallet(categoryId, actionType, amount, movementDate, paymentMethod, label) {
+async function insertMovementWithWallet(categoryId, actionType, amount, paymentMethod, label) {
   if (!isAdmin) return false;
   const cat = getCategory(categoryId);
   if (!cat) return false;
   const amt = Number(amount);
   if (!Number.isFinite(amt) || amt <= 0) { flash("Montant invalide.", true); return false; }
-  const date = parseDateInput(movementDate) || toISO(new Date());
-  const pm = normalizePaymentMethod(paymentMethod);
+  const date = toISO(new Date());
+  let pm = normalizePaymentMethod(paymentMethod);
+  if (actionType === "withdraw") pm = PAYMENT_ESPECES;
 
   if (cat.kind === "dette") {
     if (!["borrow", "repay"].includes(actionType)) {
@@ -236,18 +275,77 @@ async function insertMovementWithWallet(categoryId, actionType, amount, movement
   return true;
 }
 
-export async function recordBorrow(categoryId, amount, movementDate, paymentMethod, label) {
-  return insertMovementWithWallet(categoryId, "borrow", amount, movementDate, paymentMethod, label);
+export async function updateDebtMovement(id, amount, paymentMethod, label) {
+  if (!isAdmin) return false;
+  const mov = getMovement(id);
+  if (!mov || !isDebtMovementEditable(mov)) {
+    flash("Mouvement non modifiable.", true);
+    return false;
+  }
+  const cat = getCategory(mov.category_id);
+  if (!cat) return false;
+  const amt = Number(amount);
+  if (!Number.isFinite(amt) || amt <= 0) { flash("Montant invalide.", true); return false; }
+  const rem = inboundRemainingAmount(id);
+  const minAllowed = Number(mov.amount) - rem;
+  if (amt < minAllowed - 0.001) {
+    flash(`Montant minimum : ${money(minAllowed)} DH (déjà rendu).`, true);
+    return false;
+  }
+  let pm = normalizePaymentMethod(paymentMethod);
+  if (mov.action_type === "withdraw") pm = PAYMENT_ESPECES;
+  const lbl = (label || "").trim();
+  const { data, error } = await supabaseClient.from("debt_movements")
+    .update({ amount: amt, payment_method: pm, label: lbl })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) { flash(getErrorMessage(error, "Erreur modification."), true); return false; }
+  const walletOk = await resyncWalletForEntry(data, cat.name);
+  if (!walletOk) {
+    await supabaseClient.from("debt_movements").update({
+      amount: mov.amount,
+      payment_method: mov.payment_method,
+      label: mov.label,
+    }).eq("id", id);
+    return false;
+  }
+  const idx = state.movements.findIndex(m => m.id === id);
+  if (idx >= 0) state.movements[idx] = data;
+  await loadWalletData();
+  flash("Mouvement modifié.");
+  return true;
 }
 
-export async function recordRepay(categoryId, amount, movementDate, paymentMethod, label) {
-  return insertMovementWithWallet(categoryId, "repay", amount, movementDate, paymentMethod, label);
+export async function deleteDebtMovement(id) {
+  if (!isAdmin) return false;
+  const mov = getMovement(id);
+  if (!mov || !isDebtMovementEditable(mov)) {
+    flash("Mouvement non supprimable.", true);
+    return false;
+  }
+  const { removeDebtLedgerWallet } = await import("../shared/wallet.js");
+  await removeDebtLedgerWallet(id);
+  const { error } = await supabaseClient.from("debt_movements").delete().eq("id", id);
+  if (error) { flash(getErrorMessage(error, "Erreur suppression."), true); return false; }
+  state.movements = state.movements.filter(m => m.id !== id);
+  await loadWalletData();
+  flash("Mouvement supprimé.");
+  return true;
 }
 
-export async function recordDeposit(categoryId, amount, movementDate, paymentMethod, label) {
-  return insertMovementWithWallet(categoryId, "deposit", amount, movementDate, paymentMethod, label);
+export async function recordBorrow(categoryId, amount, paymentMethod, label) {
+  return insertMovementWithWallet(categoryId, "borrow", amount, paymentMethod, label);
 }
 
-export async function recordWithdraw(categoryId, amount, movementDate, paymentMethod, label) {
-  return insertMovementWithWallet(categoryId, "withdraw", amount, movementDate, paymentMethod, label);
+export async function recordRepay(categoryId, amount, paymentMethod, label) {
+  return insertMovementWithWallet(categoryId, "repay", amount, paymentMethod, label);
+}
+
+export async function recordDeposit(categoryId, amount, paymentMethod, label) {
+  return insertMovementWithWallet(categoryId, "deposit", amount, paymentMethod, label);
+}
+
+export async function recordWithdraw(categoryId, amount, paymentMethod, label) {
+  return insertMovementWithWallet(categoryId, "withdraw", amount, paymentMethod, label);
 }
