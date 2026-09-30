@@ -94,9 +94,22 @@ export function totalBalanceByKind(kind) {
   return getCategoriesByKind(kind).reduce((s, c) => s + categoryBalance(c.id), 0);
 }
 
+function totalMovementAmountByKindAction(kind, actionType) {
+  const ids = new Set(getCategoriesByKind(kind).map(c => c.id));
+  return state.movements
+    .filter(m => ids.has(m.category_id) && m.action_type === actionType)
+    .reduce((s, m) => s + Number(m.amount), 0);
+}
+
 export function summarySnapshot() {
+  const totalARendre = totalBalanceByKind("dette");
+  const totalRendu = totalMovementAmountByKindAction("dette", "repay");
+  const totalEmprunte = totalMovementAmountByKindAction("dette", "borrow");
   return {
-    totalDette: totalBalanceByKind("dette"),
+    totalDette: totalARendre,
+    totalARendre,
+    totalRendu,
+    totalEmprunte,
     totalEpargne: totalBalanceByKind("epargne"),
     categoriesDette: getCategoriesByKind("dette"),
     categoriesEpargne: getCategoriesByKind("epargne"),
