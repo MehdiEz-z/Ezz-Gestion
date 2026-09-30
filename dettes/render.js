@@ -161,7 +161,7 @@ function renderMouvementCategoryRow(c) {
       <div class="item-amount">${money(bal)} DH</div>
       <div class="item-actions">
         <button type="button" class="icon-btn" data-action="open-debt-detail" data-category-id="${c.id}" title="Détails">🧾</button>
-        ${isAdmin ? `<button type="button" class="icon-btn add" data-action="open-debt-action" data-category-id="${c.id}" data-action-type="${isDette ? "borrow" : "deposit"}" title="${isDette ? "Prise" : "Versement"}">＋</button>` : ""}
+        ${isAdmin ? `<button type="button" class="icon-btn add" data-action="open-debt-action" data-category-id="${c.id}" data-action-type="${isDette ? "borrow" : "deposit"}" title="${isDette ? "Emprunt" : "Versement"}">＋</button>` : ""}
       </div>
     </li>`;
 }
@@ -241,6 +241,8 @@ function renderDetailMovementLine(row, c) {
   const rem = isInbound ? inboundRemainingAmount(row.id) : 0;
   const canReturn = isAdmin && isInbound && rem > 0.001 && categoryBalance(c.id) > 0.001;
   const returnType = c.kind === "dette" ? "repay" : "withdraw";
+  const returnTitle = c.kind === "dette" ? "Retourner" : "Retirer";
+  const returnMax = Math.min(rem, categoryBalance(c.id));
   return `
     <li class="list-item" style="flex-direction:column;align-items:stretch;gap:4px">
       <div class="purchase-detail-row">
@@ -250,15 +252,15 @@ function renderDetailMovementLine(row, c) {
         </div>
         <div class="purchase-detail-trailing">
           ${renderPaymentBadge(row.payment_method, flowIn)}
-          ${editable ? `
+          ${(editable || canReturn) ? `
           <div class="purchase-detail-actions">
+            ${editable ? `
             <button class="icon-btn edit" data-action="open-edit-debt-movement" data-movement-id="${row.id}" title="Modifier">✏️</button>
-            <button class="btn-delete" data-action="delete-debt-movement" data-movement-id="${row.id}" title="Supprimer">🗑️</button>
+            <button class="btn-delete" data-action="delete-debt-movement" data-movement-id="${row.id}" title="Supprimer">🗑️</button>` : ""}
+            ${canReturn ? `<button type="button" class="icon-btn" data-action="open-debt-action" data-category-id="${c.id}" data-action-type="${returnType}" data-max-amount="${returnMax}" title="${returnTitle}">↩</button>` : ""}
           </div>` : ""}
         </div>
       </div>
-      ${canReturn ? `
-      <button type="button" class="btn-small" style="align-self:flex-start;background:${c.kind === "dette" ? "var(--month)" : "var(--week)"}" data-action="open-debt-action" data-category-id="${c.id}" data-action-type="${returnType}" data-from-movement-id="${row.id}" data-max-amount="${Math.min(rem, categoryBalance(c.id))}">${c.kind === "dette" ? "Retourner" : "Retirer"}</button>` : ""}
     </li>`;
 }
 
@@ -290,7 +292,7 @@ function renderEditMovementModal(m) {
         <div class="sheet-title">Modifier — ${esc(c.name)} <button class="close-btn" data-action="close-modal">✕</button></div>
         <form class="form-col" data-form="edit-debt-movement" data-movement-id="${mov.id}">
           <input class="field" name="amount" type="number" min="0.01" step="0.01" value="${mov.amount}" required />
-          <input class="field" name="label" placeholder="Libellé (optionnel)" value="${esc(mov.label || "")}" />
+          <input class="field" name="label" placeholder="Libellé" value="${esc(mov.label || "")}" />
           ${showPicker ? renderPaymentMethodPicker(mov.payment_method, flowIn ? "in" : "out") : `<div class="small-label">Retrait épargne : Espèces uniquement</div>`}
           <button type="submit" class="btn-primary">Enregistrer</button>
         </form>
@@ -303,8 +305,8 @@ function renderActionModal(m) {
   if (!c) return "";
   const actionType = m.actionType;
   const titles = {
-    borrow: "Prise (emprunt)",
-    repay: "Rendu (remboursement)",
+    borrow: "Emprunt",
+    repay: "Remboursement",
     deposit: "Versement épargne",
     withdraw: "Retrait épargne",
   };
@@ -320,11 +322,9 @@ function renderActionModal(m) {
         <div class="sheet-title">${titles[actionType] || "Mouvement"} — ${esc(c.name)} <button class="close-btn" data-action="close-modal">✕</button></div>
         <form class="form-col" data-form="debt-action" data-category-id="${c.id}" data-action-type="${actionType}">
           <input class="field" name="amount" type="number" min="0.01" step="0.01" placeholder="Montant en DH" value="${defaultAmount ? defaultAmount : ""}" required />
-          <input class="field" name="label" placeholder="Libellé (optionnel)" />
+          <input class="field" name="label" placeholder="Libellé" />
           ${showPicker ? renderPaymentMethodPicker("banque", flowIn ? "in" : "out") : `<div class="small-label">Retrait : Espèces uniquement<input type="hidden" name="payment_method" value="especes" /></div>`}
           <div class="small-label">Date : aujourd'hui (${formatDateFull(new Date())})</div>
-          ${(actionType === "repay" || actionType === "withdraw") && maxBal > 0
-    ? `<div class="small-label">Solde disponible : ${money(maxBal)} DH</div>` : ""}
           <button type="submit" class="btn-primary">Enregistrer</button>
         </form>
       </div>

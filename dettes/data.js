@@ -15,8 +15,8 @@ export const ui = {
 };
 
 export const ACTION_LABELS = {
-  borrow: "Prise",
-  repay: "Rendu",
+  borrow: "Emprunt",
+  repay: "Remboursement",
   deposit: "Versement",
   withdraw: "Retrait",
 };
