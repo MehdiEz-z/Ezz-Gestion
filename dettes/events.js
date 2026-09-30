@@ -68,6 +68,7 @@ function onClick(e) {
       categoryId: target.dataset.categoryId,
       actionType: target.dataset.actionType,
       maxAmount: target.dataset.maxAmount ? Number(target.dataset.maxAmount) : null,
+      linkedInboundId: target.dataset.linkedInboundId || null,
     };
     render();
   }
@@ -114,13 +115,19 @@ async function onSubmit(e) {
   }
   else if (form.dataset.form === "debt-action") {
     const { categoryId, actionType } = form.dataset;
+    const linkedInboundId = form.dataset.linkedInboundId
+      || form.linked_inbound_id?.value
+      || null;
     const pm = form.payment_method?.value || "banque";
-    const payload = [categoryId, form.amount.value, pm, form.label?.value];
     let ok = false;
-    if (actionType === "borrow") ok = await recordBorrow(...payload);
-    else if (actionType === "repay") ok = await recordRepay(...payload);
-    else if (actionType === "deposit") ok = await recordDeposit(...payload);
-    else if (actionType === "withdraw") ok = await recordWithdraw(...payload);
+    if (actionType === "borrow") ok = await recordBorrow(categoryId, form.amount.value, pm, form.label?.value);
+    else if (actionType === "repay") {
+      ok = await recordRepay(categoryId, form.amount.value, pm, form.label?.value, linkedInboundId);
+    }
+    else if (actionType === "deposit") ok = await recordDeposit(categoryId, form.amount.value, pm, form.label?.value);
+    else if (actionType === "withdraw") {
+      ok = await recordWithdraw(categoryId, form.amount.value, pm, form.label?.value, linkedInboundId);
+    }
     if (ok) {
       await loadWalletData();
       ui.modal = { type: "debt-detail", categoryId };
