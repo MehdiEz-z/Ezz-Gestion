@@ -163,7 +163,6 @@ export {
   addWalletCategory, updateWalletCategory,
   addCashWithdrawal,
   paymentMethodLabel,
-  stripPaymentMethodFromLabel,
   monthSummary, hasOpeningBalance, hasSalary,
   getUserWalletCategories, getWalletCategoriesByDirection,
   movementsForSystemType, manualMovementsForCategory,
