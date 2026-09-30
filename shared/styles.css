@@ -154,6 +154,8 @@ main { padding: 14px 16px 16px; flex: 1; }
 .badge-past { background: #EDEDEA; color: var(--muted); }
 .badge-future { background: #EDEDEA; color: var(--muted); }
 .badge-danger { background: #F5E0E0; color: var(--danger); }
+.badge-pay-carte { background: #E4E8F2; color: var(--month); font-weight: 700; }
+.badge-pay-especes { background: #E3F1EC; color: var(--week); font-weight: 700; }
 
 .chevron { font-size: 12px; color: var(--muted); }
 
@@ -585,6 +587,12 @@ body.read-only-mode #app [data-form] { display: none !important; }
   gap: 8px;
 }
 
+.purchase-detail-trailing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
 .purchase-detail-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
 .progress-dual { display: flex; height: 8px; overflow: hidden; border-radius: 4px; background: #E8EAE6; }
