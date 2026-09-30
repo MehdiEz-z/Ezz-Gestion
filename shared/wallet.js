@@ -35,6 +35,12 @@ export function paymentMethodLabel(method) {
   return normalizePaymentMethod(method) === PAYMENT_ESPECES ? "Espèces" : "Carte";
 }
 
+/** Libellé badge / détail : depense → Carte, revenue → Banque. */
+export function paymentMethodDisplayLabel(method, flow = "depense") {
+  if (normalizePaymentMethod(method) === PAYMENT_ESPECES) return "Espèces";
+  return flow === "revenue" ? "Banque" : "Carte";
+}
+
 function movementPot(m) {
   if (m.source_type === "cash_deposit") return PAYMENT_ESPECES;
   return normalizePaymentMethod(m.payment_method);
@@ -474,7 +480,7 @@ export async function addManualExpense(monthKey, categoryId, amount, label, paym
   return true;
 }
 
-export async function addManualRevenue(monthKey, categoryId, amount, label) {
+export async function addManualRevenue(monthKey, categoryId, amount, label, paymentMethod = PAYMENT_BANQUE) {
   const amt = Number(amount);
   if (!Number.isFinite(amt) || amt <= 0) { flash("Montant invalide.", true); return false; }
   const cat = getWalletCategories().find(c => c.id === categoryId);
@@ -485,6 +491,7 @@ export async function addManualRevenue(monthKey, categoryId, amount, label) {
   }
   const lbl = label?.trim();
   if (!lbl) { flash("Le libellé est obligatoire.", true); return false; }
+  const pm = normalizePaymentMethod(paymentMethod);
   const { data, error } = await supabaseClient.from("wallet_movements")
     .insert({
       month_key: monthKey,
@@ -494,7 +501,7 @@ export async function addManualRevenue(monthKey, categoryId, amount, label) {
       source_type: "manual",
       category_id: categoryId,
       label: lbl,
-      payment_method: PAYMENT_BANQUE,
+      payment_method: pm,
     })
     .select()
     .single();
@@ -515,9 +522,7 @@ export async function updateManualMovement(id, amount, label, paymentMethod = nu
   const amt = Number(amount);
   if (!Number.isFinite(amt) || amt <= 0) { flash("Montant invalide.", true); return false; }
   const direction = cat?.direction || (Number(mov.amount) < 0 ? "depense" : "revenue");
-  const pm = direction === "depense"
-    ? normalizePaymentMethod(paymentMethod ?? mov.payment_method)
-    : PAYMENT_BANQUE;
+  const pm = normalizePaymentMethod(paymentMethod ?? mov.payment_method);
   if (direction === "depense") {
     let avail = availableForPot(mov.month_key, pm);
     if (movementPot(mov) === pm) avail -= Number(mov.amount);
@@ -530,8 +535,7 @@ export async function updateManualMovement(id, amount, label, paymentMethod = nu
   const lbl = label?.trim();
   if (!lbl) { flash("Le libellé est obligatoire.", true); return false; }
   const nextAmount = direction === "depense" ? -amt : amt;
-  const updatePayload = { amount: nextAmount, label: lbl };
-  if (direction === "depense") updatePayload.payment_method = pm;
+  const updatePayload = { amount: nextAmount, label: lbl, payment_method: pm };
   const { data, error } = await supabaseClient.from("wallet_movements")
     .update(updatePayload)
     .eq("id", id)
