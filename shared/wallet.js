@@ -25,8 +25,8 @@ export const SOURCE_LABELS = {
   manual: "Charge manuelle",
   cash_withdraw: "Retrait DAB",
   cash_deposit: "Retrait DAB (espèces)",
-  debt_borrow: "Emprunt",
-  debt_repay: "Remboursement dette",
+  debt_borrow: "Dette",
+  debt_repay: "Dette rendu",
   savings_deposit: "Versement épargne",
   savings_withdraw: "Retrait épargne",
 };
@@ -52,10 +52,12 @@ function movementPot(m) {
 
 export const SYSTEM_EXPENSE_TYPES = [
   "budget_month", "budget_week", "care", "elec_pay", "water_pay",
+  "debt_repay", "savings_deposit",
 ];
 
 export const SYSTEM_REVENUE_TYPES = [
   "salary", "cnss", "assurance",
+  "debt_borrow", "savings_withdraw",
 ];
 
 /** Toujours crédit/débit banque (pas espèces). */
@@ -698,9 +700,13 @@ export function monthSummary(monthKey) {
   const budget = sumByTypes(monthKey, ["budget_month", "budget_week"]);
   const maladie = sumByTypes(monthKey, ["care"]);
   const utilities = sumByTypes(monthKey, ["elec_pay", "water_pay"]);
-  const autres = sumManualByDirection(monthKey, "depense");
+  const detteRendu = sumByTypes(monthKey, ["debt_repay"]);
+  const epargneVerse = sumByTypes(monthKey, ["savings_deposit"]);
+  const autres = sumManualByDirection(monthKey, "depense") + detteRendu + epargneVerse;
   const reimbursements = sumByTypes(monthKey, ["cnss", "assurance"], true);
-  const otherIncome = sumManualByDirection(monthKey, "revenue");
+  const dettePrise = sumByTypes(monthKey, ["debt_borrow"], true);
+  const epargneRetrait = sumByTypes(monthKey, ["savings_withdraw"], true);
+  const otherIncome = sumManualByDirection(monthKey, "revenue") + dettePrise + epargneRetrait;
 
   const totalResources = salary + soldePrev;
   const totalExpenses = budget + maladie + utilities + autres;
