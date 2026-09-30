@@ -631,7 +631,7 @@ export async function deleteWalletCategory(id) {
   return true;
 }
 
-function sumManualByDirection(monthKey, direction) {
+export function sumManualByDirection(monthKey, direction) {
   return movementsForMonth(monthKey)
     .filter(m => {
       if (m.source_type !== "manual") return false;
@@ -700,13 +700,13 @@ export function monthSummary(monthKey) {
   const budget = sumByTypes(monthKey, ["budget_month", "budget_week"]);
   const maladie = sumByTypes(monthKey, ["care"]);
   const utilities = sumByTypes(monthKey, ["elec_pay", "water_pay"]);
-  const detteRendu = sumByTypes(monthKey, ["debt_repay"]);
-  const epargneVerse = sumByTypes(monthKey, ["savings_deposit"]);
+  const detteRendu = totalForSystemType(monthKey, "debt_repay");
+  const epargneVerse = totalForSystemType(monthKey, "savings_deposit");
   const manualDepense = sumManualByDirection(monthKey, "depense");
   const autres = manualDepense;
   const reimbursements = sumByTypes(monthKey, ["cnss", "assurance"], true);
-  const dettePrise = sumByTypes(monthKey, ["debt_borrow"], true);
-  const epargneRetrait = sumByTypes(monthKey, ["savings_withdraw"], true);
+  const dettePrise = totalForSystemType(monthKey, "debt_borrow");
+  const epargneRetrait = totalForSystemType(monthKey, "savings_withdraw");
   const manualRevenue = sumManualByDirection(monthKey, "revenue");
   const otherIncome = manualRevenue;
 

@@ -173,6 +173,7 @@ export {
   getUserWalletCategories, getWalletCategoriesByDirection,
   movementsForSystemType, manualMovementsForCategory,
   saisieDepenseTotal, saisieRevenueTotal, isManualMovementEditable,
+  totalForSystemType, sumManualByDirection,
   SOURCE_LABELS,
 };
 
