@@ -2,6 +2,7 @@ import {
   ui, summarySnapshot, getCategoriesByKind, getCategory,
   categoryBalance, movementsForCategory, ACTION_LABELS, KIND_LABELS,
   getMovement, isDebtMovementEditable, inboundRemainingAmount,
+  detailInboundMovements, linkedOutbounds,
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
 import { esc, formatDateFull, money, parseISODate } from "../shared/utils.js";
@@ -234,40 +235,63 @@ function renderEditCategoryModal(m) {
     </div>`;
 }
 
-function renderDetailMovementLine(row, c) {
-  const flowIn = walletFlowIn(row.action_type);
-  const editable = isAdmin && isDebtMovementEditable(row);
-  const isInbound = row.action_type === "borrow" || row.action_type === "deposit";
-  const rem = isInbound ? inboundRemainingAmount(row.id) : 0;
-  const canReturn = isAdmin && isInbound && rem > 0.001 && categoryBalance(c.id) > 0.001;
-  const returnType = c.kind === "dette" ? "repay" : "withdraw";
-  const returnTitle = c.kind === "dette" ? "Retourner" : "Retirer";
+function renderInboundDetailLine(inbound, c) {
+  const rem = inboundRemainingAmount(inbound.id);
+  const closed = rem <= 0.001;
+  const outbounds = linkedOutbounds(inbound.id);
+  const isDette = c.kind === "dette";
+  const title = isDette ? "Emprunt" : ACTION_LABELS.deposit;
+  const outboundLabel = isDette ? "Remboursement" : ACTION_LABELS.withdraw;
+  const returnType = isDette ? "repay" : "withdraw";
+  const returnTitle = isDette ? "Retourner" : "Retirer";
   const returnMax = Math.min(rem, categoryBalance(c.id));
+  const editable = isAdmin && isDebtMovementEditable(inbound);
+  const canReturn = isAdmin && !closed && rem > 0.001 && categoryBalance(c.id) > 0.001;
+
+  const timeline = closed && outbounds.length > 0
+    ? `
+      <div class="small-label" style="margin-top:6px;line-height:1.6">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px">
+          <span>${title} : ${formatDateFull(parseISODate(inbound.movement_date))}</span>
+          ${renderPaymentBadge(inbound.payment_method, true)}
+        </div>
+        ${outbounds.map(o => `
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:4px">
+          <span>${outboundLabel} : ${formatDateFull(parseISODate(o.movement_date))}</span>
+          ${renderPaymentBadge(o.payment_method, isDette ? false : true)}
+        </div>`).join("")}
+      </div>`
+    : `<div class="small-label">${formatDateFull(parseISODate(inbound.movement_date))}${inbound.label ? ` · ${esc(inbound.label)}` : ""}</div>`;
+
   return `
     <li class="list-item" style="flex-direction:column;align-items:stretch;gap:4px">
       <div class="purchase-detail-row">
         <div>
-          <div class="list-item-name">${ACTION_LABELS[row.action_type] || row.action_type} · ${money(row.amount)} DH</div>
-          <div class="small-label">${formatDateFull(parseISODate(row.movement_date))}${row.label ? ` · ${esc(row.label)}` : ""}</div>
+          <div class="list-item-name">${title} · ${money(inbound.amount)} DH</div>
+          ${timeline}
         </div>
         <div class="purchase-detail-trailing">
-          ${renderPaymentBadge(row.payment_method, flowIn)}
+          ${!closed ? renderPaymentBadge(inbound.payment_method, true) : ""}
           ${(editable || canReturn) ? `
           <div class="purchase-detail-actions">
             ${editable ? `
-            <button class="icon-btn edit" data-action="open-edit-debt-movement" data-movement-id="${row.id}" title="Modifier">✏️</button>
-            <button class="btn-delete" data-action="delete-debt-movement" data-movement-id="${row.id}" title="Supprimer">🗑️</button>` : ""}
-            ${canReturn ? `<button type="button" class="icon-btn" data-action="open-debt-action" data-category-id="${c.id}" data-action-type="${returnType}" data-max-amount="${returnMax}" title="${returnTitle}">↩</button>` : ""}
+            <button class="icon-btn edit" data-action="open-edit-debt-movement" data-movement-id="${inbound.id}" title="Modifier">✏️</button>
+            <button class="btn-delete" data-action="delete-debt-movement" data-movement-id="${inbound.id}" title="Supprimer">🗑️</button>` : ""}
+            ${canReturn ? `<button type="button" class="icon-btn" data-action="open-debt-action" data-category-id="${c.id}" data-action-type="${returnType}" data-linked-inbound-id="${inbound.id}" data-max-amount="${returnMax}" title="${returnTitle}">↩</button>` : ""}
           </div>` : ""}
         </div>
       </div>
     </li>`;
 }
 
+function renderDetailMovementLine(row, c) {
+  return renderInboundDetailLine(row, c);
+}
+
 function renderDetailModal(m) {
   const c = getCategory(m.categoryId);
   if (!c) return "";
-  const list = movementsForCategory(c.id);
+  const list = detailInboundMovements(c.id);
   const rows = list.length === 0
     ? `<div class="small-label">Aucun mouvement.</div>`
     : `<ul class="list">${list.map(row => renderDetailMovementLine(row, c)).join("")}</ul>`;
@@ -320,7 +344,8 @@ function renderActionModal(m) {
     <div class="overlay" data-overlay-close="modal">
       <div class="sheet">
         <div class="sheet-title">${titles[actionType] || "Mouvement"} — ${esc(c.name)} <button class="close-btn" data-action="close-modal">✕</button></div>
-        <form class="form-col" data-form="debt-action" data-category-id="${c.id}" data-action-type="${actionType}">
+        <form class="form-col" data-form="debt-action" data-category-id="${c.id}" data-action-type="${actionType}"${m.linkedInboundId ? ` data-linked-inbound-id="${m.linkedInboundId}"` : ""}>
+          ${m.linkedInboundId ? `<input type="hidden" name="linked_inbound_id" value="${m.linkedInboundId}" />` : ""}
           <input class="field" name="amount" type="number" min="0.01" step="0.01" placeholder="Montant en DH" value="${defaultAmount ? defaultAmount : ""}" required />
           <input class="field" name="label" placeholder="Libellé" />
           ${showPicker ? renderPaymentMethodPicker("banque", flowIn ? "in" : "out") : `<div class="small-label">Retrait : Espèces uniquement<input type="hidden" name="payment_method" value="especes" /></div>`}
