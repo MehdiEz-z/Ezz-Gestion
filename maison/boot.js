@@ -1,4 +1,5 @@
 import { activeMonthKey } from "../shared/utils.js";
+import { loadSubTab } from "../shared/ui-persist.js";
 import { ui, fetchStateFromSupabase } from "./data.js";
 import { render } from "./render.js";
 import { setupEvents } from "./events.js";
@@ -25,6 +26,7 @@ export async function activate() {
     await fetchStateFromSupabase();
     dataLoaded = true;
   }
+  ui.subTab = loadSubTab("maison", ui.subTab);
   render();
 }
 
