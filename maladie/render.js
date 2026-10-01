@@ -4,7 +4,7 @@ import {
   isDossierEditable, isDossierLocked, isDossierCareLocked, canEditCareActions,
   categoryTotalForDossier, actionsForCategory, facilityLabel, genderLabel,
   getActiveCategoriesForDossier, getAvailableCategoriesForDossier,
-  isDossierCategoryAssigned,
+  isDossierCategoryAssigned, reimbursementDelayDays,
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
 import { esc, formatDateFull, money, parseISODate, renderDateField } from "../shared/utils.js";
@@ -336,10 +336,16 @@ function renderReimbBlock(d, block, editable) {
   const color = isCnss ? "var(--month)" : "var(--week)";
   const label = isCnss ? "CNSS" : "Assurance";
   const received = isCnss ? d.cnss_received : d.assurance_received;
+  const depositDate = isCnss ? d.cnss_deposit_date : d.assurance_sent_date;
+  const receivedDate = isCnss ? d.cnss_received_date : d.assurance_received_date;
+  const delayDays = received != null ? reimbursementDelayDays(depositDate, receivedDate) : null;
+  const delayBadge = delayDays != null
+    ? ` <span class="badge badge-current" title="Jours entre dépôt et saisie du remboursement">(${delayDays})</span>`
+    : "";
   const blockEditable = editable && received == null;
   return `
     <div class="reimb-block" style="border-color:${color}">
-      <div class="reimb-title" style="color:${color}">${label}</div>
+      <div class="reimb-title" style="color:${color}">${label}${delayBadge}</div>
       ${blockEditable ? `
         <form class="form-col" data-form="update-reimb" data-dossier-id="${d.id}" data-block="${block}">
           <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant" required />
