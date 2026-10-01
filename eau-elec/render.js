@@ -3,7 +3,7 @@ import {
   personName, getBill, elecReading, waterShare,
   getPrevMeter, isFirstEauMonth, isPrevMonthElecComplete, hasElecSharesCalculated, calcElecConso,
   monthElecStats, monthWaterStats, personRecap, personGlobalSummary,
-  recapBadge,
+  recapBadge, hasUtilityAppOwner,
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
 import {
@@ -70,6 +70,7 @@ function renderSyntheseTab() {
 }
 
 function renderPersonRow(p) {
+  const showSetOwner = isAdmin && !hasUtilityAppOwner();
   return `
     <li class="list-item">
       <div>
@@ -77,7 +78,7 @@ function renderPersonRow(p) {
         <div class="small-label">${esc(p.phone || "—")}</div>
       </div>
       <div class="list-item-right">
-        ${isAdmin && !p.is_app_owner ? `<button class="icon-btn" data-action="set-app-owner" data-person-id="${p.id}" title="Définir propriétaire app">👤</button>` : ""}
+        ${showSetOwner ? `<button class="icon-btn" data-action="set-app-owner" data-person-id="${p.id}" title="Définir propriétaire app">👤</button>` : ""}
         ${isAdmin ? `<button class="icon-btn edit" data-action="open-edit-person" data-person-id="${p.id}" title="Modifier">✏️</button>` : ""}
       </div>
     </li>`;
@@ -93,7 +94,7 @@ function renderReferentielTab() {
       <button type="submit" class="btn-primary">Ajouter la personne</button>
     </form>`;
 
-  const ownerHint = isAdmin && state.persons.length > 1 && !state.persons.some(p => p.is_app_owner)
+  const ownerHint = isAdmin && state.persons.length > 1 && !hasUtilityAppOwner()
     ? `<div class="small-label">Définissez le propriétaire de l'app avec 👤 (une seule fois).</div>`
     : "";
 
