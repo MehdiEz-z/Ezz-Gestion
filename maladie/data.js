@@ -6,7 +6,7 @@ import {
   normalizePaymentMethod, PAYMENT_BANQUE,
   syncCareAction, removeCareAction, syncDossierReimbursements,
 } from "../shared/wallet.js";
-import { flash, getErrorMessage, normalizeName, money } from "../shared/utils.js";
+import { flash, getErrorMessage, normalizeName, money, toISO } from "../shared/utils.js";
 
 export let state = {
   beneficiaries: [],
@@ -217,6 +217,16 @@ export function alertDossiers() {
     if (diffDays < 30) return false;
     return d.cnss_received == null && d.assurance_received == null;
   });
+}
+
+/** Jours entre date de dépôt et date de saisie du remboursement. */
+export function reimbursementDelayDays(depositDate, receivedDate) {
+  if (!depositDate || !receivedDate) return null;
+  const start = new Date(depositDate + "T00:00:00");
+  const end = new Date(receivedDate + "T00:00:00");
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  const days = Math.floor((end - start) / 86400000);
+  return days >= 0 ? days : null;
 }
 
 function parseDateInput(val) {
@@ -448,9 +458,19 @@ export async function updateReimbursements(dossierId, { cnssExpected, cnssReceiv
 
   const payload = {};
   if (cnssExpected !== undefined) payload.cnss_expected = cnssExpected === "" ? null : Number(cnssExpected);
-  if (cnssReceived !== undefined) payload.cnss_received = cnssReceived === "" ? null : Number(cnssReceived);
+  if (cnssReceived !== undefined) {
+    payload.cnss_received = cnssReceived === "" ? null : Number(cnssReceived);
+    if (cnssReceived !== "" && cnssReceived != null) {
+      payload.cnss_received_date = toISO(new Date());
+    }
+  }
   if (assuranceExpected !== undefined) payload.assurance_expected = assuranceExpected === "" ? null : Number(assuranceExpected);
-  if (assuranceReceived !== undefined) payload.assurance_received = assuranceReceived === "" ? null : Number(assuranceReceived);
+  if (assuranceReceived !== undefined) {
+    payload.assurance_received = assuranceReceived === "" ? null : Number(assuranceReceived);
+    if (assuranceReceived !== "" && assuranceReceived != null) {
+      payload.assurance_received_date = toISO(new Date());
+    }
+  }
 
   const merged = { ...d, ...payload };
   const status = computeDossierStatus(merged);
