@@ -15,8 +15,10 @@ import {
   activeMonthKey, esc, formatDateFull, monthChipLabel, monthLabel, monthsRangeFrom,
   money, parseISODate, previousMonthKey,
 } from "../shared/utils.js";
+import { preserveScroll } from "../shared/ui-persist.js";
 
 export function render() {
+  preserveScroll(() => {
   const controls = document.getElementById("maison-controls");
   if (controls) controls.style.display = ui.subTab === "categories" ? "none" : "flex";
   document.getElementById("month-btn-label").textContent = monthChipLabel(ui.viewedMonthKey);
@@ -37,6 +39,7 @@ export function render() {
 
   document.getElementById("modal-root").innerHTML =
     ui.monthPanelOpen ? renderMonthPanel() : (ui.modal ? renderModal() : "");
+  });
 }
 
 function renderExpandableAddCard(key, title, bodyHtml) {
