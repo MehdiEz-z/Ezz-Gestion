@@ -38,12 +38,15 @@ export async function fetchStateFromSupabase() {
   if (elec.error) { flash(getErrorMessage(elec.error, "Erreur chargement électricité."), true); return; }
   if (water.error) { flash(getErrorMessage(water.error, "Erreur chargement eau."), true); return; }
 
-  state.persons = persons.data || [];
+  state.persons = (persons.data || []).map(p => ({
+    ...p,
+    is_app_owner: p.is_app_owner === true || p.is_app_owner === "true" || p.is_app_owner === "t",
+  }));
   state.bills = bills.data || [];
   state.elecReadings = elec.data || [];
   state.waterShares = water.data || [];
 
-  const hasOwner = state.persons.some(p => p.is_app_owner);
+  const hasOwner = hasUtilityAppOwner();
   if (isAdmin && !hasOwner && state.persons.length === 1) {
     await setPersonAppOwner(state.persons[0].id);
   }
@@ -51,6 +54,10 @@ export async function fetchStateFromSupabase() {
 
 export function personName(p) {
   return `${p.first_name} ${p.last_name}`;
+}
+
+export function hasUtilityAppOwner() {
+  return state.persons.some(p => p.is_app_owner);
 }
 
 export function getBill(monthKey) {
