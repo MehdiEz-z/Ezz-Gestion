@@ -101,6 +101,64 @@ export function linkedOutbounds(inboundId) {
     .sort((a, b) => (a.movement_date < b.movement_date ? -1 : 1));
 }
 
+/**
+ * Lignes remboursement/retrait à afficher sous un emprunt (liens explicites ou FIFO sans lien).
+ * @returns {{ movement: object, amount: number }[]}
+ */
+export function inboundAppliedOutboundsForDisplay(inboundId) {
+  const linked = linkedOutbounds(inboundId);
+  if (linked.length > 0) {
+    return linked.map(m => ({ movement: m, amount: Number(m.amount) }));
+  }
+
+  const mov = getMovement(inboundId);
+  if (!mov) return [];
+  const cat = getCategory(mov.category_id);
+  if (!cat) return [];
+  const inboundType = cat.kind === "dette" ? "borrow" : "deposit";
+  const outbound = cat.kind === "dette" ? "repay" : "withdraw";
+  if (mov.action_type !== inboundType) return [];
+
+  const unlinkedRepays = movementsForCategory(mov.category_id)
+    .filter(m => m.action_type === outbound && !m.linked_inbound_id)
+    .sort((a, b) => (a.movement_date < b.movement_date ? -1 : 1));
+  if (unlinkedRepays.length === 0) return [];
+
+  let repayIdx = 0;
+  let repayLeftOnCurrent = Number(unlinkedRepays[0].amount);
+  const slices = [];
+  const chron = movementsForCategory(mov.category_id).slice().reverse();
+
+  for (const m of chron) {
+    if (m.action_type !== inboundType) continue;
+    if (linkedOutbounds(m.id).length > 0) continue;
+
+    let cap = Number(m.amount);
+    while (cap > 0.001 && repayIdx < unlinkedRepays.length) {
+      const take = Math.min(cap, repayLeftOnCurrent);
+      if (m.id === inboundId && take > 0.001) {
+        slices.push({ movement: unlinkedRepays[repayIdx], amount: take });
+      }
+      cap -= take;
+      repayLeftOnCurrent -= take;
+      if (repayLeftOnCurrent <= 0.001) {
+        repayIdx += 1;
+        repayLeftOnCurrent = repayIdx < unlinkedRepays.length
+          ? Number(unlinkedRepays[repayIdx].amount)
+          : 0;
+      }
+    }
+  }
+
+  const merged = new Map();
+  for (const s of slices) {
+    merged.set(s.movement.id, (merged.get(s.movement.id) || 0) + s.amount);
+  }
+  return [...merged.entries()]
+    .map(([id, amount]) => ({ movement: getMovement(id), amount }))
+    .filter(x => x.movement && amount > 0.001);
+}
+
 /** Lignes affichées dans le détail (emprunts / versements seulement). */
 export function detailInboundMovements(categoryId) {
   const cat = getCategory(categoryId);
