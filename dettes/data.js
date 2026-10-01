@@ -198,12 +198,42 @@ export function inboundRemainingAmount(movementId) {
   return Number(mov.amount);
 }
 
-/** Prise/versement modifiables tant qu'il reste du non rendu ; rendu/retrait figés. */
+export function isInboundBlockReadOnly(inboundId) {
+  return inboundRemainingAmount(inboundId) <= 0.001;
+}
+
+/** Remboursement / retrait éditable dans le bloc d'un emprunt ou versement. */
+export function isOutboundEditableInInboundBlock(outboundMov, inboundId) {
+  if (!outboundMov || isInboundBlockReadOnly(inboundId)) return false;
+  const inbound = getMovement(inboundId);
+  if (!inbound) return false;
+  const outbound = inbound.action_type === "borrow" ? "repay"
+    : inbound.action_type === "deposit" ? "withdraw" : null;
+  if (outboundMov.action_type !== outbound) return false;
+  if (outboundMov.linked_inbound_id) {
+    return outboundMov.linked_inbound_id === inboundId;
+  }
+  return inboundAppliedOutboundsForDisplay(inboundId)
+    .some(r => r.movement.id === outboundMov.id);
+}
+
+/** Prise/versement sans retour ; remboursement/retrait tant que le bloc n'est pas soldé. */
 export function isDebtMovementEditable(m) {
   if (!m) return false;
-  if (m.action_type === "repay" || m.action_type === "withdraw") return false;
   if (m.action_type === "borrow" || m.action_type === "deposit") {
-    return inboundRemainingAmount(m.id) > 0.001;
+    return inboundAppliedOutboundsForDisplay(m.id).length === 0;
+  }
+  if (m.action_type === "repay" || m.action_type === "withdraw") {
+    if (m.linked_inbound_id) {
+      return !isInboundBlockReadOnly(m.linked_inbound_id);
+    }
+    const cat = getCategory(m.category_id);
+    if (!cat) return false;
+    const inboundType = cat.kind === "dette" ? "borrow" : "deposit";
+    return movementsForCategory(m.category_id)
+      .filter(x => x.action_type === inboundType)
+      .some(inb => !isInboundBlockReadOnly(inb.id)
+        && inboundAppliedOutboundsForDisplay(inb.id).some(r => r.movement.id === m.id));
   }
   return false;
 }
@@ -398,12 +428,42 @@ export async function updateDebtMovement(id, amount, paymentMethod, label) {
   if (!cat) return false;
   const amt = Number(amount);
   if (!Number.isFinite(amt) || amt <= 0) { flash("Montant invalide.", true); return false; }
-  const rem = inboundRemainingAmount(id);
-  const minAllowed = Number(mov.amount) - rem;
-  if (amt < minAllowed - 0.001) {
-    flash(`Montant minimum : ${money(minAllowed)} DH (déjà rendu).`, true);
-    return false;
+
+  if (mov.action_type === "repay" || mov.action_type === "withdraw") {
+    const oldAmt = Number(mov.amount);
+    if (mov.linked_inbound_id) {
+      const rem = inboundRemainingAmount(mov.linked_inbound_id);
+      const maxOnInbound = rem + oldAmt;
+      if (amt > maxOnInbound + 0.001) {
+        flash(`Montant trop élevé : max ${money(maxOnInbound)} DH sur cet emprunt.`, true);
+        return false;
+      }
+    }
+    if (mov.action_type === "repay") {
+      const maxCat = categoryBalance(mov.category_id) + oldAmt;
+      if (amt > maxCat + 0.001) {
+        flash(`Montant trop élevé : max ${money(maxCat)} DH pour cette catégorie.`, true);
+        return false;
+      }
+    } else if (mov.action_type === "withdraw") {
+      const cat = getCategory(mov.category_id);
+      if (cat) {
+        const maxCat = categoryBalance(mov.category_id) + oldAmt;
+        if (amt > maxCat + 0.001) {
+          flash(`Montant trop élevé : max ${money(maxCat)} DH.`, true);
+          return false;
+        }
+      }
+    }
+  } else {
+    const rem = inboundRemainingAmount(id);
+    const minAllowed = Number(mov.amount) - rem;
+    if (amt < minAllowed - 0.001) {
+      flash(`Montant minimum : ${money(minAllowed)} DH (déjà rendu).`, true);
+      return false;
+    }
   }
+
   let pm = normalizePaymentMethod(paymentMethod);
   if (mov.action_type === "withdraw") pm = PAYMENT_ESPECES;
   const lbl = (label || "").trim();
@@ -436,9 +496,11 @@ export async function deleteDebtMovement(id) {
     flash("Mouvement non supprimable.", true);
     return false;
   }
-  if (linkedOutbounds(id).length > 0) {
-    flash("Supprime d'abord le remboursement lié.", true);
-    return false;
+  if (mov.action_type === "borrow" || mov.action_type === "deposit") {
+    if (inboundAppliedOutboundsForDisplay(id).length > 0) {
+      flash("Supprime d'abord les remboursements ou retraits liés.", true);
+      return false;
+    }
   }
   const { removeDebtLedgerWallet } = await import("../shared/wallet.js");
   await removeDebtLedgerWallet(id);

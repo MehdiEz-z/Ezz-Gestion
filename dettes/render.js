@@ -1,7 +1,8 @@
 import {
   ui, summarySnapshot, getCategoriesByKind, getCategory,
   categoryBalance, movementsForCategory, ACTION_LABELS, KIND_LABELS,
-  getMovement, isDebtMovementEditable, inboundRemainingAmount,
+  getMovement, isDebtMovementEditable, isOutboundEditableInInboundBlock,
+  inboundRemainingAmount,
   detailInboundMovements, inboundAppliedOutboundsForDisplay,
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
@@ -238,57 +239,87 @@ function renderEditCategoryModal(m) {
     </div>`;
 }
 
+function renderMovementMeta(mov) {
+  const date = formatDateFull(parseISODate(mov.movement_date));
+  const lab = mov.label ? esc(mov.label) : "—";
+  return `<div class="small-label">${date} — ${lab}</div>`;
+}
+
+function renderDetailActions(movementId, showEdit, showDelete, showReturn, returnAttrs = "") {
+  let html = "";
+  if (showEdit) {
+    html += `<button class="icon-btn edit" data-action="open-edit-debt-movement" data-movement-id="${movementId}" title="Modifier">✏️</button>`;
+  }
+  if (showDelete) {
+    html += `<button class="btn-delete" data-action="delete-debt-movement" data-movement-id="${movementId}" title="Supprimer">🗑️</button>`;
+  }
+  if (showReturn) {
+    html += `<button type="button" class="icon-btn" data-action="open-debt-action" ${returnAttrs} title="Retourner">↩</button>`;
+  }
+  return html;
+}
+
 function renderInboundDetailLine(inbound, c) {
   const rem = inboundRemainingAmount(inbound.id);
-  const closed = rem <= 0.001;
+  const readOnly = rem <= 0.001;
   const appliedRows = inboundAppliedOutboundsForDisplay(inbound.id);
   const isDette = c.kind === "dette";
-  const title = isDette ? "Emprunt" : ACTION_LABELS.deposit;
-  const outboundLabel = isDette ? "Remboursement" : ACTION_LABELS.withdraw;
+  const inTitle = isDette ? "Emprunt" : ACTION_LABELS.deposit;
+  const outShort = isDette ? "RB" : ACTION_LABELS.withdraw;
   const returnType = isDette ? "repay" : "withdraw";
-  const returnTitle = isDette ? "Retourner" : "Retirer";
   const returnMax = Math.min(rem, categoryBalance(c.id));
-  const editable = isAdmin && isDebtMovementEditable(inbound);
-  const canReturn = isAdmin && !closed && rem > 0.001 && categoryBalance(c.id) > 0.001;
+  const canReturn = isAdmin && !readOnly && rem > 0.001 && categoryBalance(c.id) > 0.001;
+  const inFlowIn = walletFlowIn(inbound.action_type);
+  const outFlowIn = isDette ? false : walletFlowIn("withdraw");
 
-  const amountLine = closed
-    ? `${title} · ${money(inbound.amount)} DH`
-    : `${title} · ${money(inbound.amount)} DH · Reste ${money(rem)} DH`;
+  const inEditable = isAdmin && !readOnly && isDebtMovementEditable(inbound);
+  const inActions = isAdmin && !readOnly
+    ? renderDetailActions(
+      inbound.id,
+      inEditable,
+      inEditable,
+      canReturn,
+      `data-category-id="${c.id}" data-action-type="${returnType}" data-linked-inbound-id="${inbound.id}" data-max-amount="${returnMax}"`,
+    )
+    : "";
 
-  const timeline = appliedRows.length > 0
-    ? `
-      <div class="small-label" style="margin-top:6px;line-height:1.6">
-        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px">
-          <span>${title} : ${formatDateFull(parseISODate(inbound.movement_date))}</span>
-          ${renderPaymentBadge(inbound.payment_method, true)}
-        </div>
-        ${appliedRows.map(({ movement: o, amount }) => `
-        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:4px">
-          <span>${outboundLabel} : ${money(amount)} DH · ${formatDateFull(parseISODate(o.movement_date))}</span>
-          ${renderPaymentBadge(o.payment_method, isDette ? false : true)}
-        </div>`).join("")}
-      </div>`
-    : `<div class="small-label">${formatDateFull(parseISODate(inbound.movement_date))}${inbound.label ? ` · ${esc(inbound.label)}` : ""}</div>`;
-
-  return `
-    <li class="list-item" style="flex-direction:column;align-items:stretch;gap:4px">
+  let html = `
+    <li class="list-item" style="flex-direction:column;align-items:stretch;gap:8px">
       <div class="purchase-detail-row">
         <div>
-          <div class="list-item-name">${amountLine}</div>
-          ${timeline}
+          <div class="list-item-name">${inTitle} — ${money(inbound.amount)} DH</div>
+          ${renderMovementMeta(inbound)}
         </div>
         <div class="purchase-detail-trailing">
-          ${!closed && appliedRows.length === 0 ? renderPaymentBadge(inbound.payment_method, true) : ""}
-          ${(editable || canReturn) ? `
-          <div class="purchase-detail-actions">
-            ${editable ? `
-            <button class="icon-btn edit" data-action="open-edit-debt-movement" data-movement-id="${inbound.id}" title="Modifier">✏️</button>
-            <button class="btn-delete" data-action="delete-debt-movement" data-movement-id="${inbound.id}" title="Supprimer">🗑️</button>` : ""}
-            ${canReturn ? `<button type="button" class="icon-btn" data-action="open-debt-action" data-category-id="${c.id}" data-action-type="${returnType}" data-linked-inbound-id="${inbound.id}" data-max-amount="${returnMax}" title="${returnTitle}">↩</button>` : ""}
-          </div>` : ""}
+          ${renderPaymentBadge(inbound.payment_method, inFlowIn)}
+          ${inActions ? `<div class="purchase-detail-actions">${inActions}</div>` : ""}
         </div>
-      </div>
-    </li>`;
+      </div>`;
+
+  for (const { movement: o, amount } of appliedRows) {
+    const oEditable = isAdmin && !readOnly && isOutboundEditableInInboundBlock(o, inbound.id);
+    const oActions = oEditable
+      ? renderDetailActions(o.id, true, true, false)
+      : "";
+    html += `
+      <div class="purchase-detail-row">
+        <div>
+          <div class="list-item-name">${outShort} — ${money(amount)} DH</div>
+          ${renderMovementMeta(o)}
+        </div>
+        <div class="purchase-detail-trailing">
+          ${renderPaymentBadge(o.payment_method, outFlowIn)}
+          ${oActions ? `<div class="purchase-detail-actions">${oActions}</div>` : ""}
+        </div>
+      </div>`;
+  }
+
+  if (isDette && !readOnly && rem > 0.001) {
+    html += `<div class="list-item-name">Reste — ${money(rem)} DH</div>`;
+  }
+
+  html += `</li>`;
+  return html;
 }
 
 function renderDetailMovementLine(row, c) {
@@ -317,10 +348,11 @@ function renderEditMovementModal(m) {
   if (!mov || !c || !isDebtMovementEditable(mov)) return "";
   const flowIn = walletFlowIn(mov.action_type);
   const showPicker = mov.action_type !== "withdraw";
+  const typeLabel = ACTION_LABELS[mov.action_type] || "Mouvement";
   return `
     <div class="overlay" data-overlay-close="modal">
       <div class="sheet">
-        <div class="sheet-title">Modifier — ${esc(c.name)} <button class="close-btn" data-action="close-modal">✕</button></div>
+        <div class="sheet-title">Modifier ${typeLabel} — ${esc(c.name)} <button class="close-btn" data-action="close-modal">✕</button></div>
         <form class="form-col" data-form="edit-debt-movement" data-movement-id="${mov.id}">
           <input class="field" name="amount" type="number" min="0.01" step="0.01" value="${mov.amount}" required />
           <input class="field" name="label" placeholder="Libellé" value="${esc(mov.label || "")}" />
