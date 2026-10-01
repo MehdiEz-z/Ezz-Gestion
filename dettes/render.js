@@ -2,7 +2,7 @@ import {
   ui, summarySnapshot, getCategoriesByKind, getCategory,
   categoryBalance, movementsForCategory, ACTION_LABELS, KIND_LABELS,
   getMovement, isDebtMovementEditable, inboundRemainingAmount,
-  detailInboundMovements, linkedOutbounds,
+  detailInboundMovements, inboundAppliedOutboundsForDisplay,
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
 import { esc, formatDateFull, money, parseISODate } from "../shared/utils.js";
@@ -241,7 +241,7 @@ function renderEditCategoryModal(m) {
 function renderInboundDetailLine(inbound, c) {
   const rem = inboundRemainingAmount(inbound.id);
   const closed = rem <= 0.001;
-  const outbounds = linkedOutbounds(inbound.id);
+  const appliedRows = inboundAppliedOutboundsForDisplay(inbound.id);
   const isDette = c.kind === "dette";
   const title = isDette ? "Emprunt" : ACTION_LABELS.deposit;
   const outboundLabel = isDette ? "Remboursement" : ACTION_LABELS.withdraw;
@@ -251,16 +251,20 @@ function renderInboundDetailLine(inbound, c) {
   const editable = isAdmin && isDebtMovementEditable(inbound);
   const canReturn = isAdmin && !closed && rem > 0.001 && categoryBalance(c.id) > 0.001;
 
-  const timeline = closed && outbounds.length > 0
+  const amountLine = closed
+    ? `${title} · ${money(inbound.amount)} DH`
+    : `${title} · ${money(inbound.amount)} DH · Reste ${money(rem)} DH`;
+
+  const timeline = appliedRows.length > 0
     ? `
       <div class="small-label" style="margin-top:6px;line-height:1.6">
         <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px">
           <span>${title} : ${formatDateFull(parseISODate(inbound.movement_date))}</span>
           ${renderPaymentBadge(inbound.payment_method, true)}
         </div>
-        ${outbounds.map(o => `
+        ${appliedRows.map(({ movement: o, amount }) => `
         <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:4px">
-          <span>${outboundLabel} : ${formatDateFull(parseISODate(o.movement_date))}</span>
+          <span>${outboundLabel} : ${money(amount)} DH · ${formatDateFull(parseISODate(o.movement_date))}</span>
           ${renderPaymentBadge(o.payment_method, isDette ? false : true)}
         </div>`).join("")}
       </div>`
@@ -270,11 +274,11 @@ function renderInboundDetailLine(inbound, c) {
     <li class="list-item" style="flex-direction:column;align-items:stretch;gap:4px">
       <div class="purchase-detail-row">
         <div>
-          <div class="list-item-name">${title} · ${money(inbound.amount)} DH</div>
+          <div class="list-item-name">${amountLine}</div>
           ${timeline}
         </div>
         <div class="purchase-detail-trailing">
-          ${!closed ? renderPaymentBadge(inbound.payment_method, true) : ""}
+          ${!closed && appliedRows.length === 0 ? renderPaymentBadge(inbound.payment_method, true) : ""}
           ${(editable || canReturn) ? `
           <div class="purchase-detail-actions">
             ${editable ? `
