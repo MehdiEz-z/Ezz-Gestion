@@ -8,6 +8,7 @@ import {
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
 import { esc, formatDateFull, money, parseISODate, renderDateField } from "../shared/utils.js";
+import { preserveScroll } from "../shared/ui-persist.js";
 
 function renderPaymentMethodBadge(paymentMethod) {
   const pm = paymentMethod === "especes" ? "especes" : "banque";
@@ -28,6 +29,7 @@ function renderPaymentMethodPicker(selected = "banque") {
 }
 
 export function render() {
+  preserveScroll(() => {
   document.getElementById("subtabs").innerHTML = `
     <button class="subtab ${ui.subTab === "synthese" ? "active" : ""}" data-action="set-subtab" data-tab="synthese">Synthèse</button>
     <button class="subtab ${ui.subTab === "referentiel" ? "active" : ""}" data-action="set-subtab" data-tab="referentiel">Référentiel</button>
@@ -39,6 +41,7 @@ export function render() {
   else main.innerHTML = renderDossiersTab();
 
   document.getElementById("modal-root").innerHTML = ui.modal ? renderModal() : "";
+  });
 }
 
 function renderDualProgress(spent, cnss, ass) {
