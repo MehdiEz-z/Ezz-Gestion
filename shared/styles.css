@@ -725,9 +725,18 @@ body.read-only-mode #app [data-form] { display: none !important; }
 }
 
 .reimb-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 13px;
   font-weight: 700;
   margin-bottom: 8px;
+}
+
+.reimb-delay-badge {
+  flex-shrink: 0;
+  font-weight: 600;
 }
 
 body.module-eau-elec.read-only-mode [data-action="pay-elec"],
