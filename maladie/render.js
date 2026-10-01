@@ -340,12 +340,14 @@ function renderReimbBlock(d, block, editable) {
   const receivedDate = isCnss ? d.cnss_received_date : d.assurance_received_date;
   const delayDays = received != null ? reimbursementDelayDays(depositDate, receivedDate) : null;
   const delayBadge = delayDays != null
-    ? ` <span class="badge badge-current" title="Jours entre dépôt et saisie du remboursement">(${delayDays})</span>`
+    ? `<span class="badge badge-current reimb-delay-badge" title="Jours entre dépôt et saisie du remboursement">${delayDays}</span>`
     : "";
   const blockEditable = editable && received == null;
   return `
     <div class="reimb-block" style="border-color:${color}">
-      <div class="reimb-title" style="color:${color}">${label}${delayBadge}</div>
+      <div class="reimb-title" style="color:${color}">
+        <span>${label}</span>${delayBadge}
+      </div>
       ${blockEditable ? `
         <form class="form-col" data-form="update-reimb" data-dossier-id="${d.id}" data-block="${block}">
           <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant" required />
