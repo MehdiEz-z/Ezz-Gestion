@@ -131,24 +131,47 @@ export function getPeriodDisplayRows(type, periodKey) {
     rows.push({ name, categoryId: null, orphanOnly: true });
   }
 
-  function rowActivityDate(row) {
-    const purchases = purchasesForPeriodRow(row, type, periodKey);
-    if (purchases.length) return purchases[0].date;
-    if (row.categoryId) {
-      const pc = state.periodCategories.find(
-        x => x.type === type && x.period_key === periodKey && x.category_id === row.categoryId,
-      );
-      if (pc?.created_at) return String(pc.created_at).slice(0, 10);
-    }
-    return "1970-01-01";
+  function rowHasPurchases(row) {
+    return purchasesForPeriodRow(row, type, periodKey).length > 0;
   }
 
-  return rows.sort((a, b) => {
-    const da = rowActivityDate(a);
-    const db = rowActivityDate(b);
-    if (da !== db) return da < db ? 1 : -1;
+  /** Dernière date d'achat dans la période (tri chronologique des courses). */
+  function rowLastPurchaseDate(row) {
+    const purchases = purchasesForPeriodRow(row, type, periodKey);
+    return purchases.length ? purchases[0].date : null;
+  }
+
+  function rowAssignmentDate(row) {
+    if (!row.categoryId) return "9999-12-31";
+    const pc = state.periodCategories.find(
+      x => x.type === type && x.period_key === periodKey && x.category_id === row.categoryId,
+    );
+    if (pc?.created_at) return String(pc.created_at).slice(0, 10);
+    return "9999-12-31";
+  }
+
+  const withPurchases = [];
+  const assignedOnly = [];
+  for (const row of rows) {
+    if (rowHasPurchases(row)) withPurchases.push(row);
+    else assignedOnly.push(row);
+  }
+
+  withPurchases.sort((a, b) => {
+    const da = rowLastPurchaseDate(a);
+    const db = rowLastPurchaseDate(b);
+    if (da !== db) return da < db ? -1 : 1;
     return a.name.localeCompare(b.name, "fr");
   });
+
+  assignedOnly.sort((a, b) => {
+    const da = rowAssignmentDate(a);
+    const db = rowAssignmentDate(b);
+    if (da !== db) return da < db ? -1 : 1;
+    return a.name.localeCompare(b.name, "fr");
+  });
+
+  return [...withPurchases, ...assignedOnly];
 }
 
 export function getActiveCategoriesForPeriod(type, periodKey) {
