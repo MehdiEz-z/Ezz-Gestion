@@ -1,5 +1,6 @@
 import { isAdmin } from "../shared/auth.js";
 import { getActiveModule } from "../shared/router.js";
+import { dismissModal, saveSubTab } from "../shared/ui-persist.js";
 import {
   ui, state,
   setMonthBudget, setWeekBudget,
@@ -21,7 +22,7 @@ async function onClick(e) {
   if (e.target.classList && e.target.classList.contains("overlay")) {
     const type = e.target.dataset.overlayClose;
     if (type === "month") ui.monthPanelOpen = false;
-    else if (type === "modal") ui.modal = null;
+    else if (type === "modal") dismissModal(ui);
     render();
     return;
   }
@@ -30,13 +31,18 @@ async function onClick(e) {
   if (!target) return;
   const action = target.dataset.action;
 
-  if (action === "set-subtab") { ui.subTab = target.dataset.tab; render(); }
+  if (action === "set-subtab") {
+    ui.subTab = target.dataset.tab;
+    saveSubTab("maison", ui.subTab);
+    render();
+  }
   else if (action === "open-month-panel") { ui.monthPanelOpen = true; render(); }
   else if (action === "close-month-panel") { ui.monthPanelOpen = false; render(); }
   else if (action === "select-month") {
     ui.viewedMonthKey = target.dataset.month;
     ui.monthPanelOpen = false;
     ui.subTab = "budget";
+    saveSubTab("maison", ui.subTab);
     render();
   }
   else if (action === "toggle-card") {
@@ -131,7 +137,7 @@ async function onClick(e) {
   else if (action === "confirm-delete") {
     handleConfirmDelete(target.dataset.entity, target.dataset.id);
   }
-  else if (action === "close-modal") { ui.modal = null; render(); }
+  else if (action === "close-modal") { dismissModal(ui); render(); }
 }
 
 async function handleConfirmDelete(entity, id) {

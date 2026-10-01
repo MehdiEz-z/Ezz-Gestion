@@ -11,6 +11,7 @@ import {
   getMonthWeekSegments, findWeekSegmentForToday, monthChipLabel,
   monthLabel, monthsRange, money, parseISODate, toISO,
 } from "../shared/utils.js";
+import { preserveScroll } from "../shared/ui-persist.js";
 
 function weekSegmentStatus(seg, isActiveMonth) {
   if (!isActiveMonth) return "past";
@@ -49,6 +50,7 @@ function renderWeekAchatsPreview(monthKey, seg, status) {
 }
 
 export function render() {
+  preserveScroll(() => {
   const controls = document.getElementById("maison-controls");
   if (controls) controls.style.display = ui.subTab === "categories" ? "none" : "flex";
 
@@ -70,6 +72,7 @@ export function render() {
 
   document.getElementById("modal-root").innerHTML =
     ui.monthPanelOpen ? renderMonthPanel() : (ui.modal ? renderModal() : "");
+  });
 }
 
 function renderBudgetProgress(budget, total, colorVar) {

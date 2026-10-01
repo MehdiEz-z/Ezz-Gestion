@@ -6,8 +6,10 @@ import {
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
 import { esc, formatDateFull, money, parseISODate } from "../shared/utils.js";
+import { preserveScroll } from "../shared/ui-persist.js";
 
 export function render() {
+  preserveScroll(() => {
   document.getElementById("maison-controls").style.display = "none";
   document.getElementById("subtabs").innerHTML = `
     <button class="subtab ${ui.subTab === "synthese" ? "active" : ""}" data-action="set-subtab" data-tab="synthese">Synthèse</button>
@@ -20,6 +22,7 @@ export function render() {
   else main.innerHTML = renderMouvementsTab();
 
   document.getElementById("modal-root").innerHTML = ui.modal ? renderModal() : "";
+  });
 }
 
 function renderPaymentMethodPicker(selected, flow) {

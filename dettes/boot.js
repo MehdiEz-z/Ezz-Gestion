@@ -1,3 +1,4 @@
+import { loadSubTab } from "../shared/ui-persist.js";
 import { fetchStateFromSupabase, ui } from "./data.js";
 import { loadWalletData } from "../shared/wallet.js";
 import { render } from "./render.js";
@@ -26,6 +27,7 @@ export async function activate() {
     await loadWalletData();
     await fetchStateFromSupabase();
   }
+  ui.subTab = loadSubTab("dettes", ui.subTab);
   render();
 }
 

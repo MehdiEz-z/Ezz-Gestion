@@ -1,3 +1,9 @@
+import {
+  getOwnerUtilityPaymentMethod,
+  setOwnerUtilityPaymentMethod,
+  dismissModal,
+  saveSubTab,
+} from "../shared/ui-persist.js";
 import { getActiveModule } from "../shared/router.js";
 import {
   ui, state,
@@ -18,7 +24,7 @@ function onClick(e) {
   if (e.target.classList && e.target.classList.contains("overlay")) {
     const type = e.target.dataset.overlayClose;
     if (type === "month") ui.monthPanelOpen = false;
-    else if (type === "modal") ui.modal = null;
+    else if (type === "modal") dismissModal(ui);
     render();
     return;
   }
@@ -27,13 +33,18 @@ function onClick(e) {
   if (!target) return;
   const action = target.dataset.action;
 
-  if (action === "set-subtab") { ui.subTab = target.dataset.tab; render(); }
+  if (action === "set-subtab") {
+    ui.subTab = target.dataset.tab;
+    saveSubTab("eau-elec", ui.subTab);
+    render();
+  }
   else if (action === "open-month-panel") { ui.monthPanelOpen = true; render(); }
   else if (action === "close-month-panel") { ui.monthPanelOpen = false; render(); }
   else if (action === "select-month") {
     ui.viewedMonthKey = target.dataset.month;
     ui.monthPanelOpen = false;
     ui.subTab = "factures";
+    saveSubTab("eau-elec", ui.subTab);
     render();
   }
   else if (action === "toggle-card") {
@@ -62,8 +73,14 @@ function onClick(e) {
   else if (action === "pay-elec") {
     const personId = target.dataset.personId;
     const monthKey = target.dataset.monthKey;
+    const forceModal = target.dataset.choosePm === "1";
     const p = state.persons.find(x => x.id === personId);
     if (p?.is_app_owner) {
+      const stored = getOwnerUtilityPaymentMethod();
+      if (!forceModal && stored) {
+        markElecPaid(monthKey, personId, stored).then(() => render());
+        return;
+      }
       ui.modal = { type: "utility-pay", utility: "elec", monthKey, personId };
       render();
     } else {
@@ -73,15 +90,21 @@ function onClick(e) {
   else if (action === "pay-water") {
     const personId = target.dataset.personId;
     const monthKey = target.dataset.monthKey;
+    const forceModal = target.dataset.choosePm === "1";
     const p = state.persons.find(x => x.id === personId);
     if (p?.is_app_owner) {
+      const stored = getOwnerUtilityPaymentMethod();
+      if (!forceModal && stored) {
+        markWaterPaid(monthKey, personId, stored).then(() => render());
+        return;
+      }
       ui.modal = { type: "utility-pay", utility: "water", monthKey, personId };
       render();
     } else {
       markWaterPaid(monthKey, personId).then(() => render());
     }
   }
-  else if (action === "close-modal") { ui.modal = null; render(); }
+  else if (action === "close-modal") { dismissModal(ui); render(); }
 }
 
 async function onSubmit(e) {
@@ -122,7 +145,10 @@ async function onSubmit(e) {
     const ok = utility === "water"
       ? await markWaterPaid(monthKey, personId, pm)
       : await markElecPaid(monthKey, personId, pm);
-    if (ok) ui.modal = null;
+    if (ok) {
+      setOwnerUtilityPaymentMethod(pm);
+      ui.modal = null;
+    }
     render();
   }
 }

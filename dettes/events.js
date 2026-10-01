@@ -1,4 +1,5 @@
 import { getActiveModule } from "../shared/router.js";
+import { dismissModal, saveSubTab } from "../shared/ui-persist.js";
 import { loadWalletData } from "../shared/wallet.js";
 import {
   ui,
@@ -18,7 +19,7 @@ function onClick(e) {
 
   if (e.target.classList && e.target.classList.contains("overlay")) {
     if (e.target.dataset.overlayClose === "modal") {
-      ui.modal = null;
+      dismissModal(ui);
       render();
     }
     return;
@@ -28,7 +29,11 @@ function onClick(e) {
   if (!target) return;
   const action = target.dataset.action;
 
-  if (action === "set-subtab") { ui.subTab = target.dataset.tab; render(); }
+  if (action === "set-subtab") {
+    ui.subTab = target.dataset.tab;
+    saveSubTab("dettes", ui.subTab);
+    render();
+  }
   else if (action === "toggle-card") {
     const key = target.dataset.key;
     if (ui.expanded.has(key)) ui.expanded.delete(key);
@@ -63,17 +68,24 @@ function onClick(e) {
     render();
   }
   else if (action === "open-debt-action") {
+    const prev = ui.modal?.type === "debt-detail" ? { ...ui.modal } : null;
     ui.modal = {
       type: "debt-action",
       categoryId: target.dataset.categoryId,
       actionType: target.dataset.actionType,
       maxAmount: target.dataset.maxAmount ? Number(target.dataset.maxAmount) : null,
       linkedInboundId: target.dataset.linkedInboundId || null,
+      returnTo: prev,
     };
     render();
   }
   else if (action === "open-edit-debt-movement") {
-    ui.modal = { type: "edit-debt-movement", movementId: target.dataset.movementId };
+    const prev = ui.modal?.type === "debt-detail" ? { ...ui.modal } : null;
+    ui.modal = {
+      type: "edit-debt-movement",
+      movementId: target.dataset.movementId,
+      returnTo: prev,
+    };
     render();
   }
   else if (action === "delete-debt-movement") {
@@ -94,7 +106,7 @@ function onClick(e) {
       render();
     });
   }
-  else if (action === "close-modal") { ui.modal = null; render(); }
+  else if (action === "close-modal") { dismissModal(ui); render(); }
 }
 
 async function onSubmit(e) {
@@ -144,8 +156,9 @@ async function onSubmit(e) {
     );
     if (ok) {
       await loadWalletData();
+      const returnTo = ui.modal?.returnTo;
       const mov = getMovement(form.dataset.movementId);
-      if (mov) ui.modal = { type: "debt-detail", categoryId: mov.category_id };
+      ui.modal = returnTo || (mov ? { type: "debt-detail", categoryId: mov.category_id } : null);
     }
     render();
   }

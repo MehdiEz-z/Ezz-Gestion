@@ -131,7 +131,24 @@ export function getPeriodDisplayRows(type, periodKey) {
     rows.push({ name, categoryId: null, orphanOnly: true });
   }
 
-  return rows.sort((a, b) => a.name.localeCompare(b.name, "fr"));
+  function rowActivityDate(row) {
+    const purchases = purchasesForPeriodRow(row, type, periodKey);
+    if (purchases.length) return purchases[0].date;
+    if (row.categoryId) {
+      const pc = state.periodCategories.find(
+        x => x.type === type && x.period_key === periodKey && x.category_id === row.categoryId,
+      );
+      if (pc?.created_at) return String(pc.created_at).slice(0, 10);
+    }
+    return "1970-01-01";
+  }
+
+  return rows.sort((a, b) => {
+    const da = rowActivityDate(a);
+    const db = rowActivityDate(b);
+    if (da !== db) return da < db ? 1 : -1;
+    return a.name.localeCompare(b.name, "fr");
+  });
 }
 
 export function getActiveCategoriesForPeriod(type, periodKey) {

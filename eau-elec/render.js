@@ -10,6 +10,7 @@ import {
   activeMonthKey, esc, EAU_START_MONTH, monthChipLabel, monthLabel,
   monthsRangeFrom, money, previousMonthKey,
 } from "../shared/utils.js";
+import { getOwnerUtilityPaymentMethod, preserveScroll } from "../shared/ui-persist.js";
 
 function renderDualProgress(paid, total, paidElec, paidWater) {
   const pct = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
@@ -92,8 +93,13 @@ function renderReferentielTab() {
       <button type="submit" class="btn-primary">Ajouter la personne</button>
     </form>`;
 
+  const ownerHint = isAdmin && state.persons.length > 1 && !state.persons.some(p => p.is_app_owner)
+    ? `<div class="small-label">Définissez le propriétaire de l'app avec 👤 (une seule fois).</div>`
+    : "";
+
   return `
     <div class="stack">
+      ${ownerHint}
       ${isAdmin ? renderExpandableAddCard("ref:add-person", "Ajouter une personne", addForm) : ""}
       <div class="card" style="border-color:var(--month)">
         <div class="card-head" data-action="toggle-card" data-key="ref:persons">
@@ -166,7 +172,11 @@ function renderElecPersonBlock(monthKey, p, bill) {
     : "";
 
   const payBtn = hasMeters && sharesReady && share > 0 && canEdit
-    ? `<button type="button" class="btn-small" style="background:var(--month);margin-top:6px;width:100%" data-action="pay-elec" data-month-key="${monthKey}" data-person-id="${p.id}">Payer</button>`
+    ? `<button type="button" class="btn-small" style="background:var(--month);margin-top:6px;width:100%" data-action="pay-elec" data-month-key="${monthKey}" data-person-id="${p.id}">Payer</button>${
+      p.is_app_owner && getOwnerUtilityPaymentMethod()
+        ? `<button type="button" class="btn-link small-label" style="margin-top:4px;width:100%" data-action="pay-elec" data-choose-pm="1" data-month-key="${monthKey}" data-person-id="${p.id}">Changer carte / espèces</button>`
+        : ""
+    }`
     : "";
 
   const paidBadge = isPaid ? `<span class="badge badge-current" style="margin-top:6px">Payé</span>` : "";
@@ -192,7 +202,11 @@ function renderWaterPersonBlock(monthKey, p, bill) {
   const partLine = renderUtilityKvRow("Part :", `${money(share)} DH`, true);
 
   const payBtn = hasBill && shareRow && canEdit
-    ? `<button type="button" class="btn-small" style="background:var(--week);margin-top:6px;width:100%" data-action="pay-water" data-month-key="${monthKey}" data-person-id="${p.id}">Payer</button>`
+    ? `<button type="button" class="btn-small" style="background:var(--week);margin-top:6px;width:100%" data-action="pay-water" data-month-key="${monthKey}" data-person-id="${p.id}">Payer</button>${
+      p.is_app_owner && getOwnerUtilityPaymentMethod()
+        ? `<button type="button" class="btn-link small-label" style="margin-top:4px;width:100%" data-action="pay-water" data-choose-pm="1" data-month-key="${monthKey}" data-person-id="${p.id}">Changer carte / espèces</button>`
+        : ""
+    }`
     : "";
 
   const paidBadge = isPaid ? `<span class="badge badge-current" style="margin-top:6px">Payé</span>` : "";
@@ -370,7 +384,7 @@ function renderModal() {
         <div class="sheet">
           <div class="sheet-title">Payer ${label} <button class="close-btn" data-action="close-modal">✕</button></div>
           <form class="form-col" data-form="confirm-utility-pay" data-month-key="${m.monthKey}" data-person-id="${m.personId}" data-utility="${m.utility}">
-            ${renderPaymentMethodPicker("banque")}
+            ${renderPaymentMethodPicker(getOwnerUtilityPaymentMethod() || "banque")}
             <button type="submit" class="btn-primary">Confirmer le paiement</button>
           </form>
         </div>
@@ -396,6 +410,7 @@ function renderModal() {
 }
 
 export function render() {
+  preserveScroll(() => {
   const controls = document.getElementById("maison-controls");
   if (controls) controls.style.display = ui.subTab === "factures" ? "flex" : "none";
 
@@ -415,4 +430,5 @@ export function render() {
 
   document.getElementById("modal-root").innerHTML =
     ui.monthPanelOpen ? renderMonthPanel() : (ui.modal ? renderModal() : "");
+  });
 }
