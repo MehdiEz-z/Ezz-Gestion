@@ -1,4 +1,5 @@
 import { activeMonthKey } from "../shared/utils.js";
+import { loadSubTab } from "../shared/ui-persist.js";
 import { loadWalletData } from "../shared/wallet.js";
 import { ui, fetchStateFromSupabase, loadMaladieLookup } from "./data.js";
 import { render } from "./render.js";
@@ -28,6 +29,7 @@ export async function activate() {
   } else {
     await Promise.all([loadWalletData(), loadMaladieLookup()]);
   }
+  ui.subTab = loadSubTab("tresorerie", ui.subTab);
   render();
 }
 
