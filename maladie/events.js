@@ -1,4 +1,5 @@
 import { getActiveModule } from "../shared/router.js";
+import { dismissModal, saveSubTab } from "../shared/ui-persist.js";
 import {
   ui,
   addBeneficiary, updateBeneficiary,
@@ -21,7 +22,7 @@ function onClick(e) {
 
   if (e.target.classList && e.target.classList.contains("overlay")) {
     if (e.target.dataset.overlayClose === "modal") {
-      ui.modal = null;
+      dismissModal(ui);
       render();
     }
     return;
@@ -31,7 +32,11 @@ function onClick(e) {
   if (!target) return;
   const action = target.dataset.action;
 
-  if (action === "set-subtab") { ui.subTab = target.dataset.tab; render(); }
+  if (action === "set-subtab") {
+    ui.subTab = target.dataset.tab;
+    saveSubTab("maladie", ui.subTab);
+    render();
+  }
   else if (action === "toggle-card") {
     const key = target.dataset.key;
     if (ui.expanded.has(key)) ui.expanded.delete(key);
@@ -83,7 +88,13 @@ function onClick(e) {
     cancelDossier(target.dataset.dossierId).then(() => render());
   }
   else if (action === "open-add-action") {
-    ui.modal = { type: "add-action", dossierId: target.dataset.dossierId, categoryId: target.dataset.categoryId };
+    const prev = ui.modal?.type === "action-details" ? { ...ui.modal } : null;
+    ui.modal = {
+      type: "add-action",
+      dossierId: target.dataset.dossierId,
+      categoryId: target.dataset.categoryId,
+      returnTo: prev,
+    };
     render();
   }
   else if (action === "open-action-details") {
@@ -108,7 +119,7 @@ function onClick(e) {
       render();
     });
   }
-  else if (action === "close-modal") { ui.modal = null; render(); }
+  else if (action === "close-modal") { dismissModal(ui); render(); }
 }
 
 async function onSubmit(e) {
@@ -196,7 +207,10 @@ async function onSubmit(e) {
       form.action_date.value,
       form.payment_method?.value,
     );
-    if (ok) ui.modal = null;
+    if (ok) {
+      const returnTo = ui.modal?.returnTo;
+      ui.modal = returnTo || null;
+    }
     render();
   }
   else if (type === "edit-action") {
