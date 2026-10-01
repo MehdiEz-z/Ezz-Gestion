@@ -42,6 +42,11 @@ export async function fetchStateFromSupabase() {
   state.bills = bills.data || [];
   state.elecReadings = elec.data || [];
   state.waterShares = water.data || [];
+
+  const hasOwner = state.persons.some(p => p.is_app_owner);
+  if (isAdmin && !hasOwner && state.persons.length === 1) {
+    await setPersonAppOwner(state.persons[0].id);
+  }
 }
 
 export function personName(p) {
