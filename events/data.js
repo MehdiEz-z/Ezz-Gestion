@@ -33,17 +33,21 @@ export async function fetchStateFromSupabase() {
     state.projects = projects.data || [];
   }
   if (sections.error) {
-    flash(getErrorMessage(sections.error, "Erreur chargement blocs."), true);
+    flash(getErrorMessage(sections.error, "Erreur chargement sections (table event_sections / supabase/events.sql)."), true);
     state.sections = [];
   } else {
     state.sections = sections.data || [];
   }
   if (lines.error) {
-    flash(getErrorMessage(lines.error, "Erreur chargement lignes."), true);
+    flash(getErrorMessage(lines.error, "Erreur chargement lignes (table event_lines / supabase/events.sql)."), true);
     state.lines = [];
   } else {
     state.lines = lines.data || [];
   }
+}
+
+async function reloadAfterWrite() {
+  await fetchStateFromSupabase();
 }
 
 export function sectionsForProject(projectId) {
@@ -63,14 +67,15 @@ export function projectTotal(projectId) {
 }
 
 export async function addProject(name) {
-  if (!isAdmin) return false;
+  if (!isAdmin) return null;
   const n = name.trim();
-  if (!n) { flash("Nom de l'événement obligatoire.", true); return false; }
+  if (!n) { flash("Nom de l'événement obligatoire.", true); return null; }
   const { data, error } = await supabaseClient.from("event_projects").insert({ name: n }).select().single();
   if (error) { flash(getErrorMessage(error, "Erreur création événement."), true); return null; }
-  state.projects.push(data);
+  await reloadAfterWrite();
+  const created = state.projects.find(p => p.id === data.id) || data;
   flash("Événement créé.");
-  return data;
+  return created;
 }
 
 export async function updateProject(projectId, name) {
@@ -80,34 +85,35 @@ export async function updateProject(projectId, name) {
   const { data, error } = await supabaseClient.from("event_projects")
     .update({ name: n }).eq("id", projectId).select().single();
   if (error) { flash(getErrorMessage(error, "Erreur modification."), true); return false; }
-  const p = state.projects.find(x => x.id === projectId);
-  if (p) Object.assign(p, data);
   flash("Événement modifié.");
+  await reloadAfterWrite();
   return true;
 }
 
 export async function deleteProject(projectId) {
   if (!isAdmin) return false;
-  const secIds = state.sections.filter(s => s.project_id === projectId).map(s => s.id);
   const { error } = await supabaseClient.from("event_projects").delete().eq("id", projectId);
   if (error) { flash(getErrorMessage(error, "Erreur suppression."), true); return false; }
-  state.projects = state.projects.filter(p => p.id !== projectId);
-  state.sections = state.sections.filter(s => s.project_id !== projectId);
-  state.lines = state.lines.filter(l => !secIds.includes(l.section_id));
   flash("Événement supprimé.");
+  await reloadAfterWrite();
   return true;
 }
 
 export async function addSection(projectId, name) {
   if (!isAdmin) return false;
   const n = name.trim();
-  if (!n) { flash("Nom du bloc obligatoire.", true); return false; }
+  if (!n) { flash("Nom de la section obligatoire.", true); return false; }
   const { data, error } = await supabaseClient.from("event_sections")
     .insert({ project_id: projectId, name: n }).select().single();
-  if (error) { flash(getErrorMessage(error, "Erreur ajout bloc."), true); return null; }
-  state.sections.push(data);
-  flash("Bloc ajouté.");
-  return data;
+  if (error) { flash(getErrorMessage(error, "Erreur ajout section."), true); return null; }
+  await reloadAfterWrite();
+  const created = state.sections.find(s => s.id === data.id);
+  if (!created) {
+    flash("Section créée mais non retrouvée après enregistrement. Exécutez supabase/events.sql (event_sections).", true);
+    return null;
+  }
+  flash("Section ajoutée.");
+  return created;
 }
 
 export async function updateSection(sectionId, name) {
@@ -116,20 +122,18 @@ export async function updateSection(sectionId, name) {
   if (!n) { flash("Nom obligatoire.", true); return false; }
   const { data, error } = await supabaseClient.from("event_sections")
     .update({ name: n }).eq("id", sectionId).select().single();
-  if (error) { flash(getErrorMessage(error, "Erreur modification bloc."), true); return false; }
-  const s = state.sections.find(x => x.id === sectionId);
-  if (s) Object.assign(s, data);
-  flash("Bloc modifié.");
+  if (error) { flash(getErrorMessage(error, "Erreur modification section."), true); return false; }
+  flash("Section modifiée.");
+  await reloadAfterWrite();
   return true;
 }
 
 export async function deleteSection(sectionId) {
   if (!isAdmin) return false;
   const { error } = await supabaseClient.from("event_sections").delete().eq("id", sectionId);
-  if (error) { flash(getErrorMessage(error, "Erreur suppression bloc."), true); return false; }
-  state.sections = state.sections.filter(s => s.id !== sectionId);
-  state.lines = state.lines.filter(l => l.section_id !== sectionId);
-  flash("Bloc supprimé.");
+  if (error) { flash(getErrorMessage(error, "Erreur suppression section."), true); return false; }
+  flash("Section supprimée.");
+  await reloadAfterWrite();
   return true;
 }
 
@@ -142,7 +146,11 @@ export async function addLine(sectionId, label, amount) {
   const { data, error } = await supabaseClient.from("event_lines")
     .insert({ section_id: sectionId, label: lbl, amount: amt }).select().single();
   if (error) { flash(getErrorMessage(error, "Erreur ajout ligne."), true); return false; }
-  state.lines.push(data);
+  await reloadAfterWrite();
+  if (!state.lines.some(l => l.id === data.id)) {
+    flash("Ligne créée mais non retrouvée après enregistrement. Exécutez supabase/events.sql (event_lines).", true);
+    return false;
+  }
   flash("Ligne ajoutée.");
   return true;
 }
@@ -156,9 +164,8 @@ export async function updateLine(lineId, label, amount) {
   const { data, error } = await supabaseClient.from("event_lines")
     .update({ label: lbl, amount: amt }).eq("id", lineId).select().single();
   if (error) { flash(getErrorMessage(error, "Erreur modification ligne."), true); return false; }
-  const l = state.lines.find(x => x.id === lineId);
-  if (l) Object.assign(l, data);
   flash("Ligne modifiée.");
+  await reloadAfterWrite();
   return true;
 }
 
@@ -166,8 +173,8 @@ export async function deleteLine(lineId) {
   if (!isAdmin) return false;
   const { error } = await supabaseClient.from("event_lines").delete().eq("id", lineId);
   if (error) { flash(getErrorMessage(error, "Erreur suppression ligne."), true); return false; }
-  state.lines = state.lines.filter(l => l.id !== lineId);
   flash("Ligne supprimée.");
+  await reloadAfterWrite();
   return true;
 }
 
