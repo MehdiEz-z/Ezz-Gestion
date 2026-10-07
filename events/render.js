@@ -42,41 +42,36 @@ function renderLineRow(line) {
     </li>`;
 }
 
-function renderSectionBlock(section, projectId) {
+function renderSectionBlock(section) {
+  const secKey = `evt-section:${section.id}`;
+  const secOpen = ui.expanded.has(secKey);
   const lines = linesForSection(section.id);
   const total = sectionTotal(section.id);
-  const addKey = `evt-sec-add:${section.id}`;
-  const addOpen = ui.expanded.has(addKey);
-  const addForm = isAdmin ? `
-    <div class="card card-add" style="margin-top:8px;border-style:dashed">
-      <div class="card-head" data-action="toggle-card" data-key="${addKey}">
-        <div class="card-title" style="font-size:13px">＋ Ligne</div>
-        <span class="chevron">${addOpen ? "▲" : "▼"}</span>
-      </div>
-      <div class="card-body ${addOpen ? "open" : ""}">
-        <form class="form-col" data-form="add-line" data-section-id="${section.id}">
-          <input class="field" name="label" placeholder="Libellé" required />
-          <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant DH" required />
-          <button type="submit" class="btn-primary">Ajouter</button>
-        </form>
-      </div>
-    </div>` : "";
+  const addLineForm = isAdmin ? `
+    <form class="form-col" data-form="add-line" data-section-id="${section.id}" style="margin-top:10px">
+      <input class="field" name="label" required />
+      <input class="field" name="amount" type="number" min="0" step="0.01" required />
+      <button type="submit" class="btn-small" style="background:var(--week)">Ajouter une ligne</button>
+    </form>` : "";
 
   return `
-    <div class="event-section-block" style="margin-top:12px;padding:10px;border:1px solid var(--border);border-radius:10px">
-      <div class="purchase-detail-row" style="margin-bottom:8px">
-        <div class="list-item-name" style="color:var(--week)">${esc(section.name)}</div>
-        <div class="list-item-right">
+    <div class="card" style="margin-top:10px;border-color:var(--week)">
+      <div class="card-head" data-action="toggle-card" data-key="${secKey}">
+        <div class="card-title" style="color:var(--week);font-size:14px">${esc(section.name)}</div>
+        <div style="display:flex;align-items:center;gap:8px">
           <span class="small-label"><strong>${money(total)} DH</strong></span>
           ${isAdmin ? `
-          <button class="icon-btn edit" data-action="open-edit-section" data-section-id="${section.id}" title="Modifier bloc">✏️</button>
-          <button class="btn-delete" data-action="delete-section" data-section-id="${section.id}" title="Supprimer bloc">🗑️</button>` : ""}
+          <button type="button" class="icon-btn edit" data-action="open-edit-section" data-section-id="${section.id}" title="Modifier">✏️</button>
+          <button type="button" class="btn-delete" data-action="delete-section" data-section-id="${section.id}" title="Supprimer">🗑️</button>` : ""}
+          <span class="chevron">${secOpen ? "▲" : "▼"}</span>
         </div>
       </div>
-      ${lines.length === 0
+      <div class="card-body ${secOpen ? "open" : ""}">
+        ${lines.length === 0
     ? `<div class="small-label">Aucune ligne.</div>`
     : `<ul class="list">${lines.map(renderLineRow).join("")}</ul>`}
-      ${addForm}
+        ${addLineForm}
+      </div>
     </div>`;
 }
 
@@ -95,7 +90,7 @@ function renderProjectCard(project) {
       </div>
       <div class="card-body ${addSecOpen ? "open" : ""}">
         <form class="form-col" data-form="add-section" data-project-id="${project.id}">
-          <input class="field" name="name" placeholder="Ex. Électricité, Bucheron…" required />
+          <input class="field" name="name" required />
           <button type="submit" class="btn-primary">Ajouter le bloc</button>
         </form>
       </div>
@@ -118,7 +113,7 @@ function renderProjectCard(project) {
       <div class="card-body ${open ? "open" : ""}">
         ${sections.length === 0 && !isAdmin
     ? `<div class="small-label">Aucun bloc.</div>`
-    : sections.map(s => renderSectionBlock(s, project.id)).join("")}
+    : sections.map(s => renderSectionBlock(s)).join("")}
         ${addSectionCard}
       </div>
     </div>`;
@@ -127,7 +122,7 @@ function renderProjectCard(project) {
 function renderListTab() {
   const addForm = isAdmin ? renderExpandableAddCard("evt:add-project", "Ajouter un événement", `
     <form class="form-col" data-form="add-project">
-      <input class="field" name="name" placeholder="Nom de l'événement" required />
+      <input class="field" name="name" required />
       <button type="submit" class="btn-primary">Créer</button>
     </form>`) : "";
 
