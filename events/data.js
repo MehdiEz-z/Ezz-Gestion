@@ -67,10 +67,10 @@ export async function addProject(name) {
   const n = name.trim();
   if (!n) { flash("Nom de l'événement obligatoire.", true); return false; }
   const { data, error } = await supabaseClient.from("event_projects").insert({ name: n }).select().single();
-  if (error) { flash(getErrorMessage(error, "Erreur création événement."), true); return false; }
+  if (error) { flash(getErrorMessage(error, "Erreur création événement."), true); return null; }
   state.projects.push(data);
   flash("Événement créé.");
-  return true;
+  return data;
 }
 
 export async function updateProject(projectId, name) {
@@ -104,10 +104,10 @@ export async function addSection(projectId, name) {
   if (!n) { flash("Nom du bloc obligatoire.", true); return false; }
   const { data, error } = await supabaseClient.from("event_sections")
     .insert({ project_id: projectId, name: n }).select().single();
-  if (error) { flash(getErrorMessage(error, "Erreur ajout bloc."), true); return false; }
+  if (error) { flash(getErrorMessage(error, "Erreur ajout bloc."), true); return null; }
   state.sections.push(data);
   flash("Bloc ajouté.");
-  return true;
+  return data;
 }
 
 export async function updateSection(sectionId, name) {
