@@ -6,6 +6,7 @@ const MODULE_META = {
   dettes: { title: "Dettes & épargne", maisonControls: false },
   maladie: { title: "Dossier maladie", maisonControls: false },
   "eau-elec": { title: "Eau & Électricité", maisonControls: true },
+  events: { title: "Événements", maisonControls: false },
 };
 
 const LOADERS = {
@@ -14,6 +15,7 @@ const LOADERS = {
   dettes: () => import("../dettes/boot.js"),
   maladie: () => import("../maladie/boot.js"),
   "eau-elec": () => import("../eau-elec/boot.js"),
+  events: () => import("../events/boot.js"),
 };
 
 let activeModule = null;
@@ -42,7 +44,7 @@ function updateHeaderUI(id) {
   if (controls && id !== "eau-elec") {
     controls.style.display = meta.maisonControls ? "flex" : "none";
   }
-  document.body.classList.remove("module-maison", "module-tresorerie", "module-dettes", "module-maladie", "module-eau-elec");
+  document.body.classList.remove("module-maison", "module-tresorerie", "module-dettes", "module-maladie", "module-eau-elec", "module-events");
   document.body.classList.add("module-" + id);
 }
 
