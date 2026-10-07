@@ -3,9 +3,11 @@ import { dismissModal } from "../shared/ui-persist.js";
 import {
   ui,
   addProject, updateProject, deleteProject,
+  addBlock, updateBlock, deleteBlock,
   addSection, updateSection, deleteSection,
+  addCategory, updateCategory, deleteCategory,
   addLine, updateLine, deleteLine,
-  getSection, getLine,
+  getCategory, getLine,
 } from "./data.js";
 import { render } from "./render.js";
 
@@ -17,7 +19,9 @@ export function setupEvents() {
 function modalReturnTo() {
   const m = ui.modal;
   if (!m) return null;
-  if (m.type === "category-detail") return { type: "category-detail", sectionId: m.sectionId };
+  if (m.type === "category-detail") {
+    return { type: "category-detail", categoryId: m.categoryId };
+  }
   return m.returnTo ? { ...m.returnTo } : null;
 }
 
@@ -46,36 +50,43 @@ function onClick(e) {
     ui.modal = { type: "edit-project", projectId: target.dataset.projectId };
     render();
   }
-  else if (action === "open-edit-section") {
+  else if (action === "open-edit-block") {
+    ui.modal = { type: "edit-block", blockId: target.dataset.blockId };
+    render();
+  }
+  else if (action === "open-edit-subsection") {
+    ui.modal = { type: "edit-subsection", sectionId: target.dataset.sectionId };
+    render();
+  }
+  else if (action === "open-edit-category") {
     const prev = ui.modal?.type === "category-detail"
-      ? { type: "category-detail", sectionId: ui.modal.sectionId }
+      ? { type: "category-detail", categoryId: ui.modal.categoryId }
       : null;
-    ui.modal = { type: "edit-section", sectionId: target.dataset.sectionId, returnTo: prev };
+    ui.modal = { type: "edit-category", categoryId: target.dataset.categoryId, returnTo: prev };
     render();
   }
   else if (action === "open-edit-line") {
     const prev = ui.modal?.type === "category-detail"
-      ? { type: "category-detail", sectionId: ui.modal.sectionId }
+      ? { type: "category-detail", categoryId: ui.modal.categoryId }
       : (ui.modal?.returnTo ?? null);
     ui.modal = { type: "edit-line", lineId: target.dataset.lineId, returnTo: prev };
     render();
   }
   else if (action === "open-category-detail") {
-    ui.modal = { type: "category-detail", sectionId: target.dataset.sectionId };
+    ui.modal = { type: "category-detail", categoryId: target.dataset.categoryId };
     render();
   }
   else if (action === "open-add-line") {
-    ui.modal = { type: "add-line", sectionId: target.dataset.sectionId };
+    ui.modal = { type: "add-line", categoryId: target.dataset.categoryId };
     render();
   }
   else if (action === "open-delete-confirm") {
-    const prev = modalReturnTo();
     ui.modal = {
       type: "confirm-delete",
       entity: target.dataset.entity,
       id: target.dataset.id,
       label: target.dataset.label,
-      returnTo: prev,
+      returnTo: modalReturnTo(),
     };
     render();
   }
@@ -95,21 +106,19 @@ async function handleConfirmDelete(entity, id) {
   const returnTo = ui.modal?.returnTo;
   let ok = false;
   if (entity === "project") ok = await deleteProject(id);
-  else if (entity === "category") ok = await deleteSection(id);
+  else if (entity === "block") ok = await deleteBlock(id);
+  else if (entity === "subsection") ok = await deleteSection(id);
+  else if (entity === "category") ok = await deleteCategory(id);
   else if (entity === "line") ok = await deleteLine(id);
 
   if (!ok) return;
 
   if (entity === "line" && returnTo?.type === "category-detail") {
-    const section = getSection(returnTo.sectionId);
-    if (section) ui.modal = returnTo;
-    else ui.modal = null;
-  } else if (entity === "category" && returnTo?.type === "category-detail" && returnTo.sectionId === id) {
-    ui.modal = null;
-  } else if (entity === "project") {
+    ui.modal = getCategory(returnTo.categoryId) ? returnTo : null;
+  } else if (entity === "category" && returnTo?.type === "category-detail" && returnTo.categoryId === id) {
     ui.modal = null;
   } else {
-    ui.modal = returnTo ?? null;
+    ui.modal = null;
   }
   render();
 }
@@ -120,7 +129,9 @@ async function handleConfirmSave(entity, id) {
 
   let ok = false;
   if (entity === "project") ok = await updateProject(id, m.payload.name);
-  else if (entity === "category") ok = await updateSection(id, m.payload.name);
+  else if (entity === "block") ok = await updateBlock(id, m.payload.name);
+  else if (entity === "subsection") ok = await updateSection(id, m.payload.name);
+  else if (entity === "category") ok = await updateCategory(id, m.payload.name);
   else if (entity === "line") ok = await updateLine(id, m.payload.label, m.payload.amount);
 
   if (!ok) return;
@@ -133,6 +144,10 @@ async function handleConfirmSave(entity, id) {
     ui.modal = null;
   }
   render();
+}
+
+function afterCategoryDetail(categoryId) {
+  ui.modal = { type: "category-detail", categoryId };
 }
 
 async function onSubmit(e) {
@@ -148,7 +163,7 @@ async function onSubmit(e) {
       form.reset();
       ui.expanded.delete("evt:add-project");
       ui.expanded.add(`evt-project:${created.id}`);
-      ui.expanded.add(`evt-proj-cat:${created.id}`);
+      ui.expanded.add(`evt-proj-block:${created.id}`);
     }
     render();
   }
@@ -163,40 +178,85 @@ async function onSubmit(e) {
     };
     render();
   }
-  else if (type === "add-section") {
+  else if (type === "add-block") {
     const projectId = form.dataset.projectId;
-    const created = await addSection(projectId, form.name.value);
+    const created = await addBlock(projectId, form.name.value);
     if (created) {
       form.reset();
-      ui.expanded.delete(`evt-proj-cat:${projectId}`);
+      ui.expanded.delete(`evt-proj-block:${projectId}`);
       ui.expanded.add(`evt-project:${projectId}`);
+      ui.expanded.add(`evt-block:${created.id}`);
+      ui.expanded.add(`evt-block-sub:${created.id}`);
     }
     render();
   }
-  else if (type === "edit-section") {
+  else if (type === "edit-block") {
+    const blockId = form.dataset.blockId;
+    ui.modal = {
+      type: "confirm-save",
+      entity: "block",
+      id: blockId,
+      payload: { name: form.name.value.trim() },
+      returnTo: { type: "edit-block", blockId, draft: { name: form.name.value } },
+    };
+    render();
+  }
+  else if (type === "add-subsection") {
+    const blockId = form.dataset.blockId;
+    const created = await addSection(blockId, form.name.value);
+    if (created) {
+      form.reset();
+      ui.expanded.delete(`evt-block-sub:${blockId}`);
+      ui.expanded.add(`evt-block:${blockId}`);
+      ui.expanded.add(`evt-sub:${created.id}`);
+      ui.expanded.add(`evt-sub-cat:${created.id}`);
+    }
+    render();
+  }
+  else if (type === "edit-subsection") {
     const sectionId = form.dataset.sectionId;
+    ui.modal = {
+      type: "confirm-save",
+      entity: "subsection",
+      id: sectionId,
+      payload: { name: form.name.value.trim() },
+      returnTo: { type: "edit-subsection", sectionId, draft: { name: form.name.value } },
+    };
+    render();
+  }
+  else if (type === "add-category") {
+    const sectionId = form.dataset.sectionId;
+    const created = await addCategory(sectionId, form.name.value);
+    if (created) {
+      form.reset();
+      ui.expanded.delete(`evt-sub-cat:${sectionId}`);
+      ui.expanded.add(`evt-sub:${sectionId}`);
+    }
+    render();
+  }
+  else if (type === "edit-category") {
+    const categoryId = form.dataset.categoryId;
     const prev = ui.modal?.returnTo ?? null;
     ui.modal = {
       type: "confirm-save",
       entity: "category",
-      id: sectionId,
+      id: categoryId,
       payload: { name: form.name.value.trim() },
-      returnTo: { type: "edit-section", sectionId, draft: { name: form.name.value }, returnTo: prev },
+      returnTo: { type: "edit-category", categoryId, draft: { name: form.name.value }, returnTo: prev },
     };
     render();
   }
   else if (type === "add-line") {
-    const sectionId = form.dataset.sectionId;
-    const ok = await addLine(sectionId, form.label.value, form.amount.value);
+    const categoryId = form.dataset.categoryId;
+    const ok = await addLine(categoryId, form.label.value, form.amount.value);
     if (ok) {
       form.reset();
-      ui.modal = { type: "category-detail", sectionId };
+      afterCategoryDetail(categoryId);
     }
     render();
   }
   else if (type === "edit-line") {
     const lineId = form.dataset.lineId;
-    const line = getLine(lineId);
     const prev = ui.modal?.returnTo ?? null;
     ui.modal = {
       type: "confirm-save",
