@@ -72,7 +72,10 @@ function onClick(e) {
     render();
   }
   else if (action === "open-add-line") {
-    ui.modal = { type: "add-line", categoryId: target.dataset.categoryId };
+    const prev = ui.modal?.type === "category-detail"
+      ? { type: "category-detail", categoryId: ui.modal.categoryId }
+      : null;
+    ui.modal = { type: "add-line", categoryId: target.dataset.categoryId, returnTo: prev };
     render();
   }
   else if (action === "open-delete-confirm") {
@@ -95,6 +98,10 @@ function onClick(e) {
     dismissModal(ui);
     render();
   }
+}
+
+function afterAddLine(categoryId) {
+  ui.modal = { type: "category-detail", categoryId };
 }
 
 async function handleConfirmDelete(entity, id) {
@@ -215,7 +222,7 @@ async function onSubmit(e) {
     const ok = await addLine(categoryId, form.label.value, form.amount.value);
     if (ok) {
       form.reset();
-      ui.modal = { type: "category-detail", categoryId };
+      afterAddLine(categoryId);
     }
     render();
   }
