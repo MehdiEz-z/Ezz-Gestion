@@ -49,8 +49,8 @@ function renderSectionBlock(section) {
   const total = sectionTotal(section.id);
   const addLineForm = isAdmin ? `
     <form class="form-col" data-form="add-line" data-section-id="${section.id}" style="margin-top:10px">
-      <input class="field" name="label" required />
-      <input class="field" name="amount" type="number" min="0" step="0.01" required />
+      <input class="field" name="label" placeholder="Libellé" required />
+      <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant" required />
       <button type="submit" class="btn-small" style="background:var(--week)">Ajouter une ligne</button>
     </form>` : "";
 
@@ -85,13 +85,13 @@ function renderProjectCard(project) {
   const addSectionCard = isAdmin ? `
     <div class="card card-add" style="margin-top:12px">
       <div class="card-head" data-action="toggle-card" data-key="${addSecKey}">
-        <div class="card-title">＋ Bloc</div>
+        <div class="card-title">＋ Section</div>
         <span class="chevron">${addSecOpen ? "▲" : "▼"}</span>
       </div>
       <div class="card-body ${addSecOpen ? "open" : ""}">
         <form class="form-col" data-form="add-section" data-project-id="${project.id}">
-          <input class="field" name="name" required />
-          <button type="submit" class="btn-primary">Ajouter le bloc</button>
+          <input class="field" name="name" placeholder="Nom section" required />
+          <button type="submit" class="btn-primary">Ajouter la section</button>
         </form>
       </div>
     </div>` : "";
@@ -112,7 +112,7 @@ function renderProjectCard(project) {
       </div>
       <div class="card-body ${open ? "open" : ""}">
         ${sections.length === 0 && !isAdmin
-    ? `<div class="small-label">Aucun bloc.</div>`
+    ? `<div class="small-label">Aucune section.</div>`
     : sections.map(s => renderSectionBlock(s)).join("")}
         ${addSectionCard}
       </div>
@@ -122,7 +122,7 @@ function renderProjectCard(project) {
 function renderListTab() {
   const addForm = isAdmin ? renderExpandableAddCard("evt:add-project", "Ajouter un événement", `
     <form class="form-col" data-form="add-project">
-      <input class="field" name="name" required />
+      <input class="field" name="name" placeholder="Nom événement" required />
       <button type="submit" class="btn-primary">Créer</button>
     </form>`) : "";
 
@@ -143,7 +143,7 @@ function renderModal() {
         <div class="sheet">
           <div class="sheet-title">Modifier l'événement <button class="close-btn" data-action="close-modal">✕</button></div>
           <form class="form-col" data-form="edit-project" data-project-id="${p.id}">
-            <input class="field" name="name" value="${esc(p.name)}" required />
+            <input class="field" name="name" value="${esc(p.name)}" placeholder="Nom événement" required />
             <button type="submit" class="btn-primary">Enregistrer</button>
           </form>
         </div>
@@ -155,9 +155,9 @@ function renderModal() {
     return `
       <div class="overlay" data-overlay-close="modal">
         <div class="sheet">
-          <div class="sheet-title">Modifier le bloc <button class="close-btn" data-action="close-modal">✕</button></div>
+          <div class="sheet-title">Modifier la section <button class="close-btn" data-action="close-modal">✕</button></div>
           <form class="form-col" data-form="edit-section" data-section-id="${s.id}">
-            <input class="field" name="name" value="${esc(s.name)}" required />
+            <input class="field" name="name" value="${esc(s.name)}" placeholder="Nom section" required />
             <button type="submit" class="btn-primary">Enregistrer</button>
           </form>
         </div>
@@ -171,8 +171,8 @@ function renderModal() {
         <div class="sheet">
           <div class="sheet-title">Modifier la ligne <button class="close-btn" data-action="close-modal">✕</button></div>
           <form class="form-col" data-form="edit-line" data-line-id="${line.id}">
-            <input class="field" name="label" value="${esc(line.label)}" required />
-            <input class="field" name="amount" type="number" min="0" step="0.01" value="${line.amount}" required />
+            <input class="field" name="label" value="${esc(line.label)}" placeholder="Libellé" required />
+            <input class="field" name="amount" type="number" min="0" step="0.01" value="${line.amount}" placeholder="Montant" required />
             <button type="submit" class="btn-primary">Enregistrer</button>
           </form>
         </div>
