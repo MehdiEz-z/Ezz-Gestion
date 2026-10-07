@@ -4,7 +4,7 @@ import {
   getProject, getSection, getLine,
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
-import { esc, formatDateFull, money, parseISODate, renderDateField } from "../shared/utils.js";
+import { esc, money } from "../shared/utils.js";
 import { preserveScroll } from "../shared/ui-persist.js";
 
 export function render() {
@@ -85,10 +85,6 @@ function renderProjectCard(project) {
   const open = ui.expanded.has(key);
   const sections = sectionsForProject(project.id);
   const total = projectTotal(project.id);
-  const dateHint = project.event_date
-    ? `<div class="small-label">${formatDateFull(parseISODate(project.event_date))}</div>`
-    : "";
-
   const addSecKey = `evt-proj-sec:${project.id}`;
   const addSecOpen = ui.expanded.has(addSecKey);
   const addSectionCard = isAdmin ? `
@@ -110,7 +106,6 @@ function renderProjectCard(project) {
       <div class="card-head" data-action="toggle-card" data-key="${key}">
         <div>
           <div class="card-title" style="color:var(--month)">${esc(project.name)}</div>
-          ${dateHint}
         </div>
         <div style="display:flex;align-items:center;gap:10px">
           <div class="card-preview"><strong>${money(total)} DH</strong></div>
@@ -133,7 +128,6 @@ function renderListTab() {
   const addForm = isAdmin ? renderExpandableAddCard("evt:add-project", "Ajouter un événement", `
     <form class="form-col" data-form="add-project">
       <input class="field" name="name" placeholder="Nom de l'événement" required />
-      ${renderDateField("event_date", { required: false, placeholder: "Date (optionnelle)" })}
       <button type="submit" class="btn-primary">Créer</button>
     </form>`) : "";
 
@@ -155,7 +149,6 @@ function renderModal() {
           <div class="sheet-title">Modifier l'événement <button class="close-btn" data-action="close-modal">✕</button></div>
           <form class="form-col" data-form="edit-project" data-project-id="${p.id}">
             <input class="field" name="name" value="${esc(p.name)}" required />
-            ${renderDateField("event_date", { value: p.event_date || "", required: false, placeholder: "Date (optionnelle)" })}
             <button type="submit" class="btn-primary">Enregistrer</button>
           </form>
         </div>

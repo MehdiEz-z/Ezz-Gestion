@@ -69,7 +69,7 @@ async function onSubmit(e) {
   const type = form.dataset.form;
 
   if (type === "add-project") {
-    const ok = await addProject(form.name.value, form.event_date?.value);
+    const ok = await addProject(form.name.value);
     if (ok) {
       form.reset();
       ui.expanded.delete("evt:add-project");
@@ -77,11 +77,7 @@ async function onSubmit(e) {
     render();
   }
   else if (type === "edit-project") {
-    const ok = await updateProject(
-      form.dataset.projectId,
-      form.name.value,
-      form.event_date?.value ?? "",
-    );
+    const ok = await updateProject(form.dataset.projectId, form.name.value);
     if (ok) ui.modal = null;
     render();
   }

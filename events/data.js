@@ -62,43 +62,23 @@ export function projectTotal(projectId) {
   return sectionsForProject(projectId).reduce((s, sec) => s + sectionTotal(sec.id), 0);
 }
 
-function parseOptionalDate(val) {
-  if (!val || !String(val).trim()) return null;
-  const v = String(val).trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
-  return v;
-}
-
-export async function addProject(name, eventDate) {
+export async function addProject(name) {
   if (!isAdmin) return false;
   const n = name.trim();
   if (!n) { flash("Nom de l'événement obligatoire.", true); return false; }
-  const ed = eventDate ? parseOptionalDate(eventDate) : null;
-  if (eventDate && eventDate.trim() && !ed) {
-    flash("Date invalide (AAAA-MM-JJ).", true);
-    return false;
-  }
-  const row = { name: n, event_date: ed };
-  const { data, error } = await supabaseClient.from("event_projects").insert(row).select().single();
+  const { data, error } = await supabaseClient.from("event_projects").insert({ name: n }).select().single();
   if (error) { flash(getErrorMessage(error, "Erreur création événement."), true); return false; }
   state.projects.push(data);
   flash("Événement créé.");
   return true;
 }
 
-export async function updateProject(projectId, name, eventDate) {
+export async function updateProject(projectId, name) {
   if (!isAdmin) return false;
   const n = name.trim();
   if (!n) { flash("Nom obligatoire.", true); return false; }
-  const ed = eventDate !== undefined ? (eventDate && String(eventDate).trim() ? parseOptionalDate(eventDate) : null) : undefined;
-  if (eventDate !== undefined && eventDate && String(eventDate).trim() && ed === null) {
-    flash("Date invalide.", true);
-    return false;
-  }
-  const payload = { name: n };
-  if (ed !== undefined) payload.event_date = ed;
   const { data, error } = await supabaseClient.from("event_projects")
-    .update(payload).eq("id", projectId).select().single();
+    .update({ name: n }).eq("id", projectId).select().single();
   if (error) { flash(getErrorMessage(error, "Erreur modification."), true); return false; }
   const p = state.projects.find(x => x.id === projectId);
   if (p) Object.assign(p, data);
