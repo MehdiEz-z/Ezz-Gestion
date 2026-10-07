@@ -1,6 +1,6 @@
 import { supabaseClient } from "../shared/supabase.js";
 import { isAdmin, currentUser } from "../shared/auth.js";
-import { flash, getErrorMessage } from "../shared/utils.js";
+import { flash, getErrorMessage, toISO } from "../shared/utils.js";
 
 export let state = {
   projects: [],
@@ -191,8 +191,9 @@ export async function addLine(categoryId, label, amount) {
   const amt = Number(amount);
   if (!lbl) { flash("Libellé obligatoire.", true); return false; }
   if (!Number.isFinite(amt) || amt < 0) { flash("Montant invalide.", true); return false; }
+  const actionDate = toISO(new Date());
   const { data, error } = await supabaseClient.from("event_lines")
-    .insert({ category_id: categoryId, label: lbl, amount: amt }).select().single();
+    .insert({ category_id: categoryId, label: lbl, amount: amt, action_date: actionDate }).select().single();
   if (error) { flash(getErrorMessage(error, "Erreur ajout ligne."), true); return false; }
   await reloadAfterWrite();
   if (!state.lines.some(l => l.id === data.id)) {
