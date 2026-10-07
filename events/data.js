@@ -102,17 +102,17 @@ export async function deleteProject(projectId) {
 export async function addSection(projectId, name) {
   if (!isAdmin) return false;
   const n = name.trim();
-  if (!n) { flash("Nom de la section obligatoire.", true); return false; }
+  if (!n) { flash("Nom de la catégorie obligatoire.", true); return false; }
   const { data, error } = await supabaseClient.from("event_sections")
     .insert({ project_id: projectId, name: n }).select().single();
-  if (error) { flash(getErrorMessage(error, "Erreur ajout section."), true); return null; }
+  if (error) { flash(getErrorMessage(error, "Erreur ajout catégorie."), true); return null; }
   await reloadAfterWrite();
   const created = state.sections.find(s => s.id === data.id);
   if (!created) {
-    flash("Section créée mais non retrouvée après enregistrement. Exécutez supabase/events.sql (event_sections).", true);
+    flash("Catégorie créée mais non retrouvée après enregistrement. Exécutez supabase/events.sql (event_sections).", true);
     return null;
   }
-  flash("Section ajoutée.");
+  flash("Catégorie ajoutée.");
   return created;
 }
 
@@ -122,8 +122,8 @@ export async function updateSection(sectionId, name) {
   if (!n) { flash("Nom obligatoire.", true); return false; }
   const { data, error } = await supabaseClient.from("event_sections")
     .update({ name: n }).eq("id", sectionId).select().single();
-  if (error) { flash(getErrorMessage(error, "Erreur modification section."), true); return false; }
-  flash("Section modifiée.");
+  if (error) { flash(getErrorMessage(error, "Erreur modification catégorie."), true); return false; }
+  flash("Catégorie modifiée.");
   await reloadAfterWrite();
   return true;
 }
@@ -131,8 +131,8 @@ export async function updateSection(sectionId, name) {
 export async function deleteSection(sectionId) {
   if (!isAdmin) return false;
   const { error } = await supabaseClient.from("event_sections").delete().eq("id", sectionId);
-  if (error) { flash(getErrorMessage(error, "Erreur suppression section."), true); return false; }
-  flash("Section supprimée.");
+  if (error) { flash(getErrorMessage(error, "Erreur suppression catégorie."), true); return false; }
+  flash("Catégorie supprimée.");
   await reloadAfterWrite();
   return true;
 }
