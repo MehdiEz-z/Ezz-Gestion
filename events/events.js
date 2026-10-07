@@ -69,10 +69,12 @@ async function onSubmit(e) {
   const type = form.dataset.form;
 
   if (type === "add-project") {
-    const ok = await addProject(form.name.value);
-    if (ok) {
+    const created = await addProject(form.name.value);
+    if (created) {
       form.reset();
       ui.expanded.delete("evt:add-project");
+      ui.expanded.add(`evt-project:${created.id}`);
+      ui.expanded.add(`evt-proj-sec:${created.id}`);
     }
     render();
   }
@@ -82,11 +84,13 @@ async function onSubmit(e) {
     render();
   }
   else if (type === "add-section") {
-    const ok = await addSection(form.dataset.projectId, form.name.value);
-    if (ok) {
+    const projectId = form.dataset.projectId;
+    const created = await addSection(projectId, form.name.value);
+    if (created) {
       form.reset();
-      ui.expanded.delete(`evt-proj-sec:${form.dataset.projectId}`);
-      ui.expanded.add(`evt-project:${form.dataset.projectId}`);
+      ui.expanded.delete(`evt-proj-sec:${projectId}`);
+      ui.expanded.add(`evt-project:${projectId}`);
+      ui.expanded.add(`evt-section:${created.id}`);
     }
     render();
   }
@@ -99,7 +103,7 @@ async function onSubmit(e) {
     const ok = await addLine(form.dataset.sectionId, form.label.value, form.amount.value);
     if (ok) {
       form.reset();
-      ui.expanded.delete(`evt-sec-add:${form.dataset.sectionId}`);
+      ui.expanded.add(`evt-section:${form.dataset.sectionId}`);
     }
     render();
   }
