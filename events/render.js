@@ -1,8 +1,8 @@
 import {
   ui, state,
-  blocksForProject, sectionsForBlock, categoriesForSection, linesForCategory,
-  categoryTotal, sectionTotal, blockTotal, projectTotal,
-  getProject, getBlock, getSection, getCategory, getLine,
+  sectionsForProject, categoriesForSection, linesForCategory,
+  categoryTotal, sectionTotal, projectTotal,
+  getProject, getSection, getCategory, getLine,
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
 import { esc, money } from "../shared/utils.js";
@@ -18,10 +18,10 @@ export function render() {
   });
 }
 
-function renderExpandableAddCard(key, title, bodyHtml, extraClass = "") {
+function renderExpandableAddCard(key, title, bodyHtml) {
   const open = ui.expanded.has(key);
   return `
-    <div class="card card-add ${extraClass}">
+    <div class="card card-add">
       <div class="card-head" data-action="toggle-card" data-key="${key}">
         <div class="card-title">${title}</div>
         <span class="chevron">${open ? "▲" : "▼"}</span>
@@ -43,89 +43,38 @@ function renderCategoryRow(category) {
     </li>`;
 }
 
-function renderSubsectionBlock(section) {
-  const subKey = `evt-sub:${section.id}`;
-  const subOpen = ui.expanded.has(subKey);
+function renderSectionCard(section) {
+  const secKey = `evt-section:${section.id}`;
+  const secOpen = ui.expanded.has(secKey);
   const categories = categoriesForSection(section.id);
   const total = sectionTotal(section.id);
-  const addCatKey = `evt-sub-cat:${section.id}`;
-  const addCatOpen = ui.expanded.has(addCatKey);
 
-  const addCategoryCard = isAdmin ? renderExpandableAddCard(
-    addCatKey,
-    "＋ Catégorie",
-    `<form class="form-col" data-form="add-category" data-section-id="${section.id}">
-      <input class="field" name="name" placeholder="Catégorie" required />
+  const addCategoryForm = isAdmin ? `
+    <form class="form-col" data-form="add-category" data-section-id="${section.id}" style="margin-top:12px">
+      <input class="field" name="name" placeholder="Nom catégorie" required />
       <button type="submit" class="btn-small" style="background:var(--week)">Ajouter la catégorie</button>
-    </form>`,
-  ) : "";
+    </form>` : "";
 
   return `
     <div class="card" style="margin-top:10px;border-color:var(--week)">
-      <div class="card-head" data-action="toggle-card" data-key="${subKey}">
+      <div class="card-head" data-action="toggle-card" data-key="${secKey}">
         <div>
           <div class="card-title" style="color:var(--week);font-size:14px">${esc(section.name)}</div>
-          <div class="small-label">Sous-section</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="small-label"><strong>${money(total)} DH</strong></span>
-          ${isAdmin ? `
-          <button type="button" class="icon-btn edit" data-action="open-edit-subsection" data-section-id="${section.id}" title="Modifier">✏️</button>
-          <button type="button" class="btn-delete" data-action="open-delete-confirm" data-entity="subsection" data-id="${section.id}" data-label="${esc(section.name)}" title="Supprimer">🗑️</button>` : ""}
-          <span class="chevron">${subOpen ? "▲" : "▼"}</span>
-        </div>
-      </div>
-      <div class="card-body ${subOpen ? "open" : ""}">
-        ${categories.length === 0
-    ? `<div class="small-label">Aucune catégorie.</div>`
-    : `<ul class="list">${categories.map(renderCategoryRow).join("")}</ul>`}
-        ${addCategoryCard}
-      </div>
-    </div>`;
-}
-
-function renderBlockCard(block) {
-  const blockKey = `evt-block:${block.id}`;
-  const blockOpen = ui.expanded.has(blockKey);
-  const subsections = sectionsForBlock(block.id);
-  const total = blockTotal(block.id);
-  const addSubKey = `evt-block-sub:${block.id}`;
-  const addSubOpen = ui.expanded.has(addSubKey);
-
-  const addSubCard = isAdmin ? `
-    <div class="card card-add" style="margin-top:10px">
-      <div class="card-head" data-action="toggle-card" data-key="${addSubKey}">
-        <div class="card-title">＋ Sous-section</div>
-        <span class="chevron">${addSubOpen ? "▲" : "▼"}</span>
-      </div>
-      <div class="card-body ${addSubOpen ? "open" : ""}">
-        <form class="form-col" data-form="add-subsection" data-block-id="${block.id}">
-          <input class="field" name="name" placeholder="Électricité, Eau, Bucheron…" required />
-          <button type="submit" class="btn-primary">Ajouter la sous-section</button>
-        </form>
-      </div>
-    </div>` : "";
-
-  return `
-    <div class="card" style="margin-top:12px;border-color:var(--month)">
-      <div class="card-head" data-action="toggle-card" data-key="${blockKey}">
-        <div>
-          <div class="card-title" style="color:var(--month)">${esc(block.name)}</div>
           <div class="small-label">Section</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="small-label"><strong>${money(total)} DH</strong></span>
           ${isAdmin ? `
-          <button type="button" class="icon-btn edit" data-action="open-edit-block" data-block-id="${block.id}" title="Modifier">✏️</button>
-          <button type="button" class="btn-delete" data-action="open-delete-confirm" data-entity="block" data-id="${block.id}" data-label="${esc(block.name)}" title="Supprimer">🗑️</button>` : ""}
-          <span class="chevron">${blockOpen ? "▲" : "▼"}</span>
+          <button type="button" class="icon-btn edit" data-action="open-edit-section" data-section-id="${section.id}" title="Modifier">✏️</button>
+          <button type="button" class="btn-delete" data-action="open-delete-confirm" data-entity="section" data-id="${section.id}" data-label="${esc(section.name)}" title="Supprimer">🗑️</button>` : ""}
+          <span class="chevron">${secOpen ? "▲" : "▼"}</span>
         </div>
       </div>
-      <div class="card-body ${blockOpen ? "open" : ""}">
-        ${subsections.length === 0
-    ? `<div class="small-label">Aucune sous-section.</div>`
-    : subsections.map(renderSubsectionBlock).join("")}
-        ${addSubCard}
+      <div class="card-body ${secOpen ? "open" : ""}">
+        ${categories.length === 0
+    ? `<div class="small-label">Aucune catégorie.</div>`
+    : `<ul class="list">${categories.map(renderCategoryRow).join("")}</ul>`}
+        ${addCategoryForm}
       </div>
     </div>`;
 }
@@ -133,20 +82,20 @@ function renderBlockCard(block) {
 function renderProjectCard(project) {
   const key = `evt-project:${project.id}`;
   const open = ui.expanded.has(key);
-  const blocks = blocksForProject(project.id);
+  const sections = sectionsForProject(project.id);
   const total = projectTotal(project.id);
-  const addBlockKey = `evt-proj-block:${project.id}`;
-  const addBlockOpen = ui.expanded.has(addBlockKey);
+  const addSecKey = `evt-proj-sec:${project.id}`;
+  const addSecOpen = ui.expanded.has(addSecKey);
 
-  const addBlockCard = isAdmin ? `
+  const addSectionCard = isAdmin ? `
     <div class="card card-add" style="margin-top:12px">
-      <div class="card-head" data-action="toggle-card" data-key="${addBlockKey}">
+      <div class="card-head" data-action="toggle-card" data-key="${addSecKey}">
         <div class="card-title">＋ Section</div>
-        <span class="chevron">${addBlockOpen ? "▲" : "▼"}</span>
+        <span class="chevron">${addSecOpen ? "▲" : "▼"}</span>
       </div>
-      <div class="card-body ${addBlockOpen ? "open" : ""}">
-        <form class="form-col" data-form="add-block" data-project-id="${project.id}">
-          <input class="field" name="name" placeholder="Travaux, Réception…" required />
+      <div class="card-body ${addSecOpen ? "open" : ""}">
+        <form class="form-col" data-form="add-section" data-project-id="${project.id}">
+          <input class="field" name="name" placeholder="Nom section" required />
           <button type="submit" class="btn-primary">Ajouter la section</button>
         </form>
       </div>
@@ -168,10 +117,10 @@ function renderProjectCard(project) {
         </div>
       </div>
       <div class="card-body ${open ? "open" : ""}">
-        ${blocks.length === 0
+        ${sections.length === 0
     ? `<div class="small-label">Aucune section.</div>`
-    : blocks.map(renderBlockCard).join("")}
-        ${addBlockCard}
+    : sections.map(renderSectionCard).join("")}
+        ${addSectionCard}
       </div>
     </div>`;
 }
@@ -180,7 +129,7 @@ function renderListTab() {
   const addForm = isAdmin ? renderExpandableAddCard("evt:add-project", "Ajouter un événement", `
     <form class="form-col" data-form="add-project">
       <input class="field" name="name" placeholder="Nom événement" required />
-      <button type="submit" class="btn-primary">Créer</button>
+      <button type="submit" class="btn-primary">Créer l'événement</button>
     </form>`) : "";
 
   const list = state.projects.length === 0
@@ -193,8 +142,7 @@ function renderListTab() {
 function renderConfirmDeleteModal(m) {
   const labels = {
     project: "l'événement",
-    block: "la section",
-    subsection: "la sous-section",
+    section: "la section",
     category: "la catégorie",
     line: "la ligne",
   };
@@ -214,8 +162,7 @@ function renderConfirmDeleteModal(m) {
 function renderConfirmSaveModal(m) {
   const labels = {
     project: "l'événement",
-    block: "la section",
-    subsection: "la sous-section",
+    section: "la section",
     category: "la catégorie",
     line: "la ligne",
   };
@@ -238,11 +185,10 @@ function renderCategoryDetailModal(m) {
   const lines = linesForCategory(category.id);
   const total = categoryTotal(category.id);
   const section = getSection(category.section_id);
-  const block = section ? getBlock(section.block_id) : null;
-  const project = block ? getProject(block.project_id) : null;
+  const project = section ? getProject(section.project_id) : null;
 
   const lineRows = lines.length === 0
-    ? `<div class="small-label">Aucune ligne.</div>`
+    ? `<div class="small-label">Aucun élément.</div>`
     : `<ul class="list">${lines.map(line => `
       <li class="list-item">
         <div class="list-item-name">${esc(line.label)}</div>
@@ -254,7 +200,7 @@ function renderCategoryDetailModal(m) {
         </div>
       </li>`).join("")}</ul>`;
 
-  const path = [project?.name, block?.name, section?.name].filter(Boolean).map(n => esc(n)).join(" · ");
+  const path = [project?.name, section?.name].filter(Boolean).map(n => esc(n)).join(" · ");
 
   return `
     <div class="overlay" data-overlay-close="modal">
@@ -275,13 +221,15 @@ function renderCategoryDetailModal(m) {
 function renderAddLineModal(m) {
   const category = getCategory(m.categoryId);
   if (!category) return "";
+  const section = getSection(category.section_id);
   return `
     <div class="overlay" data-overlay-close="modal">
       <div class="sheet">
-        <div class="sheet-title">Ajouter une ligne · ${esc(category.name)} <button class="close-btn" data-action="close-modal">✕</button></div>
+        <div class="sheet-title">Ajouter un élément <button class="close-btn" data-action="close-modal">✕</button></div>
+        ${section ? `<div class="small-label">${esc(section.name)} · ${esc(category.name)}</div>` : ""}
         <form class="form-col" data-form="add-line" data-category-id="${category.id}">
-          <input class="field" name="label" placeholder="Libellé" required />
-          <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant" required />
+          <input class="field" name="label" placeholder="Nom libellé" required />
+          <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant (DH)" required />
           <button type="submit" class="btn-primary">Ajouter</button>
         </form>
       </div>
@@ -310,31 +258,16 @@ function renderModal() {
         </div>
       </div>`;
   }
-  if (m.type === "edit-block") {
-    const b = getBlock(m.blockId);
-    if (!b) return "";
-    const name = m.draft?.name ?? b.name;
-    return `
-      <div class="overlay" data-overlay-close="modal">
-        <div class="sheet">
-          <div class="sheet-title">Modifier la section <button class="close-btn" data-action="close-modal">✕</button></div>
-          <form class="form-col" data-form="edit-block" data-block-id="${b.id}">
-            <input class="field" name="name" value="${esc(name)}" placeholder="Section" required />
-            <button type="submit" class="btn-primary">Enregistrer</button>
-          </form>
-        </div>
-      </div>`;
-  }
-  if (m.type === "edit-subsection") {
+  if (m.type === "edit-section") {
     const s = getSection(m.sectionId);
     if (!s) return "";
     const name = m.draft?.name ?? s.name;
     return `
       <div class="overlay" data-overlay-close="modal">
         <div class="sheet">
-          <div class="sheet-title">Modifier la sous-section <button class="close-btn" data-action="close-modal">✕</button></div>
-          <form class="form-col" data-form="edit-subsection" data-section-id="${s.id}">
-            <input class="field" name="name" value="${esc(name)}" placeholder="Sous-section" required />
+          <div class="sheet-title">Modifier la section <button class="close-btn" data-action="close-modal">✕</button></div>
+          <form class="form-col" data-form="edit-section" data-section-id="${s.id}">
+            <input class="field" name="name" value="${esc(name)}" placeholder="Nom section" required />
             <button type="submit" class="btn-primary">Enregistrer</button>
           </form>
         </div>
@@ -349,7 +282,7 @@ function renderModal() {
         <div class="sheet">
           <div class="sheet-title">Modifier la catégorie <button class="close-btn" data-action="close-modal">✕</button></div>
           <form class="form-col" data-form="edit-category" data-category-id="${c.id}">
-            <input class="field" name="name" value="${esc(name)}" placeholder="Catégorie" required />
+            <input class="field" name="name" value="${esc(name)}" placeholder="Nom catégorie" required />
             <button type="submit" class="btn-primary">Enregistrer</button>
           </form>
         </div>
@@ -363,10 +296,10 @@ function renderModal() {
     return `
       <div class="overlay" data-overlay-close="modal">
         <div class="sheet">
-          <div class="sheet-title">Modifier la ligne <button class="close-btn" data-action="close-modal">✕</button></div>
+          <div class="sheet-title">Modifier l'élément <button class="close-btn" data-action="close-modal">✕</button></div>
           <form class="form-col" data-form="edit-line" data-line-id="${line.id}">
-            <input class="field" name="label" value="${esc(label)}" placeholder="Libellé" required />
-            <input class="field" name="amount" type="number" min="0" step="0.01" value="${amount}" placeholder="Montant" required />
+            <input class="field" name="label" value="${esc(label)}" placeholder="Nom libellé" required />
+            <input class="field" name="amount" type="number" min="0" step="0.01" value="${amount}" placeholder="Montant (DH)" required />
             <button type="submit" class="btn-primary">Enregistrer</button>
           </form>
         </div>
