@@ -5,7 +5,7 @@ import {
   getProject, getSection, getCategory, getLine,
 } from "./data.js";
 import { isAdmin } from "../shared/auth.js";
-import { esc, money } from "../shared/utils.js";
+import { esc, money, formatDateFull, parseISODate } from "../shared/utils.js";
 import { preserveScroll } from "../shared/ui-persist.js";
 
 export function render() {
@@ -179,41 +179,47 @@ function renderConfirmSaveModal(m) {
     </div>`;
 }
 
+function formatLineActionDate(line) {
+  const iso = line.action_date || (line.created_at ? String(line.created_at).slice(0, 10) : null);
+  if (!iso) return "";
+  return formatDateFull(parseISODate(iso));
+}
+
+function renderEventLineDetailRow(line, editable) {
+  const amt = Number(line.amount);
+  return `
+    <li class="list-item" style="flex-direction:column;align-items:stretch;gap:4px">
+      <div class="purchase-detail-row">
+        <div>
+          <div class="list-item-name">${money(amt)} DH — ${esc(line.label)}</div>
+          <div class="small-label">${formatLineActionDate(line)}</div>
+        </div>
+        <div class="purchase-detail-trailing">
+          ${editable ? `
+          <div class="purchase-detail-actions">
+            <button type="button" class="icon-btn edit" data-action="open-edit-line" data-line-id="${line.id}" title="Modifier">✏️</button>
+            <button type="button" class="btn-delete" data-action="open-delete-confirm" data-entity="line" data-id="${line.id}" data-label="${money(amt)} DH" title="Supprimer">🗑️</button>
+          </div>` : ""}
+        </div>
+      </div>
+    </li>`;
+}
+
 function renderCategoryDetailModal(m) {
   const category = getCategory(m.categoryId);
   if (!category) return "";
   const lines = linesForCategory(category.id);
   const total = categoryTotal(category.id);
-  const section = getSection(category.section_id);
-  const project = section ? getProject(section.project_id) : null;
-
-  const lineRows = lines.length === 0
-    ? `<div class="small-label">Aucun élément.</div>`
-    : `<ul class="list">${lines.map(line => `
-      <li class="list-item">
-        <div class="list-item-name">${esc(line.label)}</div>
-        <div class="list-item-right">
-          <span class="small-label">${money(line.amount)} DH</span>
-          ${isAdmin ? `
-          <button type="button" class="icon-btn edit" data-action="open-edit-line" data-line-id="${line.id}" title="Modifier">✏️</button>
-          <button type="button" class="btn-delete" data-action="open-delete-confirm" data-entity="line" data-id="${line.id}" data-label="${esc(line.label)}" title="Supprimer">🗑️</button>` : ""}
-        </div>
-      </li>`).join("")}</ul>`;
-
-  const path = [project?.name, section?.name].filter(Boolean).map(n => esc(n)).join(" · ");
 
   return `
     <div class="overlay" data-overlay-close="modal">
       <div class="sheet">
-        <div class="sheet-title">${esc(category.name)} <button class="close-btn" data-action="close-modal">✕</button></div>
-        ${path ? `<div class="small-label">${path}</div>` : ""}
-        <div class="small-label">Total : <strong>${money(total)} DH</strong></div>
-        ${isAdmin ? `
-        <div class="btn-row" style="margin:12px 0">
-          <button type="button" class="icon-btn edit" data-action="open-edit-category" data-category-id="${category.id}" title="Renommer">✏️ Catégorie</button>
-          <button type="button" class="btn-delete" data-action="open-delete-confirm" data-entity="category" data-id="${category.id}" data-label="${esc(category.name)}" title="Supprimer">🗑️</button>
-        </div>` : ""}
-        <div style="margin-top:12px">${lineRows}</div>
+        <div class="sheet-title">${esc(category.name)} — ${money(total)} DH <button class="close-btn" data-action="close-modal">✕</button></div>
+        <ul class="list">
+          ${lines.length === 0
+    ? `<li class="list-item"><div class="small-label">Aucun élément.</div></li>`
+    : lines.map(line => renderEventLineDetailRow(line, isAdmin)).join("")}
+        </ul>
       </div>
     </div>`;
 }
@@ -221,16 +227,16 @@ function renderCategoryDetailModal(m) {
 function renderAddLineModal(m) {
   const category = getCategory(m.categoryId);
   if (!category) return "";
-  const section = getSection(category.section_id);
+  const todayLabel = formatDateFull(new Date());
   return `
     <div class="overlay" data-overlay-close="modal">
       <div class="sheet">
-        <div class="sheet-title">Ajouter un élément <button class="close-btn" data-action="close-modal">✕</button></div>
-        ${section ? `<div class="small-label">${esc(section.name)} · ${esc(category.name)}</div>` : ""}
+        <div class="sheet-title">${esc(category.name)} <button class="close-btn" data-action="close-modal">✕</button></div>
         <form class="form-col" data-form="add-line" data-category-id="${category.id}">
-          <input class="field" name="label" placeholder="Nom libellé" required />
-          <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant (DH)" required />
-          <button type="submit" class="btn-primary">Ajouter</button>
+          <input class="field" name="amount" type="number" min="0" step="0.01" placeholder="Montant en DH" required />
+          <input class="field" name="label" placeholder="Libellé" required />
+          <div class="small-label">Date : aujourd'hui (${todayLabel})</div>
+          <button type="submit" class="btn-primary">Enregistrer</button>
         </form>
       </div>
     </div>`;
@@ -298,8 +304,9 @@ function renderModal() {
         <div class="sheet">
           <div class="sheet-title">Modifier l'élément <button class="close-btn" data-action="close-modal">✕</button></div>
           <form class="form-col" data-form="edit-line" data-line-id="${line.id}">
-            <input class="field" name="label" value="${esc(label)}" placeholder="Nom libellé" required />
-            <input class="field" name="amount" type="number" min="0" step="0.01" value="${amount}" placeholder="Montant (DH)" required />
+            <input class="field" name="amount" type="number" min="0" step="0.01" value="${amount}" placeholder="Montant en DH" required />
+            <input class="field" name="label" value="${esc(label)}" placeholder="Libellé" required />
+            <div class="small-label">Date : ${formatLineActionDate(line)}</div>
             <button type="submit" class="btn-primary">Enregistrer</button>
           </form>
         </div>
