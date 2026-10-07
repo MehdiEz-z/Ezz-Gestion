@@ -4,7 +4,6 @@ import { flash, getErrorMessage } from "../shared/utils.js";
 
 export let state = {
   projects: [],
-  blocks: [],
   sections: [],
   categories: [],
   lines: [],
@@ -16,18 +15,17 @@ export const ui = {
 };
 
 export function resetState() {
-  state = { projects: [], blocks: [], sections: [], categories: [], lines: [] };
+  state = { projects: [], sections: [], categories: [], lines: [] };
   ui.expanded.clear();
   ui.modal = null;
 }
 
-const SQL_HINT = "Exécutez supabase/events.sql dans Supabase.";
+const SQL_HINT = "Exécutez supabase/events.sql dans Supabase (voir commentaire DROP si besoin).";
 
 export async function fetchStateFromSupabase() {
   if (!currentUser) return;
-  const [projects, blocks, sections, categories, lines] = await Promise.all([
+  const [projects, sections, categories, lines] = await Promise.all([
     supabaseClient.from("event_projects").select("*").order("created_at", { ascending: true }),
-    supabaseClient.from("event_blocks").select("*").order("created_at", { ascending: true }),
     supabaseClient.from("event_sections").select("*").order("created_at", { ascending: true }),
     supabaseClient.from("event_categories").select("*").order("created_at", { ascending: true }),
     supabaseClient.from("event_lines").select("*").order("created_at", { ascending: true }),
@@ -37,23 +35,18 @@ export async function fetchStateFromSupabase() {
     state.projects = [];
   } else state.projects = projects.data || [];
 
-  if (blocks.error) {
-    flash(getErrorMessage(blocks.error, `Erreur chargement sections (event_blocks). ${SQL_HINT}`), true);
-    state.blocks = [];
-  } else state.blocks = blocks.data || [];
-
   if (sections.error) {
-    flash(getErrorMessage(sections.error, `Erreur chargement sous-sections (event_sections). ${SQL_HINT}`), true);
+    flash(getErrorMessage(sections.error, `Erreur chargement sections. ${SQL_HINT}`), true);
     state.sections = [];
   } else state.sections = sections.data || [];
 
   if (categories.error) {
-    flash(getErrorMessage(categories.error, `Erreur chargement catégories (event_categories). ${SQL_HINT}`), true);
+    flash(getErrorMessage(categories.error, `Erreur chargement catégories. ${SQL_HINT}`), true);
     state.categories = [];
   } else state.categories = categories.data || [];
 
   if (lines.error) {
-    flash(getErrorMessage(lines.error, `Erreur chargement lignes (event_lines). ${SQL_HINT}`), true);
+    flash(getErrorMessage(lines.error, `Erreur chargement lignes. ${SQL_HINT}`), true);
     state.lines = [];
   } else state.lines = lines.data || [];
 }
@@ -62,12 +55,8 @@ async function reloadAfterWrite() {
   await fetchStateFromSupabase();
 }
 
-export function blocksForProject(projectId) {
-  return state.blocks.filter(b => b.project_id === projectId);
-}
-
-export function sectionsForBlock(blockId) {
-  return state.sections.filter(s => s.block_id === blockId);
+export function sectionsForProject(projectId) {
+  return state.sections.filter(s => s.project_id === projectId);
 }
 
 export function categoriesForSection(sectionId) {
@@ -86,12 +75,8 @@ export function sectionTotal(sectionId) {
   return categoriesForSection(sectionId).reduce((s, c) => s + categoryTotal(c.id), 0);
 }
 
-export function blockTotal(blockId) {
-  return sectionsForBlock(blockId).reduce((s, sec) => s + sectionTotal(sec.id), 0);
-}
-
 export function projectTotal(projectId) {
-  return blocksForProject(projectId).reduce((s, b) => s + blockTotal(b.id), 0);
+  return sectionsForProject(projectId).reduce((s, sec) => s + sectionTotal(sec.id), 0);
 }
 
 export async function addProject(name) {
@@ -126,15 +111,15 @@ export async function deleteProject(projectId) {
   return true;
 }
 
-export async function addBlock(projectId, name) {
+export async function addSection(projectId, name) {
   if (!isAdmin) return null;
   const n = name.trim();
   if (!n) { flash("Nom de la section obligatoire.", true); return null; }
-  const { data, error } = await supabaseClient.from("event_blocks")
+  const { data, error } = await supabaseClient.from("event_sections")
     .insert({ project_id: projectId, name: n }).select().single();
   if (error) { flash(getErrorMessage(error, "Erreur ajout section."), true); return null; }
   await reloadAfterWrite();
-  const created = state.blocks.find(b => b.id === data.id);
+  const created = state.sections.find(s => s.id === data.id);
   if (!created) {
     flash(`Section créée mais non retrouvée. ${SQL_HINT}`, true);
     return null;
@@ -143,50 +128,13 @@ export async function addBlock(projectId, name) {
   return created;
 }
 
-export async function updateBlock(blockId, name) {
-  if (!isAdmin) return false;
-  const n = name.trim();
-  if (!n) { flash("Nom obligatoire.", true); return false; }
-  const { error } = await supabaseClient.from("event_blocks").update({ name: n }).eq("id", blockId);
-  if (error) { flash(getErrorMessage(error, "Erreur modification section."), true); return false; }
-  flash("Section modifiée.");
-  await reloadAfterWrite();
-  return true;
-}
-
-export async function deleteBlock(blockId) {
-  if (!isAdmin) return false;
-  const { error } = await supabaseClient.from("event_blocks").delete().eq("id", blockId);
-  if (error) { flash(getErrorMessage(error, "Erreur suppression section."), true); return false; }
-  flash("Section supprimée.");
-  await reloadAfterWrite();
-  return true;
-}
-
-export async function addSection(blockId, name) {
-  if (!isAdmin) return null;
-  const n = name.trim();
-  if (!n) { flash("Nom de la sous-section obligatoire.", true); return null; }
-  const { data, error } = await supabaseClient.from("event_sections")
-    .insert({ block_id: blockId, name: n }).select().single();
-  if (error) { flash(getErrorMessage(error, "Erreur ajout sous-section."), true); return null; }
-  await reloadAfterWrite();
-  const created = state.sections.find(s => s.id === data.id);
-  if (!created) {
-    flash(`Sous-section créée mais non retrouvée. ${SQL_HINT}`, true);
-    return null;
-  }
-  flash("Sous-section ajoutée.");
-  return created;
-}
-
 export async function updateSection(sectionId, name) {
   if (!isAdmin) return false;
   const n = name.trim();
   if (!n) { flash("Nom obligatoire.", true); return false; }
   const { error } = await supabaseClient.from("event_sections").update({ name: n }).eq("id", sectionId);
-  if (error) { flash(getErrorMessage(error, "Erreur modification sous-section."), true); return false; }
-  flash("Sous-section modifiée.");
+  if (error) { flash(getErrorMessage(error, "Erreur modification section."), true); return false; }
+  flash("Section modifiée.");
   await reloadAfterWrite();
   return true;
 }
@@ -194,8 +142,8 @@ export async function updateSection(sectionId, name) {
 export async function deleteSection(sectionId) {
   if (!isAdmin) return false;
   const { error } = await supabaseClient.from("event_sections").delete().eq("id", sectionId);
-  if (error) { flash(getErrorMessage(error, "Erreur suppression sous-section."), true); return false; }
-  flash("Sous-section supprimée.");
+  if (error) { flash(getErrorMessage(error, "Erreur suppression section."), true); return false; }
+  flash("Section supprimée.");
   await reloadAfterWrite();
   return true;
 }
@@ -282,10 +230,6 @@ export function getProject(id) {
   return state.projects.find(p => p.id === id) || null;
 }
 
-export function getBlock(id) {
-  return state.blocks.find(b => b.id === id) || null;
-}
-
 export function getSection(id) {
   return state.sections.find(s => s.id === id) || null;
 }
@@ -296,18 +240,4 @@ export function getCategory(id) {
 
 export function getLine(id) {
   return state.lines.find(l => l.id === id) || null;
-}
-
-export function blockForSection(sectionId) {
-  const sec = getSection(sectionId);
-  return sec ? getBlock(sec.block_id) : null;
-}
-
-export function projectIdForCategory(categoryId) {
-  const cat = getCategory(categoryId);
-  if (!cat) return null;
-  const sec = getSection(cat.section_id);
-  if (!sec) return null;
-  const block = getBlock(sec.block_id);
-  return block?.project_id ?? null;
 }
