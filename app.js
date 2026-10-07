@@ -5,6 +5,7 @@ import { resetState as resetTresorerieState } from "./tresorerie/data.js";
 import { resetState as resetMaladieState } from "./maladie/data.js";
 import { resetState as resetEauState } from "./eau-elec/data.js";
 import { resetState as resetDettesState } from "./dettes/data.js";
+import { resetState as resetEventsState } from "./events/data.js";
 import { invalidateWalletCache } from "./shared/wallet.js";
 
 initNav();
@@ -16,17 +17,20 @@ initAuth({
     resetMaladieState();
     resetEauState();
     resetDettesState();
+    resetEventsState();
     invalidateWalletCache();
     const maison = await import("./maison/boot.js");
     const tresorerie = await import("./tresorerie/boot.js");
     const dettes = await import("./dettes/boot.js");
     const maladie = await import("./maladie/boot.js");
     const eauElec = await import("./eau-elec/boot.js");
+    const eventsMod = await import("./events/boot.js");
     maison.resetModule();
     tresorerie.resetModule();
     dettes.resetModule();
     maladie.resetModule();
     eauElec.resetModule();
+    eventsMod.resetModule();
     document.getElementById("main").innerHTML = "";
     document.getElementById("subtabs").innerHTML = "";
   },
