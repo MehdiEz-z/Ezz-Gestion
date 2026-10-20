@@ -141,6 +141,39 @@ main { padding: 14px 16px 16px; flex: 1; }
 .card-range { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .card-preview { font-size: 12px; color: var(--muted); text-align: right; white-space: nowrap; }
 
+.course-period-head {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.course-period-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.course-period-budget {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.course-period-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.course-period-status .small-label { margin-top: 0; }
+
+.course-period-head .progress-edit-row { margin-top: 2px; }
+
 .badge {
   display: inline-block;
   font-size: 10px;
