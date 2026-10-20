@@ -1,7 +1,7 @@
 import { supabaseClient } from "../shared/supabase.js";
 import { isAdmin, currentUser } from "../shared/auth.js";
 import { loadWalletData, syncMonthBudget, syncWeekBudget } from "../shared/wallet.js";
-import { flash, getErrorMessage, normalizeName, toISO, activeMonthKey, money, parseISODate, getMonthWeekSegments, weekEndForPeriodKey, findWeekSegmentForDate, findWeekSegmentForToday } from "../shared/utils.js";
+import { flash, getErrorMessage, normalizeName, toISO, activeMonthKey, money, parseISODate, getMonthWeekSegments, getDisplayWeekSegments, weekEndForPeriodKey, findWeekSegmentForDate, findWeekSegmentForToday, findDisplayWeekSegmentForDate } from "../shared/utils.js";
 
 export let state = {
   categories: [],
@@ -10,10 +10,11 @@ export let state = {
   periodCategories: [],
   monthlyBudgets: {},
   weeklyBudgets: {},
+  periodState: {},
 };
 
 export const ui = {
-  subTab: "budget",
+  subTab: "gestion",
   viewedMonthKey: null,
   monthPanelOpen: false,
   expanded: new Set(),
@@ -28,18 +29,35 @@ export function resetState() {
     periodCategories: [],
     monthlyBudgets: {},
     weeklyBudgets: {},
+    periodState: {},
   };
+}
+
+function periodStateKey(type, periodKey) {
+  return `${type}:${periodKey}`;
+}
+
+export function getPeriodState(type, periodKey) {
+  const row = state.periodState[periodStateKey(type, periodKey)];
+  return row
+    ? { consumed_total: Number(row.consumed_total) || 0, closed_at: row.closed_at }
+    : { consumed_total: 0, closed_at: null };
+}
+
+export function isPeriodClosed(type, periodKey) {
+  return !!getPeriodState(type, periodKey).closed_at;
 }
 
 export async function fetchStateFromSupabase() {
   if (!currentUser) return;
-  const [cats, places, purch, periodCats, mBudgets, wBudgets] = await Promise.all([
+  const [cats, places, purch, periodCats, mBudgets, wBudgets, periodRows] = await Promise.all([
     supabaseClient.from("categories").select("*"),
     supabaseClient.from("places").select("*"),
     supabaseClient.from("purchases").select("*").order("date", { ascending: false }),
     supabaseClient.from("period_categories").select("*"),
     supabaseClient.from("monthly_budgets").select("*"),
     supabaseClient.from("weekly_budgets").select("*"),
+    supabaseClient.from("course_period_state").select("*"),
   ]);
 
   if (cats.error) { flash(getErrorMessage(cats.error, "Erreur chargement catégories."), true); return; }
@@ -55,6 +73,14 @@ export async function fetchStateFromSupabase() {
   if (mBudgets.data) mBudgets.data.forEach(b => { state.monthlyBudgets[b.month_key] = b.amount; });
   state.weeklyBudgets = {};
   if (wBudgets.data) wBudgets.data.forEach(b => { state.weeklyBudgets[b.week_start] = b.amount; });
+  state.periodState = {};
+  if (periodRows.error) {
+    flash(getErrorMessage(periodRows.error, "Erreur chargement consommation. Exécutez supabase/maison_course_period.sql."), true);
+  } else if (periodRows.data) {
+    periodRows.data.forEach(r => {
+      state.periodState[periodStateKey(r.period_type, r.period_key)] = r;
+    });
+  }
 }
 
 function weekEndISO(isoWs, monthKey = isoWs.slice(0, 7)) {
@@ -222,21 +248,17 @@ export function purchasesForWeek(categoryId, type, isoWs, isoWe) {
 }
 
 export function monthSpentTotal(monthKey) {
-  return state.purchases
-    .filter(p => p.type === "mensuel" && p.date.slice(0, 7) === monthKey)
-    .reduce((s, p) => s + Number(p.price), 0);
+  return getPeriodState("mensuel", monthKey).consumed_total;
 }
 
-export function weekSpentTotal(isoWs, isoWe) {
-  return state.purchases
-    .filter(p => p.type === "hebdo" && p.date >= isoWs && p.date <= isoWe)
-    .reduce((s, p) => s + Number(p.price), 0);
+export function weekSpentTotal(isoWs, _isoWe) {
+  return getPeriodState("hebdo", isoWs).consumed_total;
 }
 
 /** Stock report en début de semaine (cumul des semaines passées du mois). */
 export function weekReportStockAtStart(monthKey, periodKey) {
   let reportStock = 0;
-  for (const seg of getMonthWeekSegments(monthKey)) {
+  for (const seg of getDisplayWeekSegments(monthKey)) {
     if (seg.periodKey === periodKey) break;
     const budget = state.weeklyBudgets[seg.periodKey];
     if (budget == null) continue;
@@ -253,7 +275,7 @@ export function weekReportStockAtStart(monthKey, periodKey) {
  * @returns {{
  *   consumed: number, budgetAmount: number|null, budgetPart: number, reportPart: number,
  *   reste: number, reportRemaining: number, reportStockStart: number, plafond: number,
- *   showReportLine: boolean, canAddPurchase: boolean,
+ *   showReportLine: boolean, canAddConsumption: boolean, closed: boolean,
  * }}
  */
 export function weekSpendingStats(monthKey, periodKey, { isActiveWeek, weekNumber }) {
@@ -265,7 +287,8 @@ export function weekSpendingStats(monthKey, periodKey, { isActiveWeek, weekNumbe
   if (budgetAmount == null) {
     return {
       consumed, budgetAmount: null, budgetPart: consumed, reportPart: 0, reste: 0,
-      reportRemaining: 0, reportStockStart: 0, plafond: 0, showReportLine: false, canAddPurchase: false,
+      reportRemaining: 0, reportStockStart: 0, plafond: 0, showReportLine: false,
+      canAddConsumption: false, closed: isPeriodClosed("hebdo", periodKey),
     };
   }
 
@@ -276,21 +299,30 @@ export function weekSpendingStats(monthKey, periodKey, { isActiveWeek, weekNumbe
   const reportRemaining = Math.max(0, reportStockStart - reportPart);
   const plafond = budgetAmount + reportStockStart;
   const showReportLine = isActiveWeek && weekNumber >= 2 && reportRemaining > 0;
-  const canAddPurchase = isActiveWeek && consumed < plafond;
+  const closed = isPeriodClosed("hebdo", periodKey);
+  const canAddConsumption = isActiveWeek && !closed && consumed < plafond;
 
   return {
     consumed, budgetAmount, budgetPart, reportPart, reste, reportRemaining, reportStockStart,
-    plafond, showReportLine, canAddPurchase,
+    plafond, showReportLine, canAddConsumption, closed,
   };
 }
 
-export function canAddWeeklyPurchase(additionalPrice = 0) {
-  const todaySeg = findWeekSegmentForToday();
-  if (!todaySeg) return false;
-  const monthKey = todaySeg.periodKey.slice(0, 7);
-  const stats = weekSpendingStats(monthKey, todaySeg.periodKey, {
-    isActiveWeek: true,
-    weekNumber: todaySeg.number,
+export function canAddPeriodConsumption(type, periodKey, additionalPrice = 0) {
+  if (isPeriodClosed(type, periodKey)) return false;
+  if (type === "mensuel") {
+    const budget = state.monthlyBudgets[periodKey];
+    if (budget == null) return false;
+    return monthSpentTotal(periodKey) + additionalPrice <= Number(budget);
+  }
+  const monthKey = periodKey.slice(0, 7);
+  const seg = getDisplayWeekSegments(monthKey).find(s => s.periodKey === periodKey);
+  if (!seg) return false;
+  const todayDisplay = findDisplayWeekSegmentForDate(new Date(), monthKey);
+  const isActiveWeek = todayDisplay?.periodKey === periodKey;
+  const stats = weekSpendingStats(monthKey, periodKey, {
+    isActiveWeek,
+    weekNumber: seg.number,
   });
   if (stats.budgetAmount == null) return false;
   return stats.consumed + additionalPrice <= stats.plafond;
@@ -300,10 +332,9 @@ export function weeklyRecapGain(monthKey) {
   let cumulReste = 0;
   let cumulReportConsumed = 0;
   const isActiveMonth = monthKey === activeMonthKey();
-  const todaySeg = findWeekSegmentForToday();
-  const todayKey = todaySeg?.periodKey;
-
-  for (const seg of getMonthWeekSegments(monthKey)) {
+  const todayDisplay = findDisplayWeekSegmentForDate(new Date(), monthKey);
+  const todayKey = todayDisplay?.periodKey;
+  for (const seg of getDisplayWeekSegments(monthKey)) {
     let status;
     if (!isActiveMonth) status = "past";
     else if (todayKey && seg.periodKey === todayKey) status = "current";
@@ -329,10 +360,10 @@ export function achatsRecap(monthKey) {
   const monthGain = monthBudget != null ? Number(monthBudget) - monthConso : 0;
 
   const isActiveMonth = monthKey === activeMonthKey();
-  const todaySeg = findWeekSegmentForToday();
-  const todayPeriodKey = todaySeg ? todaySeg.periodKey : null;
+  const todayDisplay = findDisplayWeekSegmentForDate(new Date(), monthKey);
+  const todayPeriodKey = todayDisplay ? todayDisplay.periodKey : null;
   let weekConso = 0;
-  for (const seg of getMonthWeekSegments(monthKey)) {
+  for (const seg of getDisplayWeekSegments(monthKey)) {
     const isoWs = seg.periodKey;
     const isoWe = toISO(seg.end);
     let status;
@@ -419,8 +450,89 @@ export async function unassignPeriodCategory(type, periodKey, categoryId) {
   return true;
 }
 
+export async function addPeriodConsumption(type, periodKey, amount) {
+  if (!isAdmin) return false;
+  if (isPeriodClosed(type, periodKey)) {
+    flash("Période clôturée : aucune modification possible.", true);
+    return false;
+  }
+  const amt = Number(amount);
+  if (!Number.isFinite(amt) || amt <= 0) {
+    flash("Montant invalide.", true);
+    return false;
+  }
+  if (type === "mensuel" && state.monthlyBudgets[periodKey] == null) {
+    flash("Définis d'abord le budget mensuel.", true);
+    return false;
+  }
+  if (type === "hebdo" && state.weeklyBudgets[periodKey] == null) {
+    flash("Définis d'abord le budget de la semaine.", true);
+    return false;
+  }
+  const prev = type === "mensuel" ? monthSpentTotal(periodKey) : weekSpentTotal(periodKey);
+  const newTotal = prev + amt;
+  const closedAt = getPeriodState(type, periodKey).closed_at;
+  const { data, error } = await supabaseClient.from("course_period_state")
+    .upsert({
+      period_type: type,
+      period_key: periodKey,
+      consumed_total: newTotal,
+      closed_at: closedAt,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "period_type,period_key" })
+    .select()
+    .single();
+  if (error) {
+    flash(getErrorMessage(error, "Erreur enregistrement consommation."), true);
+    return false;
+  }
+  state.periodState[periodStateKey(type, periodKey)] = data;
+  checkBudgetAlert(type, type === "mensuel" ? `${periodKey}-01` : periodKey);
+  flash("Consommation ajoutée.");
+  return true;
+}
+
+export async function closePeriod(type, periodKey) {
+  if (!isAdmin) return false;
+  if (isPeriodClosed(type, periodKey)) {
+    flash("Période déjà clôturée.", true);
+    return false;
+  }
+  if (type === "mensuel" && state.monthlyBudgets[periodKey] == null) {
+    flash("Budget mensuel non défini.", true);
+    return false;
+  }
+  if (type === "hebdo" && state.weeklyBudgets[periodKey] == null) {
+    flash("Budget semaine non défini.", true);
+    return false;
+  }
+  const consumed = type === "mensuel" ? monthSpentTotal(periodKey) : weekSpentTotal(periodKey);
+  const now = new Date().toISOString();
+  const { data, error } = await supabaseClient.from("course_period_state")
+    .upsert({
+      period_type: type,
+      period_key: periodKey,
+      consumed_total: consumed,
+      closed_at: now,
+      updated_at: now,
+    }, { onConflict: "period_type,period_key" })
+    .select()
+    .single();
+  if (error) {
+    flash(getErrorMessage(error, "Erreur clôture période."), true);
+    return false;
+  }
+  state.periodState[periodStateKey(type, periodKey)] = data;
+  flash(type === "mensuel" ? "Mois clôturé." : "Semaine clôturée.");
+  return true;
+}
+
 export async function setMonthBudget(monthKey, amount) {
   if (!isAdmin) return false;
+  if (isPeriodClosed("mensuel", monthKey)) {
+    flash("Mois clôturé : budget non modifiable.", true);
+    return false;
+  }
   const consumed = monthSpentTotal(monthKey);
   if (amount < consumed) {
     flash(`Impossible : le budget (${money(amount)} DH) est inférieur au total déjà consommé (${money(consumed)} DH).`, true);
@@ -439,13 +551,18 @@ export async function setMonthBudget(monthKey, amount) {
 
 export async function setWeekBudget(isoWeekStart, amount) {
   if (!isAdmin) return false;
+  if (isPeriodClosed("hebdo", isoWeekStart)) {
+    flash("Semaine clôturée : budget non modifiable.", true);
+    return false;
+  }
   const monthKey = isoWeekStart.slice(0, 7);
-  const seg = getMonthWeekSegments(monthKey).find(s => s.periodKey === isoWeekStart);
+  const seg = getDisplayWeekSegments(monthKey).find(s => s.periodKey === isoWeekStart);
   const isoWe = weekEndISO(isoWeekStart, monthKey);
   const consumed = weekSpentTotal(isoWeekStart, isoWe);
+  const todayDisplay = findDisplayWeekSegmentForDate(new Date(), monthKey);
   const reportPart = seg
     ? weekSpendingStats(monthKey, isoWeekStart, {
-      isActiveWeek: seg.periodKey === findWeekSegmentForToday()?.periodKey,
+      isActiveWeek: seg.periodKey === todayDisplay?.periodKey,
       weekNumber: seg.number,
     }).reportPart
     : Math.max(0, consumed - amount);
@@ -563,11 +680,14 @@ export async function addPurchase({ categoryId, type, place_id, price }) {
   if (!isAdmin) return false;
   const cat = state.categories.find(c => c.id === categoryId);
   if (!cat) return false;
-  if (type === "hebdo" && !canAddWeeklyPurchase(Number(price))) {
-    flash("Plafond hebdo atteint (budget semaine + report épuisés).", true);
-    return false;
-  }
   const date = toISO(new Date());
+  if (type === "hebdo") {
+    const seg = findDisplayWeekSegmentForDate(new Date());
+    if (!seg || !canAddPeriodConsumption("hebdo", seg.periodKey, Number(price))) {
+      flash("Plafond hebdo atteint (budget semaine + report épuisés).", true);
+      return false;
+    }
+  }
   const { data, error } = await supabaseClient.from("purchases")
     .insert({
       category_id: categoryId,
@@ -596,7 +716,8 @@ export async function updatePurchase(id, { price, place_id }) {
   }
   if (purchase.type === "hebdo") {
     const delta = Number(price) - Number(purchase.price);
-    if (delta > 0 && !canAddWeeklyPurchase(delta)) {
+    const seg = findDisplayWeekSegmentForDate(parseISODate(purchase.date));
+    if (delta > 0 && (!seg || !canAddPeriodConsumption("hebdo", seg.periodKey, delta))) {
       flash("Plafond hebdo atteint (budget semaine + report épuisés).", true);
       return false;
     }
@@ -633,11 +754,12 @@ function checkBudgetAlert(type, date) {
     if (!budget) return;
     if (monthSpentTotal(mk) > budget) flash("Alerte : budget mensuel dépassé !", true);
   } else {
-    const seg = findWeekSegmentForDate(parseISODate(date));
+    const seg = findDisplayWeekSegmentForDate(parseISODate(date));
     if (!seg) return;
     const monthKey = seg.periodKey.slice(0, 7);
+    const todayDisplay = findDisplayWeekSegmentForDate(new Date(), monthKey);
     const stats = weekSpendingStats(monthKey, seg.periodKey, {
-      isActiveWeek: seg.periodKey === findWeekSegmentForToday()?.periodKey,
+      isActiveWeek: seg.periodKey === todayDisplay?.periodKey,
       weekNumber: seg.number,
     });
     if (stats.budgetAmount == null) return;
