@@ -82,8 +82,26 @@ export function getMonthWeekSegments(monthKey) {
   return segments;
 }
 
+export function segmentDayCount(seg) {
+  const ms = seg.end.getTime() - seg.start.getTime();
+  return Math.round(ms / 86400000) + 1;
+}
+
+/** Semaines affichées en courses : au moins 3 jours dans le mois. */
+export function getDisplayWeekSegments(monthKey) {
+  const filtered = getMonthWeekSegments(monthKey).filter(seg => segmentDayCount(seg) >= 3);
+  filtered.forEach((s, i) => { s.number = i + 1; });
+  return filtered;
+}
+
+export function findDisplayWeekSegmentForDate(date, monthKey = getMonthKey(date)) {
+  const iso = toISO(date);
+  return getDisplayWeekSegments(monthKey).find(s => iso >= s.periodKey && iso <= toISO(s.end)) || null;
+}
+
 export function weekEndForPeriodKey(periodKey, monthKey = periodKey.slice(0, 7)) {
-  const seg = getMonthWeekSegments(monthKey).find(s => s.periodKey === periodKey);
+  const seg = getDisplayWeekSegments(monthKey).find(s => s.periodKey === periodKey)
+    || getMonthWeekSegments(monthKey).find(s => s.periodKey === periodKey);
   if (seg) return toISO(seg.end);
   return toISO(addDays(parseISODate(periodKey), 6));
 }
