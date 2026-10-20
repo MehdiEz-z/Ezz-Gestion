@@ -73,7 +73,7 @@ function closedBanner(type, periodKey) {
   const closedAt = getPeriodState(type, periodKey).closed_at;
   if (!closedAt) return "";
   const d = formatDateFull(new Date(closedAt));
-  return `<div class="small-label" style="margin-top:8px">🔒 Période clôturée le ${d} — lecture seule</div>`;
+  return `<div class="small-label" style="margin-top:8px">🔒 Période clôturée le ${d}</div>`;
 }
 
 function renderConsumptionForm(type, periodKey, canAdd) {
@@ -97,7 +97,7 @@ function renderBadges(extra) {
 
 function renderPeriodHead({
   title, titleColor, periodLabel, budget, consumed,
-  badges, progressHtml, toggleKey, canToggle,
+  badges, progressHtml, toggleKey, canToggle, previewExtra = "",
 }) {
   const open = ui.expanded.has(toggleKey);
   const hasBudget = budget != null;
@@ -110,14 +110,15 @@ function renderPeriodHead({
           <div class="card-range">${periodLabel}</div>
           <div class="course-period-badges">${renderBadges(badges)}</div>
         </div>
-        <div class="course-period-right">
+        ${hasBudget || canToggle ? `
+        <div class="course-period-preview-wrap">
           ${hasBudget ? `
-            <div class="course-period-amounts">
-              <div class="course-period-budget">${money(budget)} DH</div>
-              <div class="small-label course-period-consumed">Consommé : ${consumed}</div>
+            <div class="card-preview">
+              ${money(budget)} DH<br>
+              <span class="small-label">Consommé : ${consumed}</span>${previewExtra}
             </div>` : ""}
           ${canToggle ? `<span class="chevron">${open ? "▲" : "▼"}</span>` : ""}
-        </div>
+        </div>` : ""}
       </div>
       ${hasBudget
     ? `<div class="course-period-progress">${progressHtml}</div>`
@@ -203,6 +204,9 @@ function renderGestionTab(monthKey) {
     if (stats.budgetAmount != null && stats.reportPart > 0) {
       consumedLabel = `${money(stats.budgetPart)} DH + <span class="danger">${money(stats.reportPart)} DH</span>`;
     }
+    const weekPreviewExtra = stats.showReportLine
+      ? `<br><span class="small-label success">Report : ${money(stats.reportRemaining)} DH</span>`
+      : "";
 
     const weekHead = status === "future" ? `
       <div class="card-head course-period-card-head">
@@ -219,6 +223,7 @@ function renderGestionTab(monthKey) {
       periodLabel: `${formatDateShort(seg.start)} → ${formatDateShort(seg.end)}`,
       budget,
       consumed: consumedLabel,
+      previewExtra: weekPreviewExtra,
       badges: [
         `<span class="badge ${status === "current" ? "badge-current" : "badge-past"}">${status === "current" ? "Semaine active" : "Consultation"}</span>`,
         closed ? `<span class="badge badge-past">Clôturé</span>` : "",
@@ -340,7 +345,7 @@ function renderConfirmCloseModal(m) {
     <div class="overlay" data-overlay-close="modal">
       <div class="sheet">
         <div class="sheet-title">Clôturer la période</div>
-        <p class="confirm-text">Après clôture, <strong>aucune modification</strong> ne sera possible sur ${label} (budget, consommation). Confirmer ?</p>
+        <p class="confirm-text">Après clôture, <strong>aucune modification</strong> ne sera possible sur ${label}. Confirmer ?</p>
         <div class="btn-row">
           <button type="button" class="btn-primary" data-action="confirm-close-period" data-period-type="${m.periodType}" data-period-key="${esc(m.periodKey)}">Clôturer</button>
           <button type="button" class="btn-secondary" data-action="close-modal">Annuler</button>
