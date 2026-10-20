@@ -1,5 +1,6 @@
 import { supabaseClient } from "./supabase.js";
 import { flash, getErrorMessage } from "./utils.js";
+import { guardFormSubmit, isSubmitBusy } from "./submit-busy.js";
 
 export let currentUser = null;
 export let isAdmin = false;
@@ -60,28 +61,32 @@ export function initAuth({ onAuthenticated, onSignedOut, onBeforeShowApp }) {
 
   document.getElementById("auth-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const username = document.getElementById("auth-username").value;
-    const email = getFakeEmail(username);
-    const password = document.getElementById("auth-password").value;
+    const form = e.target;
     const msgEl = document.getElementById("auth-msg");
-    msgEl.textContent = "Connexion en cours...";
-    const { data: authData, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-    if (error) {
-      msgEl.textContent = getErrorMessage(error, "Nom d'utilisateur ou mot de passe incorrect.");
-    } else if (authData.session?.user) {
-      msgEl.textContent = "";
-      try {
-        await handleSession(authData.session.user);
-      } catch (err) {
-        msgEl.textContent = getErrorMessage(err, "Erreur lors de la connexion.");
+    await guardFormSubmit(form, async () => {
+      const username = document.getElementById("auth-username").value;
+      const email = getFakeEmail(username);
+      const password = document.getElementById("auth-password").value;
+      msgEl.textContent = "Connexion en cours...";
+      const { data: authData, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) {
+        msgEl.textContent = getErrorMessage(error, "Nom d'utilisateur ou mot de passe incorrect.");
+      } else if (authData.session?.user) {
+        msgEl.textContent = "";
+        try {
+          await handleSession(authData.session.user);
+        } catch (err) {
+          msgEl.textContent = getErrorMessage(err, "Erreur lors de la connexion.");
+        }
+      } else {
+        msgEl.textContent = "Connexion impossible. Réessayez.";
       }
-    } else {
-      msgEl.textContent = "Connexion impossible. Réessayez.";
-    }
+    });
   });
 
   document.getElementById("change-pwd-form").addEventListener("submit", async (e) => {
     e.preventDefault();
+    const form = e.target;
     const newPwd = document.getElementById("new-pwd").value;
     const confirmPwd = document.getElementById("confirm-pwd").value;
     const msgEl = document.getElementById("change-pwd-msg");
@@ -89,6 +94,8 @@ export function initAuth({ onAuthenticated, onSignedOut, onBeforeShowApp }) {
       msgEl.textContent = "Les mots de passe ne correspondent pas.";
       return;
     }
+    if (isSubmitBusy()) return;
+    await guardFormSubmit(form, async () => {
     msgEl.textContent = "Mise à jour en cours...";
     const { error } = await supabaseClient.auth.updateUser({
       password: newPwd,
@@ -106,6 +113,7 @@ export function initAuth({ onAuthenticated, onSignedOut, onBeforeShowApp }) {
       document.getElementById("bottom-nav").style.display = "flex";
       await onAuthenticated(user);
     }
+    });
   });
 
   document.getElementById("logout-btn").addEventListener("click", async () => {
