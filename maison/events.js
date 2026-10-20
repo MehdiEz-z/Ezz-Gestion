@@ -1,17 +1,12 @@
-import { isAdmin } from "../shared/auth.js";
 import { getActiveModule } from "../shared/router.js";
 import { dismissModal, saveSubTab } from "../shared/ui-persist.js";
 import {
-  ui, state,
+  ui,
   setMonthBudget, setWeekBudget,
-  addCategory, updateCategory, deleteCategory,
-  addPlace, updatePlace, deletePlace,
-  addPurchase, updatePurchase, deletePurchase,
-  assignPeriodCategory, unassignPeriodCategory,
+  addPeriodConsumption, closePeriod,
 } from "./data.js";
 import { render } from "./render.js";
-import { activeMonthKey, findWeekSegmentForToday, normalizeName } from "../shared/utils.js";
-import { guardAction, guardFormSubmit, BUSY_DELETE } from "../shared/submit-busy.js";
+import { guardAction, guardFormSubmit } from "../shared/submit-busy.js";
 
 export function setupEvents() {
   document.addEventListener("click", onClick);
@@ -32,17 +27,12 @@ async function onClick(e) {
   if (!target) return;
   const action = target.dataset.action;
 
-  if (action === "set-subtab") {
-    ui.subTab = target.dataset.tab;
-    saveSubTab("maison", ui.subTab);
-    render();
-  }
-  else if (action === "open-month-panel") { ui.monthPanelOpen = true; render(); }
+  if (action === "open-month-panel") { ui.monthPanelOpen = true; render(); }
   else if (action === "close-month-panel") { ui.monthPanelOpen = false; render(); }
   else if (action === "select-month") {
     ui.viewedMonthKey = target.dataset.month;
     ui.monthPanelOpen = false;
-    ui.subTab = "budget";
+    ui.subTab = "gestion";
     saveSubTab("maison", ui.subTab);
     render();
   }
@@ -50,61 +40,6 @@ async function onClick(e) {
     const key = target.dataset.key;
     if (ui.expanded.has(key)) ui.expanded.delete(key);
     else ui.expanded.add(key);
-    render();
-  }
-  else if (action === "pick-cat-type") {
-    if (target.disabled) return;
-    const form = target.closest("form");
-    form.querySelectorAll("[data-action='pick-cat-type']").forEach(b => b.classList.remove("active-week", "active-month"));
-    target.classList.add(target.dataset.value === "hebdo" ? "active-week" : "active-month");
-    form.querySelector("[name='type']").value = target.dataset.value;
-  }
-  else if (action === "assign-category") {
-    const type = target.dataset.type;
-    const periodKey = type === "mensuel" ? target.dataset.monthKey : target.dataset.weekStart;
-    await guardAction(target, async () => {
-      await assignPeriodCategory(type, periodKey, target.dataset.categoryId);
-      render();
-    });
-  }
-  else if (action === "unassign-category") {
-    const type = target.dataset.type;
-    const periodKey = type === "mensuel" ? target.dataset.monthKey : target.dataset.weekStart;
-    await guardAction(target, async () => {
-      await unassignPeriodCategory(type, periodKey, target.dataset.categoryId);
-      render();
-    });
-  }
-  else if (action === "open-add-purchase") {
-    ui.modal = {
-      type: "add",
-      categoryId: target.dataset.categoryId,
-      type_: target.dataset.type,
-      monthKey: target.dataset.monthKey || null,
-      weekStart: target.dataset.weekStart || null,
-    };
-    render();
-  }
-  else if (action === "open-details") {
-    const type = target.dataset.type;
-    const monthKey = target.dataset.monthKey || null;
-    const weekStart = target.dataset.weekStart || null;
-    const editable = type === "mensuel"
-      ? monthKey === activeMonthKey()
-      : weekStart === (findWeekSegmentForToday()?.periodKey || "");
-    const categoryId = target.dataset.categoryId || null;
-    const displayName = target.dataset.categoryName
-      || state.categories.find(c => c.id === categoryId)?.name
-      || "";
-    ui.modal = {
-      type: "details",
-      categoryId,
-      displayName,
-      periodType: type,
-      monthKey,
-      weekStart,
-      editable,
-    };
     render();
   }
   else if (action === "open-edit-budget") {
@@ -115,51 +50,22 @@ async function onClick(e) {
     }
     render();
   }
-  else if (action === "open-edit-category") {
-    ui.modal = { type: "edit-category", categoryId: target.dataset.categoryId };
-    render();
-  }
-  else if (action === "open-edit-place") {
-    ui.modal = { type: "edit-place", placeId: target.dataset.placeId };
-    render();
-  }
-  else if (action === "open-edit-purchase") {
-    const prev = ui.modal && ui.modal.type === "details" ? { ...ui.modal } : null;
-    ui.modal = { type: "edit-purchase", purchaseId: target.dataset.purchaseId, returnTo: prev };
-    render();
-  }
-  else if (action === "open-delete-confirm") {
-    const prev = ui.modal && ui.modal.type === "details" ? { ...ui.modal } : null;
+  else if (action === "open-close-period") {
     ui.modal = {
-      type: "confirm-delete",
-      entity: target.dataset.entity,
-      id: target.dataset.id,
-      label: target.dataset.label,
-      returnTo: prev,
+      type: "confirm-close",
+      periodType: target.dataset.periodType,
+      periodKey: target.dataset.periodKey,
     };
     render();
   }
-  else if (action === "confirm-delete") {
-    await guardAction(target, () => handleConfirmDelete(target.dataset.entity, target.dataset.id), BUSY_DELETE);
+  else if (action === "confirm-close-period") {
+    await guardAction(target, async () => {
+      const ok = await closePeriod(target.dataset.periodType, target.dataset.periodKey);
+      if (ok) ui.modal = null;
+      render();
+    });
   }
   else if (action === "close-modal") { dismissModal(ui); render(); }
-}
-
-async function handleConfirmDelete(entity, id) {
-  const returnTo = ui.modal && ui.modal.returnTo;
-  let ok = false;
-  if (entity === "purchase") ok = await deletePurchase(id);
-  else if (entity === "category") ok = await deleteCategory(id);
-  else if (entity === "place") ok = await deletePlace(id);
-
-  if (!ok) return;
-
-  if (entity === "purchase" && returnTo) {
-    ui.modal = returnTo;
-  } else {
-    ui.modal = null;
-  }
-  render();
 }
 
 async function onSubmit(e) {
@@ -169,75 +75,33 @@ async function onSubmit(e) {
   e.preventDefault();
 
   await guardFormSubmit(form, async () => {
-  const type = form.dataset.form;
+    const type = form.dataset.form;
 
-  if (type === "set-month-budget") {
-    const n = parseFloat(form.amount.value);
-    if (!isNaN(n) && n >= 0) await setMonthBudget(ui.viewedMonthKey, n);
-    render();
-  }
-  else if (type === "set-week-budget") {
-    const n = parseFloat(form.amount.value);
-    if (!isNaN(n) && n >= 0) await setWeekBudget(form.dataset.weekStart, n);
-    render();
-  }
-  else if (type === "edit-budget") {
-    const n = parseFloat(form.amount.value);
-    if (isNaN(n) || n < 0) return;
-    let ok;
-    if (form.dataset.budgetType === "month") ok = await setMonthBudget(form.dataset.monthKey, n);
-    else ok = await setWeekBudget(form.dataset.weekStart, n);
-    if (ok) ui.modal = null;
-    render();
-  }
-  else if (type === "add-category") {
-    const name = normalizeName(form.name.value);
-    const t = form.type.value;
-    if (name) await addCategory(name, t);
-    form.reset();
-    render();
-  }
-  else if (type === "edit-category") {
-    const name = normalizeName(form.name.value);
-    const t = form.type.value;
-    if (name) {
-      const ok = await updateCategory(form.dataset.categoryId, name, t);
-      if (ok) ui.modal = null;
+    if (type === "set-month-budget") {
+      const n = parseFloat(form.amount.value);
+      if (!isNaN(n) && n >= 0) await setMonthBudget(ui.viewedMonthKey, n);
+      render();
     }
-    render();
-  }
-  else if (type === "add-place") {
-    const name = normalizeName(form.name.value);
-    if (name) await addPlace(name);
-    form.reset();
-    render();
-  }
-  else if (type === "edit-place") {
-    const name = normalizeName(form.name.value);
-    if (name) {
-      const ok = await updatePlace(form.dataset.placeId, name);
-      if (ok) ui.modal = null;
+    else if (type === "set-week-budget") {
+      const n = parseFloat(form.amount.value);
+      if (!isNaN(n) && n >= 0) await setWeekBudget(form.dataset.weekStart, n);
+      render();
     }
-    render();
-  }
-  else if (type === "add-purchase") {
-    const price = parseFloat(form.price.value);
-    const place_id = form.place.value;
-    const categoryId = form.dataset.categoryId;
-    const cat = state.categories.find(c => c.id === categoryId);
-    if (!cat || isNaN(price) || price < 0 || !place_id) return;
-    const ok = await addPurchase({ categoryId: cat.id, type: cat.type, place_id, price });
-    if (ok) ui.modal = null;
-    render();
-  }
-  else if (type === "edit-purchase") {
-    const price = parseFloat(form.price.value);
-    const place_id = form.place.value;
-    if (isNaN(price) || price < 0 || !place_id) return;
-    const returnTo = ui.modal && ui.modal.returnTo;
-    const ok = await updatePurchase(form.dataset.purchaseId, { price, place_id });
-    if (ok) ui.modal = returnTo || null;
-    render();
-  }
+    else if (type === "edit-budget") {
+      const n = parseFloat(form.amount.value);
+      if (isNaN(n) || n < 0) return;
+      let ok;
+      if (form.dataset.budgetType === "month") ok = await setMonthBudget(form.dataset.monthKey, n);
+      else ok = await setWeekBudget(form.dataset.weekStart, n);
+      if (ok) ui.modal = null;
+      render();
+    }
+    else if (type === "add-consumption") {
+      const n = parseFloat(form.amount.value);
+      if (isNaN(n) || n <= 0) return;
+      const ok = await addPeriodConsumption(form.dataset.periodType, form.dataset.periodKey, n);
+      if (ok) form.reset();
+      render();
+    }
   });
 }
