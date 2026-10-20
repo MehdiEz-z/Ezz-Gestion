@@ -150,7 +150,7 @@ main { padding: 14px 16px 16px; flex: 1; }
 .course-period-top {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   width: 100%;
 }
