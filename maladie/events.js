@@ -11,13 +11,14 @@ import {
   addCareAction, updateCareAction, deleteCareAction,
 } from "./data.js";
 import { render } from "./render.js";
+import { guardAction, guardFormSubmit, BUSY_DELETE } from "../shared/submit-busy.js";
 
 export function setupEvents() {
   document.addEventListener("click", onClick);
   document.addEventListener("submit", onSubmit);
 }
 
-function onClick(e) {
+async function onClick(e) {
   if (getActiveModule() !== "maladie") return;
 
   if (e.target.classList && e.target.classList.contains("overlay")) {
@@ -79,13 +80,22 @@ function onClick(e) {
     render();
   }
   else if (action === "assign-dossier-category") {
-    assignDossierCategory(target.dataset.dossierId, target.dataset.categoryId).then(() => render());
+    await guardAction(target, async () => {
+      await assignDossierCategory(target.dataset.dossierId, target.dataset.categoryId);
+      render();
+    });
   }
   else if (action === "unassign-dossier-category") {
-    unassignDossierCategory(target.dataset.dossierId, target.dataset.categoryId).then(() => render());
+    await guardAction(target, async () => {
+      await unassignDossierCategory(target.dataset.dossierId, target.dataset.categoryId);
+      render();
+    });
   }
   else if (action === "cancel-dossier") {
-    cancelDossier(target.dataset.dossierId).then(() => render());
+    await guardAction(target, async () => {
+      await cancelDossier(target.dataset.dossierId);
+      render();
+    });
   }
   else if (action === "open-add-action") {
     const prev = ui.modal?.type === "action-details" ? { ...ui.modal } : null;
@@ -112,12 +122,13 @@ function onClick(e) {
     render();
   }
   else if (action === "confirm-delete-action") {
-    const returnTo = ui.modal && ui.modal.returnTo;
-    deleteCareAction(target.dataset.id).then((ok) => {
+    await guardAction(target, async () => {
+      const returnTo = ui.modal && ui.modal.returnTo;
+      const ok = await deleteCareAction(target.dataset.id);
       if (!ok) return;
       ui.modal = returnTo || null;
       render();
-    });
+    }, BUSY_DELETE);
   }
   else if (action === "close-modal") { dismissModal(ui); render(); }
 }
@@ -127,6 +138,8 @@ async function onSubmit(e) {
   const form = e.target.closest("[data-form]");
   if (!form) return;
   e.preventDefault();
+
+  await guardFormSubmit(form, async () => {
   const type = form.dataset.form;
 
   if (type === "add-beneficiary") {
@@ -226,4 +239,5 @@ async function onSubmit(e) {
     if (ok) ui.modal = returnTo || null;
     render();
   }
+  });
 }
