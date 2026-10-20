@@ -96,26 +96,32 @@ function renderBadges(extra) {
 }
 
 function renderPeriodHead({
-  title, titleColor, periodLabel, budget, consumed, consumedExtra,
+  title, titleColor, periodLabel, budget, consumed,
   badges, progressHtml, toggleKey, canToggle,
 }) {
   const open = ui.expanded.has(toggleKey);
   const hasBudget = budget != null;
+  const toggleAttr = canToggle ? `data-action="toggle-card" data-key="${toggleKey}"` : "";
   return `
-    <div class="card-head" ${canToggle ? `data-action="toggle-card" data-key="${toggleKey}"` : ""}>
-      <div class="course-period-head">
-        <div class="course-period-title-row">
+    <div class="card-head course-period-card-head" ${toggleAttr}>
+      <div class="course-period-top">
+        <div class="course-period-left">
           <div class="card-title" style="color:${titleColor}">${title}</div>
-          ${hasBudget ? `<div class="course-period-budget">${money(budget)} DH</div>` : ""}
+          <div class="card-range">${periodLabel}</div>
+          <div class="course-period-badges">${renderBadges(badges)}</div>
         </div>
-        <div class="card-range">${periodLabel}</div>
-        <div class="course-period-status">
-          ${renderBadges(badges)}
-          ${hasBudget ? `<span class="small-label">Consommé : ${consumed}${consumedExtra || ""}</span>` : ""}
+        <div class="course-period-right">
+          ${hasBudget ? `
+            <div class="course-period-amounts">
+              <div class="course-period-budget">${money(budget)} DH</div>
+              <div class="small-label course-period-consumed">Consommé : ${consumed}</div>
+            </div>` : ""}
+          ${canToggle ? `<span class="chevron">${open ? "▲" : "▼"}</span>` : ""}
         </div>
-        ${hasBudget ? progressHtml : `<div class="small-label">Budget non défini</div>`}
       </div>
-      ${canToggle ? `<span class="chevron">${open ? "▲" : "▼"}</span>` : ""}
+      ${hasBudget
+    ? `<div class="course-period-progress">${progressHtml}</div>`
+    : `<div class="small-label" style="margin-top:4px">Budget non défini</div>`}
     </div>`;
 }
 
@@ -139,7 +145,6 @@ function renderGestionTab(monthKey) {
     periodLabel: monthLabel(monthKey),
     budget: monthBudget,
     consumed: `${money(monthTotal)} DH`,
-    consumedExtra: "",
     badges: [
       `<span class="badge ${isActiveMonth ? "badge-current" : "badge-past"}">${isActiveMonth ? "Mois en cours" : "Consultation"}</span>`,
       monthClosed ? `<span class="badge badge-past">Clôturé</span>` : "",
@@ -200,13 +205,13 @@ function renderGestionTab(monthKey) {
     }
 
     const weekHead = status === "future" ? `
-      <div class="card-head">
-        <div class="course-period-head">
-          <div class="course-period-title-row">
+      <div class="card-head course-period-card-head">
+        <div class="course-period-top">
+          <div class="course-period-left">
             <div class="card-title" style="color:var(--week)">Semaine ${n}</div>
+            <div class="card-range">${formatDateShort(seg.start)} → ${formatDateShort(seg.end)}</div>
+            <div class="course-period-badges"><span class="badge badge-future">Verrouillée</span></div>
           </div>
-          <div class="card-range">${formatDateShort(seg.start)} → ${formatDateShort(seg.end)}</div>
-          <span class="badge badge-future">Verrouillée</span>
         </div>
       </div>` : renderPeriodHead({
       title: `Semaine ${n}`,
@@ -214,7 +219,6 @@ function renderGestionTab(monthKey) {
       periodLabel: `${formatDateShort(seg.start)} → ${formatDateShort(seg.end)}`,
       budget,
       consumed: consumedLabel,
-      consumedExtra: "",
       badges: [
         `<span class="badge ${status === "current" ? "badge-current" : "badge-past"}">${status === "current" ? "Semaine active" : "Consultation"}</span>`,
         closed ? `<span class="badge badge-past">Clôturé</span>` : "",
