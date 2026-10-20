@@ -126,6 +126,41 @@ function renderSyntheseTab() {
     }).join("");
 
   const totalReimb = s.totalCnss + s.totalAss;
+  const withdrawn = state.reimbWithdrawnTotal;
+  const withdrawKey = "maladie-reimb-withdraw";
+  const withdrawOpen = ui.expanded.has(withdrawKey);
+  const withdrawPct = totalReimb > 0 ? Math.min(100, (withdrawn / totalReimb) * 100) : 0;
+  const canAddWithdraw = isAdmin && totalReimb > 0 && withdrawn < totalReimb;
+
+  const withdrawCard = totalReimb <= 0 ? "" : `
+      <div class="card" style="border-color:var(--week)">
+        <div class="card-head" data-action="toggle-card" data-key="${withdrawKey}">
+          <div>
+            <div class="card-title" style="color:var(--week)">Retraits sur remboursements</div>
+            <span class="small-label">Suivi personnel (hors trésorerie)</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="card-preview">
+              Remboursé : ${money(totalReimb)} DH<br>
+              <span class="small-label">Retiré : ${money(withdrawn)} DH</span>
+            </div>
+            <span class="chevron">${withdrawOpen ? "▲" : "▼"}</span>
+          </div>
+        </div>
+        <div class="card-body ${withdrawOpen ? "open" : ""}">
+          <div class="progress-row">
+            <div class="progress-track">
+              <div class="progress-fill" style="width:${withdrawPct}%;background:var(--week)"></div>
+            </div>
+          </div>
+          <div class="small-label success" style="margin-top:6px">Reste : ${money(Math.max(0, totalReimb - withdrawn))} DH</div>
+          ${canAddWithdraw ? `
+            <form class="inline-form" style="margin-top:12px" data-form="add-reimb-withdrawal">
+              <input class="field" name="amount" type="number" min="0.01" step="0.01" placeholder="Montant" required />
+              <button type="submit" class="btn-small" style="background:var(--week)">Ajouter</button>
+            </form>` : (isAdmin && withdrawn >= totalReimb ? `<div class="small-label" style="margin-top:8px">Plafond atteint.</div>` : "")}
+        </div>
+      </div>`;
 
   return `
     <div class="stack">
@@ -161,6 +196,8 @@ function renderSyntheseTab() {
           </div>
         </div>
       </div>
+
+      ${withdrawCard}
 
       <div class="card">
         <div class="card-head" data-action="toggle-card" data-key="alerts">

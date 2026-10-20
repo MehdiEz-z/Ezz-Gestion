@@ -9,6 +9,7 @@ import {
   assignDossierNumber, updateReimbursements,
   assignDossierCategory, unassignDossierCategory,
   addCareAction, updateCareAction, deleteCareAction,
+  addReimbWithdrawal,
 } from "./data.js";
 import { render } from "./render.js";
 import { guardAction, guardFormSubmit, BUSY_DELETE } from "../shared/submit-busy.js";
@@ -223,6 +224,14 @@ async function onSubmit(e) {
     if (ok) {
       const returnTo = ui.modal?.returnTo;
       ui.modal = returnTo || null;
+    }
+    render();
+  }
+  else if (type === "add-reimb-withdrawal") {
+    const n = parseFloat(form.amount.value);
+    if (!isNaN(n) && n > 0) {
+      const ok = await addReimbWithdrawal(n);
+      if (ok) form.reset();
     }
     render();
   }

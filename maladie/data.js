@@ -15,6 +15,7 @@ export let state = {
   dossiers: [],
   careActions: [],
   dossierCareCategories: [],
+  reimbWithdrawnTotal: 0,
 };
 
 export const ui = {
@@ -35,18 +36,20 @@ export function resetState() {
   state = {
     beneficiaries: [], doctors: [], careCategories: [],
     dossiers: [], careActions: [], dossierCareCategories: [],
+    reimbWithdrawnTotal: 0,
   };
 }
 
 export async function fetchStateFromSupabase() {
   if (!currentUser) return;
-  const [ben, docs, cats, doss, actions, dossCats] = await Promise.all([
+  const [ben, docs, cats, doss, actions, dossCats, withdrawnRow] = await Promise.all([
     supabaseClient.from("beneficiaries").select("*").order("last_name"),
     supabaseClient.from("doctors").select("*").order("name"),
     supabaseClient.from("care_categories").select("*").order("name"),
     supabaseClient.from("medical_dossiers").select("*").order("created_at", { ascending: false }),
     supabaseClient.from("care_actions").select("*").order("action_date", { ascending: false }),
     supabaseClient.from("dossier_care_categories").select("*"),
+    supabaseClient.from("maladie_reimb_withdrawn").select("*").eq("scope", "global").maybeSingle(),
   ]);
 
   if (ben.error) { flash(getErrorMessage(ben.error, "Erreur chargement bénéficiaires."), true); return; }
@@ -62,6 +65,50 @@ export async function fetchStateFromSupabase() {
   state.dossiers = doss.data || [];
   state.careActions = actions.data || [];
   state.dossierCareCategories = dossCats.data || [];
+  if (withdrawnRow.error) {
+    flash(getErrorMessage(withdrawnRow.error, "Erreur chargement retraits. Exécutez supabase/maladie_reimb_withdrawn.sql."), true);
+    state.reimbWithdrawnTotal = 0;
+  } else {
+    state.reimbWithdrawnTotal = withdrawnRow.data ? Number(withdrawnRow.data.withdrawn_total) || 0 : 0;
+  }
+}
+
+const REIMB_WITHDRAWN_SCOPE = "global";
+
+export function totalReimbursedGlobal() {
+  const s = globalStats();
+  return s.totalCnss + s.totalAss;
+}
+
+export async function addReimbWithdrawal(amount) {
+  if (!isAdmin) return false;
+  const amt = Number(amount);
+  if (!Number.isFinite(amt) || amt <= 0) {
+    flash("Montant invalide.", true);
+    return false;
+  }
+  const cap = totalReimbursedGlobal();
+  const newTotal = state.reimbWithdrawnTotal + amt;
+  if (newTotal > cap) {
+    flash("Le montant dépasse le montant remboursé.", true);
+    return false;
+  }
+  const now = new Date().toISOString();
+  const { data, error } = await supabaseClient.from("maladie_reimb_withdrawn")
+    .upsert({
+      scope: REIMB_WITHDRAWN_SCOPE,
+      withdrawn_total: newTotal,
+      updated_at: now,
+    }, { onConflict: "scope" })
+    .select()
+    .single();
+  if (error) {
+    flash(getErrorMessage(error, "Erreur enregistrement retrait."), true);
+    return false;
+  }
+  state.reimbWithdrawnTotal = Number(data.withdrawn_total) || 0;
+  flash("Retrait enregistré.");
+  return true;
 }
 
 export function beneficiaryName(b) {
