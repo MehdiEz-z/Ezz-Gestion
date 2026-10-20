@@ -20,30 +20,13 @@ function weekSegmentStatus(seg, monthKey, isActiveMonth) {
   return "future";
 }
 
-function renderWeekConsumedLabel(stats) {
-  if (stats.budgetAmount == null) {
-    return `<span class="small-label">Consommé : ${money(stats.consumed)} DH</span>`;
-  }
-  if (stats.reportPart > 0) {
-    return `<span class="small-label">Consommé : ${money(stats.budgetPart)} DH + <span class="danger">${money(stats.reportPart)} DH</span></span>`;
-  }
-  return `<span class="small-label">Consommé : ${money(stats.consumed)} DH</span>`;
+function lastDayOfMonthKey(monthKey) {
+  const [y, m] = monthKey.split("-").map(Number);
+  return new Date(y, m, 0);
 }
 
-function renderWeekPreview(monthKey, seg, status) {
-  const isActiveWeek = status === "current";
-  const stats = weekSpendingStats(monthKey, seg.periodKey, {
-    isActiveWeek,
-    weekNumber: seg.number,
-  });
-  if (stats.budgetAmount == null) return "Budget non défini";
-  const remCls = stats.reste > 0 ? "success" : "danger";
-  let html = renderWeekConsumedLabel(stats);
-  html += `<br><span class="small-label ${remCls}">Reste : ${money(stats.reste)} DH</span>`;
-  if (stats.showReportLine) {
-    html += `<br><span class="small-label">Report : ${money(stats.reportRemaining)} DH</span>`;
-  }
-  return html;
+function isPeriodEndReached(endDate) {
+  return toISO(new Date()) >= toISO(endDate);
 }
 
 export function render() {
@@ -62,7 +45,7 @@ export function render() {
 }
 
 function renderBudgetProgress(budget, total, colorVar) {
-  const pct = Math.min(100, (total / Number(budget)) * 100);
+  const pct = budget > 0 ? Math.min(100, (total / Number(budget)) * 100) : 0;
   const over = total > Number(budget);
   return `
     <div class="progress-row">
@@ -96,8 +79,8 @@ function closedBanner(type, periodKey) {
 function renderConsumptionForm(type, periodKey, canAdd) {
   if (!canAdd) return "";
   return `
-    <form class="inline-form" style="margin-top:12px" data-form="add-consumption" data-period-type="${type}" data-period-key="${esc(periodKey)}">
-      <input class="field" name="amount" type="number" min="0.01" step="0.01" placeholder="Montant (DH)" required />
+    <form class="inline-form" data-form="add-consumption" data-period-type="${type}" data-period-key="${esc(periodKey)}">
+      <input class="field" name="amount" type="number" min="0.01" step="0.01" placeholder="Montant" required />
       <button type="submit" class="btn-small" style="background:${type === "mensuel" ? "var(--month)" : "var(--week)"}">Ajouter</button>
     </form>`;
 }
@@ -108,33 +91,71 @@ function renderCloseBtn(type, periodKey, show) {
     <button type="button" class="btn-secondary" style="margin-top:12px;width:100%" data-action="open-close-period" data-period-type="${type}" data-period-key="${esc(periodKey)}">Clôturer la période</button>`;
 }
 
+function renderBadges(extra) {
+  return extra.filter(Boolean).join(" ");
+}
+
+function renderPeriodHead({
+  title, titleColor, periodLabel, budget, consumed, consumedExtra,
+  badges, progressHtml, toggleKey, canToggle,
+}) {
+  const open = ui.expanded.has(toggleKey);
+  const hasBudget = budget != null;
+  return `
+    <div class="card-head" ${canToggle ? `data-action="toggle-card" data-key="${toggleKey}"` : ""}>
+      <div class="course-period-head">
+        <div class="course-period-title-row">
+          <div class="card-title" style="color:${titleColor}">${title}</div>
+          ${hasBudget ? `<div class="course-period-budget">${money(budget)} DH</div>` : ""}
+        </div>
+        <div class="card-range">${periodLabel}</div>
+        <div class="course-period-status">
+          ${renderBadges(badges)}
+          ${hasBudget ? `<span class="small-label">Consommé : ${consumed}${consumedExtra || ""}</span>` : ""}
+        </div>
+        ${hasBudget ? progressHtml : `<div class="small-label">Budget non défini</div>`}
+      </div>
+      ${canToggle ? `<span class="chevron">${open ? "▲" : "▼"}</span>` : ""}
+    </div>`;
+}
+
 function renderGestionTab(monthKey) {
   const isActiveMonth = monthKey === activeMonthKey();
   const monthBudget = state.monthlyBudgets[monthKey];
   const monthTotal = monthSpentTotal(monthKey);
   const monthClosed = isPeriodClosed("mensuel", monthKey);
   const monthKeyStr = "month:" + monthKey;
-  const monthOpen = ui.expanded.has(monthKeyStr) || monthBudget === undefined;
+  const monthOpen = ui.expanded.has(monthKeyStr);
+  const monthBodyOpen = monthBudget === undefined ? true : monthOpen;
   const canEditMonthBudget = isActiveMonth && !monthClosed && monthBudget !== undefined;
   const canAddMonth = isActiveMonth && !monthClosed && monthBudget != null && canAddPeriodConsumption("mensuel", monthKey);
-  const canCloseMonth = isActiveMonth && !monthClosed && monthBudget != null;
+  const canCloseMonth = !monthClosed && monthBudget != null
+    && isPeriodEndReached(lastDayOfMonthKey(monthKey));
+  const monthCanToggle = monthBudget !== undefined;
+
+  const monthHead = renderPeriodHead({
+    title: "Budget mensuel",
+    titleColor: "var(--month)",
+    periodLabel: monthLabel(monthKey),
+    budget: monthBudget,
+    consumed: `${money(monthTotal)} DH`,
+    consumedExtra: "",
+    badges: [
+      `<span class="badge ${isActiveMonth ? "badge-current" : "badge-past"}">${isActiveMonth ? "Mois en cours" : "Consultation"}</span>`,
+      monthClosed ? `<span class="badge badge-past">Clôturé</span>` : "",
+      monthBudget !== undefined && monthTotal > Number(monthBudget) ? `<span class="badge badge-danger">Dépassé</span>` : "",
+    ],
+    progressHtml: monthBudget !== undefined
+      ? renderBudgetProgressRow(monthBudget, monthTotal, "var(--month)", canEditMonthBudget ? renderBudgetEditBtn("month", `data-month-key="${monthKey}"`) : "")
+      : "",
+    toggleKey: monthKeyStr,
+    canToggle: monthCanToggle,
+  });
 
   const monthCard = `
     <div class="card" style="border-color:var(--month)">
-      <div class="card-head" data-action="toggle-card" data-key="${monthKeyStr}">
-        <div>
-          <div class="card-title" style="color:var(--month)">Budget mensuel</div>
-          <div class="card-range">${monthLabel(monthKey)}</div>
-          <span class="badge ${isActiveMonth ? "badge-current" : "badge-past"}">${isActiveMonth ? "Mois en cours" : "Consultation"}</span>
-          ${monthClosed ? `<span class="badge badge-past">Clôturé</span>` : ""}
-          ${monthBudget !== undefined && monthTotal > Number(monthBudget) ? `<span class="badge badge-danger">Dépassé</span>` : ""}
-        </div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <div class="card-preview">${monthBudget !== undefined ? money(monthBudget) + " DH<br><span class=\"small-label\">Consommé : " + money(monthTotal) + " DH</span>" : "budget non défini"}</div>
-          <span class="chevron">${monthOpen ? "▲" : "▼"}</span>
-        </div>
-      </div>
-      <div class="card-body ${monthOpen ? "open" : ""}">
+      ${monthHead}
+      <div class="card-body ${monthBodyOpen ? "open" : ""}">
         ${monthBudget === undefined ? (
     isActiveMonth && !monthClosed ? `
           <form class="inline-form" data-form="set-month-budget">
@@ -142,7 +163,6 @@ function renderGestionTab(monthKey) {
             <button type="submit" class="btn-small" style="background:var(--month)">Fixer</button>
           </form>` : `<div class="small-label">Budget non défini pour ce mois.</div>`
   ) : `
-          ${renderBudgetProgressRow(monthBudget, monthTotal, "var(--month)", canEditMonthBudget ? renderBudgetEditBtn("month", `data-month-key="${monthKey}"`) : "")}
           ${closedBanner("mensuel", monthKey)}
           ${renderConsumptionForm("mensuel", monthKey, canAddMonth)}
           ${renderCloseBtn("mensuel", monthKey, canCloseMonth)}
@@ -159,8 +179,11 @@ function renderGestionTab(monthKey) {
     const budget = state.weeklyBudgets[isoWs];
     const total = weekSpentTotal(isoWs, isoWe);
     const key = "week:" + isoWs;
-    const canToggle = status !== "future";
-    const open = canToggle && (budget === undefined ? ui.expanded.has(key) : true);
+    const canToggle = status !== "future" && budget !== undefined;
+    const open = ui.expanded.has(key);
+    const weekBodyOpen = budget === undefined
+      ? (status === "current" && !closed)
+      : (open && status !== "future");
     const canEditWeek = status === "current" && budget !== undefined && !closed;
     const stats = weekSpendingStats(monthKey, isoWs, {
       isActiveWeek: status === "current",
@@ -168,24 +191,46 @@ function renderGestionTab(monthKey) {
     });
     const canAddWeek = isActiveMonth && status !== "future" && !closed && budget != null
       && canAddPeriodConsumption("hebdo", isoWs);
-    const canCloseWeek = isActiveMonth && status !== "future" && !closed && budget != null;
+    const canCloseWeek = !closed && budget != null && status !== "future"
+      && isPeriodEndReached(seg.end);
+
+    let consumedLabel = `${money(total)} DH`;
+    if (stats.budgetAmount != null && stats.reportPart > 0) {
+      consumedLabel = `${money(stats.budgetPart)} DH + <span class="danger">${money(stats.reportPart)} DH</span>`;
+    }
+
+    const weekHead = status === "future" ? `
+      <div class="card-head">
+        <div class="course-period-head">
+          <div class="course-period-title-row">
+            <div class="card-title" style="color:var(--week)">Semaine ${n}</div>
+          </div>
+          <div class="card-range">${formatDateShort(seg.start)} → ${formatDateShort(seg.end)}</div>
+          <span class="badge badge-future">Verrouillée</span>
+        </div>
+      </div>` : renderPeriodHead({
+      title: `Semaine ${n}`,
+      titleColor: "var(--week)",
+      periodLabel: `${formatDateShort(seg.start)} → ${formatDateShort(seg.end)}`,
+      budget,
+      consumed: consumedLabel,
+      consumedExtra: "",
+      badges: [
+        `<span class="badge ${status === "current" ? "badge-current" : "badge-past"}">${status === "current" ? "Semaine active" : "Consultation"}</span>`,
+        closed ? `<span class="badge badge-past">Clôturé</span>` : "",
+        budget !== undefined && stats.plafond > 0 && total > stats.plafond ? `<span class="badge badge-danger">Dépassé</span>` : "",
+      ],
+      progressHtml: budget !== undefined
+        ? renderBudgetProgressRow(budget, total, "var(--week)", canEditWeek ? renderBudgetEditBtn("week", `data-week-start="${isoWs}"`) : "")
+        : "",
+      toggleKey: key,
+      canToggle,
+    });
 
     return `
       <div class="card ${status === "future" ? "disabled" : ""}" style="border-color:var(--week)">
-        <div class="card-head" data-action="${canToggle ? "toggle-card" : ""}" data-key="${key}">
-          <div>
-            <div class="card-title" style="color:var(--week)">Semaine ${n}</div>
-            <div class="card-range">${formatDateShort(seg.start)} → ${formatDateShort(seg.end)}</div>
-            <span class="badge ${status === "current" ? "badge-current" : status === "past" ? "badge-past" : "badge-future"}">${status === "current" ? "Semaine active" : status === "past" ? "Consultation" : "Verrouillée"}</span>
-            ${closed ? `<span class="badge badge-past">Clôturé</span>` : ""}
-            ${budget !== undefined && stats.plafond > 0 && total > stats.plafond ? `<span class="badge badge-danger">Dépassé</span>` : ""}
-          </div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <div class="card-preview">${status === "future" ? "" : (budget !== undefined ? renderWeekPreview(monthKey, seg, status) : "budget non défini")}</div>
-            ${canToggle ? `<span class="chevron">${open ? "▲" : "▼"}</span>` : ""}
-          </div>
-        </div>
-        <div class="card-body ${open && status !== "future" ? "open" : ""}">
+        ${weekHead}
+        <div class="card-body ${weekBodyOpen ? "open" : ""}">
           ${status === "future" ? "" : budget === undefined ? (
       status === "current" && !closed ? `
             <form class="inline-form" data-form="set-week-budget" data-week-start="${isoWs}">
@@ -193,7 +238,6 @@ function renderGestionTab(monthKey) {
               <button type="submit" class="btn-small" style="background:var(--week)">Fixer</button>
             </form>` : `<div class="small-label">Budget non défini pour cette semaine.</div>`
     ) : `
-            ${renderBudgetProgressRow(budget, total, "var(--week)", canEditWeek ? renderBudgetEditBtn("week", `data-week-start="${isoWs}"`) : "")}
             ${closedBanner("hebdo", isoWs)}
             ${renderConsumptionForm("hebdo", isoWs, canAddWeek)}
             ${!canAddWeek && isActiveMonth && status !== "future" && !closed && budget != null && !stats.canAddConsumption
