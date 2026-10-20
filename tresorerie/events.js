@@ -9,6 +9,7 @@ import {
   pinSaisieCategory, unpinSaisieCategory, loadMaladieLookup,
 } from "./data.js";
 import { render } from "./render.js";
+import { guardAction, guardFormSubmit, BUSY_DELETE } from "../shared/submit-busy.js";
 
 export function setupEvents() {
   document.addEventListener("click", onClick);
@@ -122,7 +123,7 @@ async function onClick(e) {
     render();
   }
   else if (action === "confirm-delete") {
-    handleConfirmDelete(target.dataset.entity, target.dataset.id);
+    await guardAction(target, () => handleConfirmDelete(target.dataset.entity, target.dataset.id), BUSY_DELETE);
   }
   else if (action === "close-modal") { dismissModal(ui); render(); }
 }
@@ -149,6 +150,7 @@ async function onSubmit(e) {
   if (!form) return;
   e.preventDefault();
 
+  await guardFormSubmit(form, async () => {
   if (form.dataset.form === "set-opening") {
     const ok = await setOpeningBalance(ui.viewedMonthKey, form.amount.value);
     if (ok) { await Promise.all([loadWalletData(), loadMaladieLookup()]); render(); }
@@ -203,4 +205,5 @@ async function onSubmit(e) {
       render();
     }
   }
+  });
 }

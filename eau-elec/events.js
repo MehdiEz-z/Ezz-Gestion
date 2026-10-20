@@ -12,13 +12,14 @@ import {
   markElecPaid, markWaterPaid,
 } from "./data.js";
 import { render } from "./render.js";
+import { guardAction, guardFormSubmit } from "../shared/submit-busy.js";
 
 export function setupEvents() {
   document.addEventListener("click", onClick);
   document.addEventListener("submit", onSubmit);
 }
 
-function onClick(e) {
+async function onClick(e) {
   if (getActiveModule() !== "eau-elec") return;
 
   if (e.target.classList && e.target.classList.contains("overlay")) {
@@ -58,7 +59,10 @@ function onClick(e) {
     render();
   }
   else if (action === "set-app-owner") {
-    setPersonAppOwner(target.dataset.personId).then(() => render());
+    await guardAction(target, async () => {
+      await setPersonAppOwner(target.dataset.personId);
+      render();
+    });
   }
   else if (action === "pick-payment-method") {
     const form = target.closest("form");
@@ -78,13 +82,19 @@ function onClick(e) {
     if (p?.is_app_owner) {
       const stored = getOwnerUtilityPaymentMethod();
       if (!forceModal && stored) {
-        markElecPaid(monthKey, personId, stored).then(() => render());
+        await guardAction(target, async () => {
+          await markElecPaid(monthKey, personId, stored);
+          render();
+        });
         return;
       }
       ui.modal = { type: "utility-pay", utility: "elec", monthKey, personId };
       render();
     } else {
-      markElecPaid(monthKey, personId).then(() => render());
+      await guardAction(target, async () => {
+        await markElecPaid(monthKey, personId);
+        render();
+      });
     }
   }
   else if (action === "pay-water") {
@@ -95,13 +105,19 @@ function onClick(e) {
     if (p?.is_app_owner) {
       const stored = getOwnerUtilityPaymentMethod();
       if (!forceModal && stored) {
-        markWaterPaid(monthKey, personId, stored).then(() => render());
+        await guardAction(target, async () => {
+          await markWaterPaid(monthKey, personId, stored);
+          render();
+        });
         return;
       }
       ui.modal = { type: "utility-pay", utility: "water", monthKey, personId };
       render();
     } else {
-      markWaterPaid(monthKey, personId).then(() => render());
+      await guardAction(target, async () => {
+        await markWaterPaid(monthKey, personId);
+        render();
+      });
     }
   }
   else if (action === "close-modal") { dismissModal(ui); render(); }
@@ -112,6 +128,8 @@ async function onSubmit(e) {
   const form = e.target.closest("[data-form]");
   if (!form) return;
   e.preventDefault();
+
+  await guardFormSubmit(form, async () => {
   const type = form.dataset.form;
 
   if (type === "add-person") {
@@ -151,4 +169,5 @@ async function onSubmit(e) {
     }
     render();
   }
+  });
 }

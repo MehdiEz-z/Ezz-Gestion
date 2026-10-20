@@ -241,6 +241,14 @@ input, select, button { font-family: inherit; font-size: 15px; }
   width: 100%;
 }
 
+.btn-primary.is-busy,
+.btn-danger.is-busy,
+.btn-small.is-busy {
+  opacity: 0.75;
+  cursor: wait;
+  pointer-events: none;
+}
+
 .btn-secondary {
   padding: 12px;
   border-radius: 8px;

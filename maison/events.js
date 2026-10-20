@@ -11,6 +11,7 @@ import {
 } from "./data.js";
 import { render } from "./render.js";
 import { activeMonthKey, findWeekSegmentForToday, normalizeName } from "../shared/utils.js";
+import { guardAction, guardFormSubmit, BUSY_DELETE } from "../shared/submit-busy.js";
 
 export function setupEvents() {
   document.addEventListener("click", onClick);
@@ -61,14 +62,18 @@ async function onClick(e) {
   else if (action === "assign-category") {
     const type = target.dataset.type;
     const periodKey = type === "mensuel" ? target.dataset.monthKey : target.dataset.weekStart;
-    await assignPeriodCategory(type, periodKey, target.dataset.categoryId);
-    render();
+    await guardAction(target, async () => {
+      await assignPeriodCategory(type, periodKey, target.dataset.categoryId);
+      render();
+    });
   }
   else if (action === "unassign-category") {
     const type = target.dataset.type;
     const periodKey = type === "mensuel" ? target.dataset.monthKey : target.dataset.weekStart;
-    await unassignPeriodCategory(type, periodKey, target.dataset.categoryId);
-    render();
+    await guardAction(target, async () => {
+      await unassignPeriodCategory(type, periodKey, target.dataset.categoryId);
+      render();
+    });
   }
   else if (action === "open-add-purchase") {
     ui.modal = {
@@ -135,7 +140,7 @@ async function onClick(e) {
     render();
   }
   else if (action === "confirm-delete") {
-    handleConfirmDelete(target.dataset.entity, target.dataset.id);
+    await guardAction(target, () => handleConfirmDelete(target.dataset.entity, target.dataset.id), BUSY_DELETE);
   }
   else if (action === "close-modal") { dismissModal(ui); render(); }
 }
@@ -162,6 +167,8 @@ async function onSubmit(e) {
   const form = e.target.closest("[data-form]");
   if (!form) return;
   e.preventDefault();
+
+  await guardFormSubmit(form, async () => {
   const type = form.dataset.form;
 
   if (type === "set-month-budget") {
@@ -232,4 +239,5 @@ async function onSubmit(e) {
     if (ok) ui.modal = returnTo || null;
     render();
   }
+  });
 }

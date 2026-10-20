@@ -1,5 +1,6 @@
 import { getActiveModule } from "../shared/router.js";
 import { dismissModal } from "../shared/ui-persist.js";
+import { guardAction, guardFormSubmit, BUSY_DELETE } from "../shared/submit-busy.js";
 import {
   ui,
   addProject, updateProject, deleteProject,
@@ -24,7 +25,7 @@ function modalReturnTo() {
   return m.returnTo ? { ...m.returnTo } : null;
 }
 
-function onClick(e) {
+async function onClick(e) {
   if (getActiveModule() !== "events") return;
 
   if (e.target.classList && e.target.classList.contains("overlay")) {
@@ -89,10 +90,10 @@ function onClick(e) {
     render();
   }
   else if (action === "confirm-delete") {
-    handleConfirmDelete(target.dataset.entity, target.dataset.id);
+    await guardAction(target, () => handleConfirmDelete(target.dataset.entity, target.dataset.id), BUSY_DELETE);
   }
   else if (action === "confirm-save") {
-    handleConfirmSave(target.dataset.entity, target.dataset.id);
+    await guardAction(target, () => handleConfirmSave(target.dataset.entity, target.dataset.id));
   }
   else if (action === "close-modal") {
     dismissModal(ui);
@@ -151,96 +152,99 @@ async function onSubmit(e) {
   const form = e.target.closest("[data-form]");
   if (!form) return;
   e.preventDefault();
-  const type = form.dataset.form;
 
-  if (type === "add-project") {
-    const created = await addProject(form.name.value);
-    if (created) {
-      form.reset();
-      ui.expanded.delete("evt:add-project");
-      ui.expanded.add(`evt-project:${created.id}`);
-      ui.expanded.add(`evt-proj-sec:${created.id}`);
+  await guardFormSubmit(form, async () => {
+    const type = form.dataset.form;
+
+    if (type === "add-project") {
+      const created = await addProject(form.name.value);
+      if (created) {
+        form.reset();
+        ui.expanded.delete("evt:add-project");
+        ui.expanded.add(`evt-project:${created.id}`);
+        ui.expanded.add(`evt-proj-sec:${created.id}`);
+      }
+      render();
     }
-    render();
-  }
-  else if (type === "edit-project") {
-    const projectId = form.dataset.projectId;
-    ui.modal = {
-      type: "confirm-save",
-      entity: "project",
-      id: projectId,
-      payload: { name: form.name.value.trim() },
-      returnTo: { type: "edit-project", projectId, draft: { name: form.name.value } },
-    };
-    render();
-  }
-  else if (type === "add-section") {
-    const projectId = form.dataset.projectId;
-    const created = await addSection(projectId, form.name.value);
-    if (created) {
-      form.reset();
-      ui.expanded.delete(`evt-proj-sec:${projectId}`);
-      ui.expanded.add(`evt-project:${projectId}`);
-      ui.expanded.add(`evt-section:${created.id}`);
+    else if (type === "edit-project") {
+      const projectId = form.dataset.projectId;
+      ui.modal = {
+        type: "confirm-save",
+        entity: "project",
+        id: projectId,
+        payload: { name: form.name.value.trim() },
+        returnTo: { type: "edit-project", projectId, draft: { name: form.name.value } },
+      };
+      render();
     }
-    render();
-  }
-  else if (type === "edit-section") {
-    const sectionId = form.dataset.sectionId;
-    ui.modal = {
-      type: "confirm-save",
-      entity: "section",
-      id: sectionId,
-      payload: { name: form.name.value.trim() },
-      returnTo: { type: "edit-section", sectionId, draft: { name: form.name.value } },
-    };
-    render();
-  }
-  else if (type === "add-category") {
-    const sectionId = form.dataset.sectionId;
-    const created = await addCategory(sectionId, form.name.value);
-    if (created) {
-      form.reset();
-      ui.expanded.add(`evt-section:${sectionId}`);
+    else if (type === "add-section") {
+      const projectId = form.dataset.projectId;
+      const created = await addSection(projectId, form.name.value);
+      if (created) {
+        form.reset();
+        ui.expanded.delete(`evt-proj-sec:${projectId}`);
+        ui.expanded.add(`evt-project:${projectId}`);
+        ui.expanded.add(`evt-section:${created.id}`);
+      }
+      render();
     }
-    render();
-  }
-  else if (type === "edit-category") {
-    const categoryId = form.dataset.categoryId;
-    const prev = ui.modal?.returnTo ?? null;
-    ui.modal = {
-      type: "confirm-save",
-      entity: "category",
-      id: categoryId,
-      payload: { name: form.name.value.trim() },
-      returnTo: { type: "edit-category", categoryId, draft: { name: form.name.value }, returnTo: prev },
-    };
-    render();
-  }
-  else if (type === "add-line") {
-    const categoryId = form.dataset.categoryId;
-    const ok = await addLine(categoryId, form.label.value, form.amount.value);
-    if (ok) {
-      form.reset();
-      afterAddLine(categoryId);
+    else if (type === "edit-section") {
+      const sectionId = form.dataset.sectionId;
+      ui.modal = {
+        type: "confirm-save",
+        entity: "section",
+        id: sectionId,
+        payload: { name: form.name.value.trim() },
+        returnTo: { type: "edit-section", sectionId, draft: { name: form.name.value } },
+      };
+      render();
     }
-    render();
-  }
-  else if (type === "edit-line") {
-    const lineId = form.dataset.lineId;
-    const prev = ui.modal?.returnTo ?? null;
-    ui.modal = {
-      type: "confirm-save",
-      entity: "line",
-      id: lineId,
-      payload: { label: form.label.value.trim(), amount: form.amount.value },
-      returnTo: {
-        type: "edit-line",
-        lineId,
-        draft: { label: form.label.value, amount: form.amount.value },
-        returnTo: prev,
-      },
-    };
-    render();
-  }
+    else if (type === "add-category") {
+      const sectionId = form.dataset.sectionId;
+      const created = await addCategory(sectionId, form.name.value);
+      if (created) {
+        form.reset();
+        ui.expanded.add(`evt-section:${sectionId}`);
+      }
+      render();
+    }
+    else if (type === "edit-category") {
+      const categoryId = form.dataset.categoryId;
+      const prev = ui.modal?.returnTo ?? null;
+      ui.modal = {
+        type: "confirm-save",
+        entity: "category",
+        id: categoryId,
+        payload: { name: form.name.value.trim() },
+        returnTo: { type: "edit-category", categoryId, draft: { name: form.name.value }, returnTo: prev },
+      };
+      render();
+    }
+    else if (type === "add-line") {
+      const categoryId = form.dataset.categoryId;
+      const ok = await addLine(categoryId, form.label.value, form.amount.value);
+      if (ok) {
+        form.reset();
+        afterAddLine(categoryId);
+      }
+      render();
+    }
+    else if (type === "edit-line") {
+      const lineId = form.dataset.lineId;
+      const prev = ui.modal?.returnTo ?? null;
+      ui.modal = {
+        type: "confirm-save",
+        entity: "line",
+        id: lineId,
+        payload: { label: form.label.value.trim(), amount: form.amount.value },
+        returnTo: {
+          type: "edit-line",
+          lineId,
+          draft: { label: form.label.value, amount: form.amount.value },
+          returnTo: prev,
+        },
+      };
+      render();
+    }
+  });
 }
