@@ -8,13 +8,14 @@ import {
   updateDebtMovement, deleteDebtMovement, getMovement,
 } from "./data.js";
 import { render } from "./render.js";
+import { guardAction, guardFormSubmit, BUSY_DELETE } from "../shared/submit-busy.js";
 
 export function setupEvents() {
   document.addEventListener("click", onClick);
   document.addEventListener("submit", onSubmit);
 }
 
-function onClick(e) {
+async function onClick(e) {
   if (getActiveModule() !== "dettes") return;
 
   if (e.target.classList && e.target.classList.contains("overlay")) {
@@ -92,19 +93,21 @@ function onClick(e) {
     const movId = target.dataset.movementId;
     const mov = getMovement(movId);
     const detailCat = ui.modal?.type === "debt-detail" ? ui.modal.categoryId : mov?.category_id;
-    deleteDebtMovement(movId).then(async ok => {
+    await guardAction(target, async () => {
+      const ok = await deleteDebtMovement(movId);
       if (ok) {
         await loadWalletData();
         ui.modal = detailCat ? { type: "debt-detail", categoryId: detailCat } : null;
       }
       render();
-    });
+    }, BUSY_DELETE);
   }
   else if (action === "delete-debt-category") {
-    deleteCategory(target.dataset.categoryId).then(ok => {
+    await guardAction(target, async () => {
+      const ok = await deleteCategory(target.dataset.categoryId);
       if (ok) ui.modal = null;
       render();
-    });
+    }, BUSY_DELETE);
   }
   else if (action === "close-modal") { dismissModal(ui); render(); }
 }
@@ -115,6 +118,7 @@ async function onSubmit(e) {
   if (!form) return;
   e.preventDefault();
 
+  await guardFormSubmit(form, async () => {
   if (form.dataset.form === "add-debt-category") {
     const ok = await addCategory(form.name.value, form.kind.value);
     if (ok) form.reset();
@@ -162,4 +166,5 @@ async function onSubmit(e) {
     }
     render();
   }
+  });
 }
