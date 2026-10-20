@@ -141,38 +141,65 @@ main { padding: 14px 16px 16px; flex: 1; }
 .card-range { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .card-preview { font-size: 12px; color: var(--muted); text-align: right; white-space: nowrap; }
 
-.course-period-head {
-  flex: 1;
-  min-width: 0;
-  display: flex;
+.card-head.course-period-card-head {
   flex-direction: column;
-  gap: 6px;
+  align-items: stretch;
+  gap: 10px;
 }
 
-.course-period-title-row {
+.course-period-top {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: flex-start;
   gap: 12px;
+  width: 100%;
+}
+
+.course-period-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.course-period-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.course-period-badges .badge { margin-top: 0; }
+
+.course-period-right {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.course-period-amounts {
+  text-align: right;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .course-period-budget {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--ink);
   white-space: nowrap;
+  line-height: 1.3;
 }
 
-.course-period-status {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
+.course-period-consumed {
+  margin-top: 2px;
+  white-space: nowrap;
 }
 
-.course-period-status .small-label { margin-top: 0; }
+.course-period-progress {
+  width: 100%;
+}
 
-.course-period-head .progress-edit-row { margin-top: 2px; }
+.course-period-progress .progress-edit-row { margin-top: 0; }
 
 .badge {
   display: inline-block;
