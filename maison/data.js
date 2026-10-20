@@ -469,6 +469,15 @@ export async function addPeriodConsumption(type, periodKey, amount) {
     flash("Définis d'abord le budget de la semaine.", true);
     return false;
   }
+  if (!canAddPeriodConsumption(type, periodKey, amt)) {
+    flash(
+      type === "mensuel"
+        ? "Le montant dépasse le budget mensuel."
+        : "Le montant dépasse le plafond (budget + report).",
+      true,
+    );
+    return false;
+  }
   const prev = type === "mensuel" ? monthSpentTotal(periodKey) : weekSpentTotal(periodKey);
   const newTotal = prev + amt;
   const closedAt = getPeriodState(type, periodKey).closed_at;
