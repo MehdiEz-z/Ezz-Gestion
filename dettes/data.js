@@ -10,6 +10,7 @@ export let state = {
 };
 
 export const ui = {
+  subTab: "dette",
   expanded: new Set(),
   modal: null,
 };
