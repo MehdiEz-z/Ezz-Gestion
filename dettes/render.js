@@ -32,7 +32,7 @@ function renderExpandableAddCard(key, title, bodyHtml) {
 
 function renderDetteSummaryCard() {
   const s = summarySnapshot();
-  const denom = s.totalEmprunte > 0 ? s.totalEmprunte : (s.totalRendu + s.totalARendre);
+  const denom = s.totalEmprunte > 0 ? s.totalEmprunte : (s.totalRendu + s.resteARendre);
   const repayPct = denom > 0 ? Math.min(100, (s.totalRendu / denom) * 100) : 0;
 
   return `
@@ -40,7 +40,8 @@ function renderDetteSummaryCard() {
       <div class="card-head">
         <div class="card-title" style="color:var(--month)">Total Dette</div>
         <div class="card-preview" style="text-align:right">
-          À rendre : ${money(s.totalARendre)} DH<br>
+          Emprunté (total) : ${money(s.totalEmprunte)} DH<br>
+          Reste à rendre : ${money(s.resteARendre)} DH<br>
           <span class="small-label success">Rendu : ${money(s.totalRendu)} DH</span>
         </div>
       </div>
@@ -75,7 +76,7 @@ function renderKindBlock(kind) {
   const isDette = kind === "dette";
   const cats = getCategoriesByKind(kind);
   const s = summarySnapshot();
-  const total = isDette ? s.totalARendre : s.totalEpargne;
+  const total = isDette ? s.resteARendre : s.totalEpargne;
   const border = isDette ? "var(--month)" : "var(--week)";
   const title = isDette ? "Dettes" : "Épargne";
   const addKey = `dettes-add:${kind}`;

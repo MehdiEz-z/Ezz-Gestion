@@ -68,11 +68,11 @@ export function totalBalanceByKind(typeBloc) {
 }
 
 export function summarySnapshot() {
-  const totalARendre = totalBalanceByKind("dette");
+  const resteARendre = totalBalanceByKind("dette");
   const totalRendu = state.synthese.cumul_remboursements;
   const totalEmprunte = state.synthese.cumul_emprunts;
   return {
-    totalARendre,
+    resteARendre,
     totalRendu,
     totalEmprunte,
     totalEpargne: totalBalanceByKind("epargne"),
