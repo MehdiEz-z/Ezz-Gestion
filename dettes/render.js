@@ -40,7 +40,7 @@ function renderDetteSummaryCard() {
       <div class="card-head">
         <div class="card-title" style="color:var(--month)">Total Dette</div>
         <div class="card-preview" style="text-align:right">
-          Emprunté (total) : ${money(s.totalEmprunte)} DH<br>
+          Emprunté : ${money(s.totalEmprunte)} DH<br>
           Reste à rendre : ${money(s.resteARendre)} DH<br>
           <span class="small-label success">Rendu : ${money(s.totalRendu)} DH</span>
         </div>
