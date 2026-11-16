@@ -5,13 +5,22 @@ import { guardFormSubmit, isSubmitBusy } from "./submit-busy.js";
 export let currentUser = null;
 export let isAdmin = false;
 
+/** Rôles Supabase (raw_user_meta_data.role) : ADMIN | VISITEUR */
+export const ROLE_ADMIN = "ADMIN";
+export const ROLE_VISITEUR = "VISITEUR";
+
 export function setCurrentUser(user) {
   currentUser = user;
 }
 
+function normalizeRole(role) {
+  return typeof role === "string" ? role.trim().toUpperCase() : "";
+}
+
 export function updateAccessRights() {
   const meta = currentUser && currentUser.user_metadata;
-  isAdmin = !!(meta && meta.role === "admin");
+  const role = normalizeRole(meta && meta.role);
+  isAdmin = role === ROLE_ADMIN;
   document.body.classList.toggle("read-only-mode", !isAdmin);
 }
 
