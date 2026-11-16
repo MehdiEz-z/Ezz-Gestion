@@ -1,3 +1,4 @@
+import { loadSubTab } from "../shared/ui-persist.js";
 import { fetchStateFromSupabase, ui } from "./data.js";
 import { render } from "./render.js";
 import { setupEvents } from "./events.js";
@@ -24,6 +25,8 @@ export async function activate() {
   } else {
     await fetchStateFromSupabase();
   }
+  ui.subTab = loadSubTab("dettes", ui.subTab);
+  if (ui.subTab !== "dette" && ui.subTab !== "epargne") ui.subTab = "dette";
   render();
 }
 
