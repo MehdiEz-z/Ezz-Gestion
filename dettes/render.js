@@ -7,9 +7,13 @@ export function render() {
   preserveScroll(() => {
     document.getElementById("maison-controls").style.display = "none";
     document.getElementById("header-title").textContent = "Dettes & épargne";
-    document.getElementById("subtabs").innerHTML = "";
-    document.getElementById("main").innerHTML = `
-      <div class="stack">${renderDetteBlock()}${renderEpargneBlock()}</div>`;
+    document.getElementById("subtabs").innerHTML = `
+      <button type="button" class="subtab ${ui.subTab === "dette" ? "active" : ""}" data-action="set-subtab" data-tab="dette">Dettes</button>
+      <button type="button" class="subtab ${ui.subTab === "epargne" ? "active" : ""}" data-action="set-subtab" data-tab="epargne">Épargne</button>`;
+
+    const main = document.getElementById("main");
+    const body = ui.subTab === "epargne" ? renderEpargneBlock() : renderDetteBlock();
+    main.innerHTML = `<div class="stack">${body}</div>`;
     document.getElementById("modal-root").innerHTML = ui.modal ? renderModal() : "";
   });
 }

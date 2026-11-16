@@ -1,5 +1,5 @@
 import { getActiveModule } from "../shared/router.js";
-import { dismissModal } from "../shared/ui-persist.js";
+import { dismissModal, saveSubTab } from "../shared/ui-persist.js";
 import { ui, addCategory, applyCategoryAmount } from "./data.js";
 import { render } from "./render.js";
 import { guardFormSubmit } from "../shared/submit-busy.js";
@@ -24,7 +24,15 @@ async function onClick(e) {
   if (!target) return;
   const action = target.dataset.action;
 
-  if (action === "toggle-card") {
+  if (action === "set-subtab") {
+    const tab = target.dataset.tab;
+    if (tab !== "dette" && tab !== "epargne") return;
+    ui.subTab = tab;
+    saveSubTab("dettes", tab);
+    ui.modal = null;
+    render();
+  }
+  else if (action === "toggle-card") {
     const key = target.dataset.key;
     if (ui.expanded.has(key)) ui.expanded.delete(key);
     else ui.expanded.add(key);
