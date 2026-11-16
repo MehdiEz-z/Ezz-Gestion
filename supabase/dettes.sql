@@ -1,33 +1,33 @@
 -- Dettes & épargne v2 (balance par catégorie, hors trésorerie)
 
-create table debt_categories (
+create table dette_categorie (
   id uuid primary key default gen_random_uuid(),
-  name text not null,
-  kind text not null check (kind in ('dette', 'epargne')),
-  balance numeric(12, 2) not null default 0 check (balance >= 0),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  nom text not null,
+  type_bloc text not null check (type_bloc in ('dette', 'epargne')),
+  solde numeric(12, 2) not null default 0 check (solde >= 0),
+  date_creation timestamptz not null default now(),
+  date_modification timestamptz not null default now()
 );
 
-create unique index debt_categories_name_kind on debt_categories (kind, lower(trim(name)));
+create unique index dette_categorie_nom_type_bloc on dette_categorie (type_bloc, lower(trim(nom)));
 
-create table debt_stats (
-  scope text primary key default 'global',
-  total_borrowed_dette numeric(12, 2) not null default 0 check (total_borrowed_dette >= 0),
-  total_repaid_dette numeric(12, 2) not null default 0 check (total_repaid_dette >= 0),
-  updated_at timestamptz not null default now()
+create table dette_synthese_globale (
+  cle text primary key default 'global',
+  cumul_emprunts numeric(12, 2) not null default 0 check (cumul_emprunts >= 0),
+  cumul_remboursements numeric(12, 2) not null default 0 check (cumul_remboursements >= 0),
+  date_modification timestamptz not null default now()
 );
 
-insert into debt_stats (scope) values ('global')
-  on conflict (scope) do nothing;
+insert into dette_synthese_globale (cle) values ('global')
+  on conflict (cle) do nothing;
 
-alter table debt_categories enable row level security;
-alter table debt_stats enable row level security;
+alter table dette_categorie enable row level security;
+alter table dette_synthese_globale enable row level security;
 
-drop policy if exists "debt_categories_all" on debt_categories;
-drop policy if exists "debt_stats_all" on debt_stats;
+drop policy if exists "dette_categorie_all" on dette_categorie;
+drop policy if exists "dette_synthese_globale_all" on dette_synthese_globale;
 
-create policy "debt_categories_all" on debt_categories for all to authenticated using (true) with check (true);
-create policy "debt_stats_all" on debt_stats for all to authenticated using (true) with check (true);
+create policy "dette_categorie_all" on dette_categorie for all to authenticated using (true) with check (true);
+create policy "dette_synthese_globale_all" on dette_synthese_globale for all to authenticated using (true) with check (true);
 
-grant select, insert, update, delete on debt_categories, debt_stats to authenticated;
+grant select, insert, update, delete on dette_categorie, dette_synthese_globale to authenticated;
