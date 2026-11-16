@@ -51,12 +51,12 @@ function renderDetteSummaryCard() {
 }
 
 function renderCategoryRow(c) {
-  const bal = Number(c.balance);
-  const inTitle = c.kind === "dette" ? "Emprunt" : "Versement";
-  const outTitle = c.kind === "dette" ? "Remboursement" : "Retrait";
+  const bal = Number(c.solde);
+  const inTitle = c.type_bloc === "dette" ? "Emprunt" : "Versement";
+  const outTitle = c.type_bloc === "dette" ? "Remboursement" : "Retrait";
   return `
     <li class="item-row">
-      <div class="item-name">${esc(c.name)}</div>
+      <div class="item-name">${esc(c.nom)}</div>
       <div class="item-amount">${money(bal)} DH</div>
       <div class="item-actions">
         ${isAdmin ? `
@@ -122,14 +122,14 @@ function renderModal() {
   const c = getCategory(m.categoryId);
   if (!c) return "";
   const isIn = m.sign === "in";
-  const actionLabel = c.kind === "dette"
+  const actionLabel = c.type_bloc === "dette"
     ? (isIn ? "Emprunt" : "Remboursement")
     : (isIn ? "Versement" : "Retrait");
 
   return `
     <div class="overlay" data-overlay-close="modal">
       <div class="sheet">
-        <div class="sheet-title">${esc(c.name)} <button type="button" class="close-btn" data-action="close-modal">✕</button></div>
+        <div class="sheet-title">${esc(c.nom)} <button type="button" class="close-btn" data-action="close-modal">✕</button></div>
         <p class="small-label" style="margin-bottom:12px">${actionLabel}</p>
         <form class="form-col" data-form="debt-amount" data-category-id="${c.id}" data-sign="${m.sign}">
           <input class="field" name="amount" type="number" min="0.01" step="0.01" placeholder="Montant" required autofocus />
